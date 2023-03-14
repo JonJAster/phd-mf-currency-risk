@@ -21,37 +21,29 @@ const COUNTRY_GROUPS = Dict(
     ]
 )
 
-const INPUT_FILESTRING_BASE = "./Data/Raw Data/Mutual Funds"
-const OUTPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds"
+const INPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Cleaned Files"
+const OUTPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Grouped Files"
 const DATESTRING = r"\d{4}-\d{2}"
 
-function load_file_by_parts(folder)
+function load_file_by_parts(folder, debug_mode=false)
+    read_limit = debug_mode ? 500 : nothing
     folderstring = joinpath(INPUT_FILESTRING_BASE, folder)
     files = readdir(folderstring)
     data = DataFrame()
 
     for file in files
         filestring = joinpath(folderstring, file)
-        read_data = CSV.read(filestring, DataFrame)
+        read_data = CSV.read(filestring, DataFrame, limit=read_limit)
         
-        if folder == "info"
-            raw_names = names(read_data)
-            underscored_names = replace.(raw_names, r"\s+\(" => "_")
-            bracket_stripped_names = replace.(underscored_names, r"\)" => "")
-            dashed_names = replace.(bracket_stripped_names, r"\s+" => "-")
-            rename!(read_data, lowercase.(dashed_names))
-        else
-            start_date::String7 = match(DATESTRING, names(read_data)[4]).match
+        if folder != "info"
+            start_date = match(DATESTRING, names(read_data)[4]).match
             number_of_other_dates = size(read_data, 2) - 4
             data_dates = [Date(start_date) + Month(i) for i in 0:number_of_other_dates]
-
-            rename!(
-                read_data,
-                Symbol.([
-                    lowercase.(names(read_data)[1:3])...,
-                    Dates.format.(data_dates, "yyyy-mm")...
-                ])
+            
+            column_names = Symbol.(
+                [names(read_data)[1:3]; Dates.format.(data_dates, "yyyy-mm")]
             )
+            rename!(read_data, column_names)
         end
 
         data = vcat(data, read_data)
@@ -87,26 +79,43 @@ function save_file_by_country_group(data, folder, group_map)
     end
 end
 
-function main()
+function test(folder, secid_to_group)
+    if folder == "info"
+        data = info
+    else
+        data = load_file_by_parts(folder, false)
+    end
+
+    save_file_by_country_group(data, folder, secid_to_group)
+end
+
+function main(debug_mode=false)
+    main_time_start = time()
     # Load info data first to build a map from fundid to domicile country group
     info = load_file_by_parts("info")
 
     info[!, :country_group] .= map_country_to_group.(info[!, :domicile])
     secid_to_group = Dict(zip(info[!, :secid], info[!, :country_group]))
+    println("Regrouping files...")
 
     for folder in FIELD_FOLDERS
-        time_start = time()
-        println("Processing folder: $folder")
+        folder_time_start = time()
+        
+        test(folder, secid_to_group)
+        # if folder == "info"
+        #     data = info
+        # else
+        #     data = load_file_by_parts(folder, debug_mode)
+        # end
 
-        if folder == "info"
-            data = info
-        else
-            data = load_file_by_parts(folder)
-        end
-
-        save_file_by_country_group(data, folder, secid_to_group)
-        println("Finished in $(round(time() - time_start, digits=2)) seconds")
+        # save_file_by_country_group(data, folder, secid_to_group)
+        folder_duration = round(time() - folder_time_start, digits=2)
+        println("Processed folder $folder in $folder_duration seconds")
     end
+    main_duration = round(time() - main_time_start, digits=2)
+    println("Finished refining mutual fund data in $main_duration seconds")
 end
 
-main()
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

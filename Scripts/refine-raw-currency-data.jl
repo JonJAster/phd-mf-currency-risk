@@ -201,7 +201,7 @@ function main()
     CSV.write("$OUTPUT_FILESTRING_BASE/currency_rates.csv", currency_table)
 
     time_duration = round(time() - time_start, digits=2)
-    println("Finished generating currency data in $time_duration seconds")
+    println("Finished refining currency data in $time_duration seconds")
 end
 
 main()
