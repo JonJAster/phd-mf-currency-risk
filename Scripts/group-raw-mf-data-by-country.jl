@@ -25,6 +25,8 @@ const INPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Cleaned Files"
 const OUTPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Grouped Files"
 const DATESTRING = r"\d{4}-\d{2}"
 
+const EXPLICIT_TYPES = Dict("FundId"=>String15, "SecId"=>String15)
+
 function load_file_by_parts(folder, debug_mode=false)
     read_limit = debug_mode ? 500 : nothing
     folderstring = joinpath(INPUT_FILESTRING_BASE, folder)
@@ -33,15 +35,20 @@ function load_file_by_parts(folder, debug_mode=false)
 
     for file in files
         filestring = joinpath(folderstring, file)
-        read_data = CSV.read(filestring, DataFrame, limit=read_limit)
+        read_data = (
+            CSV.read(filestring, DataFrame, limit=read_limit, types=EXPLICIT_TYPES,
+                     stringtype=String, truestrings=["Yes"], falsestrings=["No"])
+        )
         
-        if folder != "info"
+        if folder == "info"
+            normalise_headings!(read_data)
+        else
             start_date = match(DATESTRING, names(read_data)[4]).match
             number_of_other_dates = size(read_data, 2) - 4
             data_dates = [Date(start_date) + Month(i) for i in 0:number_of_other_dates]
             
             column_names = Symbol.(
-                [names(read_data)[1:3]; Dates.format.(data_dates, "yyyy-mm")]
+                [lowercase.(names(read_data)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
             )
             rename!(read_data, column_names)
         end
@@ -50,6 +57,19 @@ function load_file_by_parts(folder, debug_mode=false)
     end
 
     return data
+end
+
+function normalise_headings!(data_part)
+    raw_names = names(data_part)
+    re_whitespace_plus_bracket = r"[^\S\r\n]+\("
+    re_close_bracket = r"\)"
+    re_remaining_whitespace = r"\s+"
+
+    underscored_names = replace.(raw_names, re_whitespace_plus_bracket => "_")
+    bracket_stripped_names = replace.(underscored_names, re_close_bracket => "")
+    dashed_names = replace.(bracket_stripped_names, re_remaining_whitespace => "-")
+
+    rename!(data_part, lowercase.(dashed_names))
 end
 
 function map_country_to_group(country::AbstractString)
@@ -66,7 +86,7 @@ map_country_to_group(::Missing) = return "other"
 function save_file_by_country_group(data, folder, group_map)
     for group in [keys(COUNTRY_GROUPS)..., "other"]
         # Split the dataframe into a subset of rows with the given country group
-        data_split = data[map(secid -> get(group_map, String15(secid), ""),
+        data_split = data[map(secid -> get(group_map, secid, ""),
                           data[!, :secid]) .== group, :]
 
         filestring = joinpath(OUTPUT_FILESTRING_BASE, folder, "mf_$(folder)_$group.csv")
@@ -77,16 +97,6 @@ function save_file_by_country_group(data, folder, group_map)
 
         CSV.write(filestring, data_split)
     end
-end
-
-function test(folder, secid_to_group)
-    if folder == "info"
-        data = info
-    else
-        data = load_file_by_parts(folder, false)
-    end
-
-    save_file_by_country_group(data, folder, secid_to_group)
 end
 
 function main(debug_mode=false)
@@ -101,14 +111,13 @@ function main(debug_mode=false)
     for folder in FIELD_FOLDERS
         folder_time_start = time()
         
-        test(folder, secid_to_group)
-        # if folder == "info"
-        #     data = info
-        # else
-        #     data = load_file_by_parts(folder, debug_mode)
-        # end
+        if folder == "info"
+            data = info
+        else
+            data = load_file_by_parts(folder, debug_mode)
+        end
 
-        # save_file_by_country_group(data, folder, secid_to_group)
+        save_file_by_country_group(data, folder, secid_to_group)
         folder_duration = round(time() - folder_time_start, digits=2)
         println("Processed folder $folder in $folder_duration seconds")
     end
