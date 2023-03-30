@@ -10,6 +10,7 @@ const RATE_SETTLEMENTS = ["spot", "forward"]
 const RATE_LEVELS = ["bid", "mid", "ask"]
 const INVERTED_RATE_LEVELS = Dict("bid" => "ask", "mid" => "mid", "ask" => "bid")
 const RATE_TYPES =  Iterators.product(RATE_SETTLEMENTS, RATE_LEVELS)
+const RATE_TYPE_NAMES = (vec ∘ collect)("$(a)_$b" for (a,b) in RATE_TYPES)
 const DATE_FORMAT = DateFormat("dd/mm/yyyy")
 
 const CIP_VIOLATIONS = [
@@ -93,9 +94,9 @@ function push_source_to_rate_sets!(currency_rate_sets, series_source, rate_data)
             series_source.f_denom
         )
         
-        push!(currency_rate_sets[("spot", checked_level)], termcheck(spot_series, term))
+        push!(currency_rate_sets[("spot", level)], termcheck(spot_series, term))
         push!(
-            currency_rate_sets[("forward", checked_level)], termcheck(forward_series, term)
+            currency_rate_sets[("forward", level)], termcheck(forward_series, term)
         )
     end
 end
@@ -149,7 +150,7 @@ function remove_cip_violations!(currency_table)
             .& (currency_table[:, :date] .>= Date(i.start_date))
             .& (currency_table[:, :date] .<= Date(i.end_date))
         )
-        rate_columns = collect("$(a)_$b" for (a, b) in RATE_TYPES) |> vec
+        rate_columns = RATE_TYPE_NAMES
 
         currency_table[cip_violation_mask, rate_columns] .= missing
     end
@@ -195,8 +196,10 @@ function main()
     currency_table = vcat(currency_series...)
     currency_table[!, :date] = lastdayofmonth.(currency_table[!, :date])
 
+    dropmissing!(currency_table, RATE_TYPE_NAMES, disallowmissing=false)
     remove_cip_violations!(currency_table)
     end_euro_constituents!(currency_table)
+    sort!(currency_table, [:cur_code, :date])
     
     CSV.write("$OUTPUT_FILESTRING_BASE/currency_rates.csv", currency_table)
 
@@ -204,4 +207,6 @@ function main()
     println("Finished refining currency data in $time_duration seconds")
 end
 
-main()
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

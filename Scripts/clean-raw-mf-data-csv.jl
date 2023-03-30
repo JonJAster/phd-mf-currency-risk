@@ -49,9 +49,9 @@ function cleanfile(data_part)
     open(data_part, "r+") do file
         @TryIO content = read(file, String)
 
-        content = remove_empty_quotes(content)
+        #content = remove_empty_quotes(content)
         content = remove_linefeed_chars_in_values(content)
-        #content = remove_delimeters_in_values(content)
+        content = remove_thousand_separating_commas(content)
 
         seek(file, 0)
         @TryIO write(file, content)
@@ -60,9 +60,9 @@ function cleanfile(data_part)
     end
 end
 
-remove_empty_quotes(string) = replace(string, r"\"\"" => "")
+#remove_empty_quotes(string) = replace(string, r"\"\"" => "")
 remove_linefeed_chars_in_values(string) = replace(string, r"(?!<\r)\n" => "")
-#remove_delimeters_in_values(string) = replace(string, r"," => "")
+remove_thousand_separating_commas(string) = replace(string, r",(?=\d{3}(,\d{3})*\")" => "")
 
 function main()
     # The format of the csv files provided by Morningstar can cause slowdowns and errors

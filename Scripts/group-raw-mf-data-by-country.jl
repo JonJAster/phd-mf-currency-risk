@@ -25,13 +25,14 @@ const INPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Cleaned Files"
 const OUTPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Grouped Files"
 const DATESTRING = r"\d{4}-\d{2}"
 
-const EXPLICIT_TYPES = Dict("FundId"=>String15, "SecId"=>String15)
+const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
+const DATA_COLS = Not([:name, :fundid, :secid])
 
 function load_file_by_parts(folder, debug_mode=false)
     read_limit = debug_mode ? 500 : nothing
     folderstring = joinpath(INPUT_FILESTRING_BASE, folder)
     files = readdir(folderstring)
-    data = DataFrame()
+    data_parts = DataFrame[]
 
     for file in files
         filestring = joinpath(folderstring, file)
@@ -51,12 +52,29 @@ function load_file_by_parts(folder, debug_mode=false)
                 [lowercase.(names(read_data)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
             )
             rename!(read_data, column_names)
+            
+            read_data = (drop_missing_ids ∘ drop_empty_rows)(read_data)
         end
 
-        data = vcat(data, read_data)
+        push!(data_parts, read_data)
     end
 
+    data = vcat(data_parts...) |> drop_empty_cols
     return data
+end
+
+drop_missing_ids(df) = dropmissing(df, [:fundid, :secid])
+
+function drop_empty_rows(df)
+    where_data_exists = .!ismissing.(df[!, DATA_COLS])
+    any_data = reduce(.|, eachcol(where_data_exists))
+    return df[any_data, :]
+end
+
+function drop_empty_cols(df)
+    where_data_exists = .!ismissing.(df)
+    any_data = any.(eachcol(where_data_exists))
+    return df[:, any_data]
 end
 
 function normalise_headings!(data_part)
@@ -99,6 +117,20 @@ function save_file_by_country_group(data, folder, group_map)
     end
 end
 
+function regroup_data(folder, secid_to_group, info, debug_mode=false)
+    folder_time_start = time()
+    if folder == "info"
+        data = info
+    else
+        data = load_file_by_parts(folder, debug_mode)
+    end
+
+    save_file_by_country_group(data, folder, secid_to_group)
+        
+    folder_duration = round(time() - folder_time_start, digits=2)
+    println("Processed folder $folder in $folder_duration seconds")
+end
+
 function main(debug_mode=false)
     main_time_start = time()
     # Load info data first to build a map from fundid to domicile country group
@@ -109,18 +141,9 @@ function main(debug_mode=false)
     println("Regrouping files...")
 
     for folder in FIELD_FOLDERS
-        folder_time_start = time()
-        
-        if folder == "info"
-            data = info
-        else
-            data = load_file_by_parts(folder, debug_mode)
-        end
-
-        save_file_by_country_group(data, folder, secid_to_group)
-        folder_duration = round(time() - folder_time_start, digits=2)
-        println("Processed folder $folder in $folder_duration seconds")
+        regroup_data(folder, secid_to_group, info, debug_mode)
     end
+
     main_duration = round(time() - main_time_start, digits=2)
     println("Finished refining mutual fund data in $main_duration seconds")
 end
