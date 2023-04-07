@@ -4,7 +4,7 @@ using Statistics
 using ShiftedArrays: lead, lag
 
 const INPUT_FILESTRING = "./Data/Refined Data/Currencies/currency_rates.csv"
-const OUTPUT_FILESTRING = "./Data/Refined Data/Currencies/currency_factors.csv"
+const OUTPUT_FILESTRING = "./Data/Processed Data/Currencies/currency_factors.csv"
 
 const BASKET_ALLOCATION_ORDER = Dict(
     # Quantile number => Order that that quantile receives a currency added to the sample

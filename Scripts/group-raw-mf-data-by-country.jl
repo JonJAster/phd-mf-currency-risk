@@ -52,8 +52,10 @@ function load_file_by_parts(folder, debug_mode=false)
                 [lowercase.(names(read_data)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
             )
             rename!(read_data, column_names)
-            
+            global before = read_data
             read_data = (drop_missing_ids ∘ drop_empty_rows)(read_data)
+            global after = read_data
+            sum(ismissing.(before.secid)) > 0 && error("stop and read")
         end
 
         push!(data_parts, read_data)
@@ -62,7 +64,8 @@ function load_file_by_parts(folder, debug_mode=false)
     data = vcat(data_parts...) |> drop_empty_cols
     return data
 end
-
+sum(ismissing.(before.secid))
+sum(ismissing.(after.fundid))
 drop_missing_ids(df) = dropmissing(df, [:fundid, :secid])
 
 function drop_empty_rows(df)
