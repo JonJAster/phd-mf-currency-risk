@@ -21,8 +21,8 @@ const COUNTRY_GROUPS = Dict(
     ]
 )
 
-const INPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Cleaned Files"
-const OUTPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Grouped Files"
+const INPUT_FILESTRING_BASE = "./data/prepared/mutual-funds/cleaned"
+const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds/regrouped"
 const DATESTRING = r"\d{4}-\d{2}"
 
 const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
@@ -64,9 +64,9 @@ function load_file_by_parts(folder, debug_mode=false)
     data = vcat(data_parts...) |> drop_empty_cols
     return data
 end
-sum(ismissing.(before.secid))
-sum(ismissing.(after.fundid))
-drop_missing_ids(df) = dropmissing(df, [:fundid, :secid])
+# sum(ismissing.(before.secid))
+# sum(ismissing.(after.fundid))
+# drop_missing_ids(df) = dropmissing(df, [:fundid, :secid])
 
 function drop_empty_rows(df)
     where_data_exists = .!ismissing.(df[!, DATA_COLS])

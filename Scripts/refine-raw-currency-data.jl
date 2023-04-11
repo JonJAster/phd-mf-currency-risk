@@ -3,8 +3,8 @@ using DataFrames
 using DataStructures
 using Dates
 
-const INPUT_FILESTRING_BASE = "./Data/Raw Data/Currencies"
-const OUTPUT_FILESTRING_BASE = "./Data/Refined Data/Currencies"
+const INPUT_FILESTRING_BASE = "./data/raw/currencies"
+const OUTPUT_FILESTRING_BASE = "./data/prepared/currencies"
 
 const RATE_SETTLEMENTS = ["spot", "forward"]
 const RATE_LEVELS = ["bid", "mid", "ask"]

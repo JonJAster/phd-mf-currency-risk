@@ -2,8 +2,8 @@ using CSV
 using DataFrames
 using ShiftedArrays: lead, lag
 
-const INPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Grouped Files"
-const OUTPUT_FILESTRING_BASE = "./Data/Processed Data/Mutual Funds"
+const INPUT_FILESTRING_BASE = "./data/cleaned/mutual-funds/regrouped"
+const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds"
 
 const ID_COLUMNS = [:name, :fundid, :secid]
 

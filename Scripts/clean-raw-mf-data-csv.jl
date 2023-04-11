@@ -4,8 +4,8 @@ const FIELD_FOLDERS = [
     "usd-monthly-net-returns"
 ]
 
-const INPUT_FILESTRING_BASE = "./Data/Raw Data/Mutual Funds"
-const OUTPUT_FILESTRING_BASE = "./Data/Refined Data/Mutual Funds/Cleaned Files"
+const INPUT_FILESTRING_BASE = "./data/raw/mutual-funds"
+const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds/cleaned"
 const PERMISSION_DENIED = 13
 
 macro TryIO(expr, timeout_seconds=120, wait_seconds=10)
