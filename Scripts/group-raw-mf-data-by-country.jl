@@ -21,25 +21,28 @@ const COUNTRY_GROUPS = Dict(
     ]
 )
 
-const INPUT_FILESTRING_BASE = "./data/prepared/mutual-funds/cleaned"
-const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds/regrouped"
+const INPUT_FILESTRING_BASE = "./data/raw/mutual-funds"
+const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds"
 const DATESTRING = r"\d{4}-\d{2}"
 
 const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
 const DATA_COLS = Not([:name, :fundid, :secid])
 
-function load_file_by_parts(folder, debug_mode=false)
-    read_limit = debug_mode ? 500 : nothing
+function load_file_by_parts(folder)
     folderstring = joinpath(INPUT_FILESTRING_BASE, folder)
     files = readdir(folderstring)
     data_parts = DataFrame[]
 
     for file in files
         filestring = joinpath(folderstring, file)
-        read_data = (
-            CSV.read(filestring, DataFrame, limit=read_limit, types=EXPLICIT_TYPES,
-                     stringtype=String, truestrings=["Yes"], falsestrings=["No"])
-        )
+        if folder == "monthly-net-assets"
+            read_data = read_without_thousands_separators(filestring)
+        else
+            read_data = CSV.read(
+                filestring, DataFrame, types=EXPLICIT_TYPES, stringtype=String,
+                truestrings=["Yes"], falsestrings=["No"]
+            )
+        end
         
         if folder == "info"
             normalise_headings!(read_data)
@@ -52,10 +55,10 @@ function load_file_by_parts(folder, debug_mode=false)
                 [lowercase.(names(read_data)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
             )
             rename!(read_data, column_names)
-            global before = read_data
+            #global before = read_data
             read_data = (drop_missing_ids ∘ drop_empty_rows)(read_data)
-            global after = read_data
-            sum(ismissing.(before.secid)) > 0 && error("stop and read")
+            #global after = read_data
+            #sum(ismissing.(before.secid)) > 0 && error("stop and read")
         end
 
         push!(data_parts, read_data)
@@ -64,9 +67,24 @@ function load_file_by_parts(folder, debug_mode=false)
     data = vcat(data_parts...) |> drop_empty_cols
     return data
 end
-# sum(ismissing.(before.secid))
-# sum(ismissing.(after.fundid))
-# drop_missing_ids(df) = dropmissing(df, [:fundid, :secid])
+
+function read_without_thousands_separators(filestring)
+    open(filestring, "r") do file
+        datastring = read(file, String)
+
+        datastring = remove_thousand_separating_commas(datastring)
+
+        read_data = CSV.read(
+            IOBuffer(datastring), DataFrame, types=EXPLICIT_TYPES
+        )
+
+        return read_data
+    end
+end
+
+remove_thousand_separating_commas(string) = replace(string, r",(?=\d{3}(,\d{3})*\")" => "")
+
+drop_missing_ids(df) = dropmissing(df, [:fundid, :secid])
 
 function drop_empty_rows(df)
     where_data_exists = .!ismissing.(df[!, DATA_COLS])
@@ -82,7 +100,7 @@ end
 
 function normalise_headings!(data_part)
     raw_names = names(data_part)
-    re_whitespace_plus_bracket = r"[^\S\r\n]+\("
+    re_whitespace_plus_bracket = r"\s+\("
     re_close_bracket = r"\)"
     re_remaining_whitespace = r"\s+"
 
@@ -120,12 +138,12 @@ function save_file_by_country_group(data, folder, group_map)
     end
 end
 
-function regroup_data(folder, secid_to_group, info, debug_mode=false)
+function regroup_data(folder, secid_to_group, info)
     folder_time_start = time()
     if folder == "info"
         data = info
     else
-        data = load_file_by_parts(folder, debug_mode)
+        data = load_file_by_parts(folder)
     end
 
     save_file_by_country_group(data, folder, secid_to_group)
@@ -134,7 +152,7 @@ function regroup_data(folder, secid_to_group, info, debug_mode=false)
     println("Processed folder $folder in $folder_duration seconds")
 end
 
-function main(debug_mode=false)
+function main()
     main_time_start = time()
     # Load info data first to build a map from fundid to domicile country group
     info = load_file_by_parts("info")
@@ -144,7 +162,7 @@ function main(debug_mode=false)
     println("Regrouping files...")
 
     for folder in FIELD_FOLDERS
-        regroup_data(folder, secid_to_group, info, debug_mode)
+        regroup_data(folder, secid_to_group, info)
     end
 
     main_duration = round(time() - main_time_start, digits=2)
@@ -154,3 +172,6 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
+
+# sum(ismissing.(before.secid))
+# sum(ismissing.(after.fundid))
