@@ -47,8 +47,6 @@ function push_data_part!(data_field_set, folder, country_group)
         push!(data_field_set, stacked_data)
     end
 end
-    
-
 
 function main()
     x = load_dataset("other")
@@ -57,43 +55,3 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
-
-# test for any missing values in any id columns for each of the field FIELD_FOLDERS
-function test_missing_values()
-    for folder in FIELD_FOLDERS
-        for country_group in COUNTRY_GROUPS
-            filestring = joinpath(INPUT_FILESTRING_BASE, folder, "mf_$(folder)_$country_group.csv")
-            data_field = CSV.read(filestring, DataFrame)
-            for id_column in ID_COLUMNS
-                if any(ismissing, data_field[!, id_column])
-                    println("Missing values in $id_column for $folder in $country_group")
-                end
-            end
-        end
-    end
-end
-
-test_missing_values()
-
-# in each of the 7 dataframes held in testdfs, check for missing values in any of the first four columns
-for (i,df) in enumerate(testdfs)
-    missing_values = ismissing.(df[:, ID_COLUMNS])
-
-    for (j, col) in enumerate(eachcol(missing_values))
-        if any(col)
-            println("Missing values in column $j in dataframe $i")
-        end
-    end
-end
-
-findfirst(ismissing, first(testdfs).fundid)
-
-testdfs[1][1520, :]
-
-testfolder = joinpath(INPUT_FILESTRING_BASE, "local-monthly-gross-returns", "mf_local-monthly-gross-returns_other.csv")
-
-testdf = CSV.read(testfolder, DataFrame)
-
-findfirst(ismissing, testdf.fundid)
-
-testdf[1520, :]
