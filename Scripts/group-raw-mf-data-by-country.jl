@@ -55,10 +55,10 @@ function load_file_by_parts(folder)
                 [lowercase.(names(read_data)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
             )
             rename!(read_data, column_names)
-            #global before = read_data
+            global before = read_data
             read_data = (drop_missing_ids ∘ drop_empty_rows)(read_data)
-            #global after = read_data
-            #sum(ismissing.(before.secid)) > 0 && error("stop and read")
+            global after = read_data
+            sum(ismissing.(before.fundid)) > 0 && error("stop and read")
         end
 
         push!(data_parts, read_data)
@@ -84,7 +84,13 @@ end
 
 remove_thousand_separating_commas(string) = replace(string, r",(?=\d{3}(,\d{3})*\")" => "")
 
-drop_missing_ids(df) = dropmissing(df, [:fundid, :secid])
+function drop_missing_ids(df)
+    fundid_not_empty = df.fundid .!= ""
+    secid_not_empty = df.secid .!= ""
+    no_empty_ids = df[fundid_not_empty .& secid_not_empty, :]
+    no_missing_ids = dropmissing(no_empty_ids, [:fundid, :secid])
+    return no_missing_ids
+end
 
 function drop_empty_rows(df)
     where_data_exists = .!ismissing.(df[!, DATA_COLS])
@@ -175,3 +181,93 @@ end
 
 # sum(ismissing.(before.secid))
 # sum(ismissing.(after.fundid))
+
+# Debugging code
+
+# for group in union(keys(COUNTRY_GROUPS), ["other"])
+#     println("Checking $group")
+#     dataset = DataFrame[]
+#     for folder in FIELD_FOLDERS
+#         timestart = time()
+#         filestring = joinpath("./data/prepared/mutual-funds", folder, "mf_$(folder)_$group.csv")
+#         df = CSV.read(filestring, DataFrame)
+#         push!(dataset, df)
+#     end
+
+#     total_missing = 0
+
+#     for (i,df) in enumerate(dataset)
+#         num_missing = sum(ismissing, df[!, :fundid])
+#         total_missing += num_missing
+#         num_missing > 0 && println("missing fundids in df$i: $num_missing")
+#     end
+
+#     println("\ntotal missing: $total_missing\n")
+# end
+
+# This testing code loads all data for FIELD_FOLDERS[3] and checks for missing secids where the domicile is "irl-bra"
+# folderstring = joinpath("./data/raw/mutual-funds", FIELD_FOLDERS[3])
+# files = readdir(folderstring)
+# missing_secid_rows = []
+# info = load_file_by_parts("info")
+# for file in files
+#     filestring = joinpath(folderstring, file)
+#     println(filestring)
+#     df = CSV.read(filestring, DataFrame)
+#     function correct_domicile(secid)
+#         ismissing(secid) && return false
+#         secid_lookup = info[info[!, :secid] .== secid,:]
+#         size(secid_lookup, 1) == 0 && return false
+#         return first(secid_lookup[!, :domicile]) == "irl-bra"
+#     end
+#     push!(missing_secid_rows, df[correct_domicile.(df.SecId), :])
+# end
+
+# Identify the first row with a missing fundid in the irl-bra dataframe for FIELD_FOLDERS[3] in the prepared data
+# folderstring = joinpath("./data/prepared/mutual-funds", FIELD_FOLDERS[3])
+# filestring = joinpath(folderstring, "mf_$(FIELD_FOLDERS[3])_irl-bra.csv")
+
+# df = CSV.read(filestring, DataFrame)
+
+# first_missing_row = findfirst(ismissing, df[!, :fundid])
+# row = df[first_missing_row, 1:5]
+# println("First missing row: $row")
+# debug_secid = row.secid
+
+# # Find the raw file for FIELD_FOLDERS[3] that contains the secid for the first missing row\
+# folderstring = joinpath("./data/raw/mutual-funds", FIELD_FOLDERS[3])
+# files = readdir(folderstring)
+# debug_raw_file = DataFrame()
+# for file in files
+#     filestring = joinpath(folderstring, file)
+#     df = CSV.read(filestring, DataFrame)
+#     if any(df[!, :SecId] .== debug_secid)
+#         println("Found in $filestring")
+#         debug_raw_file = df
+#         break
+#     end
+# end
+
+# # Find the row
+# debug_row = debug_raw_file[debug_raw_file[!, :SecId] .== debug_secid, 1:5]
+
+# # It's missing in the raw file
+# names(debug_raw_file)
+# dropped = drop_missing_ids(debug_raw_file)
+
+# function debug_prep(read_data)
+#     start_date = match(DATESTRING, names(read_data)[4]).match
+#     number_of_other_dates = size(read_data, 2) - 4
+#     data_dates = [Date(start_date) + Month(i) for i in 0:number_of_other_dates]
+
+#     column_names = Symbol.(
+#         [lowercase.(names(read_data)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
+#     )
+#     rename!(read_data, column_names)
+#     return read_data
+# end
+
+# x = debug_prep(debug_raw_file)
+# y = drop_missing_ids(x)
+
+# y[y.secid .== debug_secid, 1:5]
