@@ -4,7 +4,7 @@ using Statistics
 using ShiftedArrays: lead, lag
 
 const INPUT_FILESTRING = "./data/prepared/currencies/currency_rates.csv"
-const OUTPUT_FILESTRING = "./data/transformed/currencies/currency_factors.csv"
+const OUTPUT_FILESTRING_BASE = "./data/transformed/currencies"
 
 const BASKET_ALLOCATION_ORDER = Dict(
     # Quantile number => Order that that quantile receives a currency added to the sample
@@ -188,6 +188,11 @@ function main()
 
     currency_factors = compute_factors(basket_rates)
 
+    if !isdir(OUTPUT_FILESTRING_BASE)
+        mkpath(OUTPUT_FILESTRING_BASE)
+    end
+
+    OUTPUT_FILESTRING = joinpath(OUTPUT_FILESTRING_BASE, "currency_factors.csv")
     CSV.write(OUTPUT_FILESTRING, currency_factors)
 end
 
