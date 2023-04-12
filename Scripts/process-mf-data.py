@@ -4,10 +4,12 @@ import statsmodels.api as sm
 import scipy.stats as stats
 import re
 import os
-import progressbar as pb
+import multiprocessing
+from pandas.tseries.offsets import MonthEnd
+from datetime import datetime
 
-COUNTRY_GROUPS = ["lux", "kor", "usa", "can-chn-jpn", "irl-bra", "gbr-fra-ind",
-                  "esp-tha-aus-zaf-mex-aut-che", "other"]
+COUNTRY_GROUPS = {0: "lux", 1: "kor", 2: "usa", 3: "can-chn-jpn", 4: "irl-bra",
+                  5: "gbr-fra-ind", 6: "esp-tha-aus-zaf-mex-aut-che", 7: "other"}
 
 # Define Assisting Functions
 def load_data(filename_base, country_group_code, series_type, value_name=None,\
@@ -41,7 +43,6 @@ def load_data(filename_base, country_group_code, series_type, value_name=None,\
         The loaded and formatted data to be read.
 
     """
-    
     # --- SCRUB INPUTS ---
     # Place solitary cs_dates input into a list.
     if isinstance(cs_dates, str):
@@ -113,8 +114,6 @@ def panelmerge(dflist, how="outer"):
     """
 
     # Start a progress bar
-    bar = pb.ProgressBar(max_value = 2)
-    bar.update(0)
     for i in dflist:
         # For the first dataframe, set the return variable to that
         # DataFrame. For every subsequent DataFrame, merge it with the
@@ -124,7 +123,6 @@ def panelmerge(dflist, how="outer"):
         else:
             df_return = df_return.merge(i, on=["fundid", "secid", "date"],
                                         how=how)
-            bar.update(bar.value + 1)
     
     return df_return
 
@@ -223,6 +221,306 @@ def agg_verify(df_in, column_names, return_concurrents=False):
         
     return output
 
+def polate_assets(df_in, how="interpolate", keep=False, retain_testdata=False):
+    """
+    This function either interpolates, extrapolates or both interpolates
+    and extrapolates values of net assets within fund classes within a
+    given dataframe.
+    
+    Parameters
+    ----------
+    df_in : DataFrame
+        The data to be interpolated and/or extrapolated.
+    how : {"interpolate", "extrapolate", "both", False},
+        default "interpolate"
+        The method to be used to add additional observations
+    keep : bool, default False
+        If True, the returned dataframe will retain the original net
+        assets column
+    retain_testdata : bool, default False
+        If true, the returned dataframe will contain some additional
+        columns useful for testing the accuracy of the algorithm
+        
+    Returns
+    -------
+    df_return : DataFrame
+        A DataFrame containing the extended version of the original data.
+    """
+    
+    # --- SCRUB INPUTS ---
+    # Validate how, and immediately return if how=False.
+    if not how:
+        return df_in
+    elif how not in ["interpolate", "extrapolate", "both"]:
+        raise ValueError("how must be 'interpolate', 'extrapolate',"
+                        "'both' or False.")
+    
+    # Validate keep
+    if keep not in [True, False]:
+        raise ValueError("keep must be True or False.")
+        
+    # Validate retain_testdata
+    if retain_testdata not in [True, False]:
+        raise ValueError("retain_testdata must be True or False.")
+    
+    # --- PREPARE DATA ---
+    # Copy the input DataFrame, and drop all missing values of net
+    # assets, ensuring that all observations are ordered by secid and
+    # date. 
+    df_assetobs = (
+        df_in.copy().sort_values(by=["fundid", "secid", "date"])
+                    .dropna(subset=["net_assets"])
+                    .loc[:, ["secid", "date"]]
+    )
+    
+    # --- PROCESS DATA ---
+
+    # Assign a cumulative count column grouped by secid.
+    df_assetobs["polation_id"] = df_assetobs.groupby("secid").cumcount()
+    
+    # Left merge the cumulative count column back into the original
+    # DataFrame by secid and date, providing a unique ID to each
+    # nonmissing observation of net_assets for a given secid.
+    df_main = pd.merge(df_in, df_assetobs, on=["secid", "date"], how="left")
+
+    # Back fill the polation ID within each secid. The purpose of this
+    # backfilling is so to group together consecutive missing
+    # observations with the next available nonmissing observation.
+    df_main["polation_id"] = df_main.groupby("secid").polation_id.bfill()
+    
+    # All nan values of polation_id now occur either after the last
+    # non-missing observation for a given fund class or where a fund
+    # class has no non-missing values of net assets. The latter case
+    # will fail when extrapolating anyway, so there is no need to
+    # distinguish these two groups. Assign all missing values of
+    # polation ID a value of "00", which will be used for extrapolation.
+    df_main.polation_id.fillna("00", inplace=True)
+
+    # Each polation group (except groups labelled 0) should be
+    # associated with a base value of net assets which was the value
+    # of net assets in the nonmissing observation immediately preceeding
+    # the start of that interpolation group. This can be obtained by
+    # forward filling net asset observations within a secid and then
+    # shifting the forward-filled data forward by one place within that
+    # secid. By forward filling net assets, we ensure that every missing
+    # observation of net assets can see the most recent nonmissing
+    # value. Still, the nonmissing value immediately following that
+    # sequence of missing values cannot yet see the base value.
+    # Additionally, the most recent nonmissing observation itself can
+    # see the base value for that group (it's own value of net assets),
+    # but does not need to see this value during the interpolation. So,
+    # by shifting the forward-filled column forward once, the entire
+    # polation group can see the most recent nonmissing value of net
+    # assets.
+    df_main["polation_group_asset_base"] = (
+        df_main.groupby("secid").net_assets.ffill()
+    )
+    df_main["polation_group_asset_base"] = (
+        df_main.groupby("secid").polation_group_asset_base.shift(1)
+    )
+
+    # For polation groups labelled 0, the asset target should be the net
+    # assets of the first nonmissing observation. These polation groups
+    # are now the only ones with a nan value for
+    # polation_group_asset_base, so we achieve this by filling nan
+    # values with a backfilled series of net assets within each secid.
+    df_main.polation_group_asset_base.fillna(df_main.groupby("secid")
+                                                    .net_assets
+                                                    .bfill(), inplace=True)
+    
+    # Define a multiplicative net return column (1 + net return/100),
+    # from which a cumulative net return column can be defined
+    df_main["multret_net"] = df_main.ret_net_m/100 + 1
+    
+    # Multiplicative return will be NaN if net return is missing. To
+    # ensure that interpolation completes even where some return values
+    # are missing within a polation group, these NaN values will be
+    # replaced by 1. The error this introduces into the interpolation
+    # will be redistributed evenly across the group when the discrepancy
+    # is accounted for. The error introduced into extrapolation in this
+    # way would be significant and impossible to account for, so NaNs
+    # will later be placed back into the cumulative return series for
+    # extrapolation groups and propogated outwards away from the
+    # nonmissing net asset series.
+    df_main.multret_net.fillna(1, inplace=True)
+
+    # Define a cumulative net return column within each polation group
+    # for use in predicting net assets within that group absent the
+    # impact of fund inflows and outflows.
+    df_main["cumret_net"] = (
+        df_main.groupby(["secid", "polation_id"]).multret_net.cumprod()
+    )
+
+    # Cumulative return can be multiplied by the asset base to arrive at
+    # a predicted value for net assets excluding discrepancies for that
+    # position for any polation group not labelled 0. To achieve the
+    # same functionality for polation groups labelled 0, all cumulative
+    # returns for that group should be divided by the value for
+    # cumulative return of the first nonmissing net assets observation
+    # for that secid. By dividing all cumulative returns by the same
+    # value, we don't change the property that each return within that
+    # group is equal to the cumulative return of the previous observation
+    # multiplied by the net return of the current observation, but now
+    # the cumulative product for the final observation in that group
+    # (the observation with the first nonmissing value of net assets)
+    # will be 1. So, multiplying net assets for each observation in that
+    # group with the new cumulative return will result in a series of
+    # net asset values that are each equal to the previous net assests
+    # value grown by the current net return in a way that ends up
+    # equalling the known value of net assets for the first nonmissing
+    # observation.
+        
+    # Define a column to hold the next available value of multiplicative
+    # return within each secid. Begin by copying the multiplicative
+    # returns column but setting all values for observations with
+    # missing net assets back to NaN so that the first non-NaN value
+    # can be backfilled, then backfill the new column within each secid.
+    df_main["cumret_divisor"] = np.where(df_main.net_assets.isnull(),
+                                        np.nan, df_main.cumret_net)
+    df_main["cumret_divisor"] = df_main.groupby(["secid"]).cumret_divisor.bfill()
+    
+    # Divide the cumulative return by the divisor value for that
+    # observation only if the polation group id is 0.
+    df_main["cumret_net"] = np.where(df_main.polation_id == 0,
+                                    df_main.cumret_net/df_main.cumret_divisor,
+                                    df_main.cumret_net)
+
+
+    # Missing values of multiplicative return have previously been
+    # replaced with 1, but this solution does not work for
+    # extrapolation, so the first observation with a missing return in
+    # a polation group labelled 0 or 00 should have its cumulative
+    # return set to NaN, and this NaN value should be propogated outward
+    # away from the series of nonmissing asset observations. It is
+    # possible to propogate non-NaN values across NaN values, but not
+    # the other way around, so we create a column to flag observations
+    # that should be set to NaN and set the value of this flag to NaN
+    # for non-flagged observations, then propogate the flag.
+    df_main["stop_backextrapolation_flag"] = (
+        np.where((df_main.polation_id == 0) & (df_main.ret_net_m.isnull()),
+                1, np.nan)
+    )
+    df_main["stop_backextrapolation_flag"] = (
+        df_main.groupby("secid").stop_backextrapolation_flag.bfill()
+    )
+    
+    df_main["stop_forwardextrapolation_flag"] = (
+        np.where((df_main.polation_id == "00") & (df_main.ret_net_m.isnull()),
+                1, np.nan)
+    )
+    df_main["stop_forwardextrapolation_flag"] = (
+        df_main.groupby("secid").stop_forwardextrapolation_flag.ffill()
+    )
+    
+    # Now nullify flagged values of cumulative return
+    df_main["cumret_net"] = (
+        np.where((df_main.stop_backextrapolation_flag == 1)
+                | (df_main.stop_forwardextrapolation_flag == 1),
+                np.nan, df_main.cumret_net)
+    )
+
+    # Predict net assets absent the impact of fund inflows and outflows
+    # (and other errors).
+    df_main["net_assets_recalculated_exflows"] = (
+        df_main.cumret_net * df_main.polation_group_asset_base
+    )
+    
+    # The effect of fund inflows and outflows (and other errors if they
+    # exist) across the time-series of a single polation group is given
+    # by the ratio of the actual value of net assets in the final
+    # observation for that polation group (which is always nonmissing)
+    # and the calculated net assets excluding fund flows for that
+    # observation. We define a discrepancy column which is equal to 1
+    # (no change) both before the first nonmissing observation and
+    # after the final nonmissing observation in each group, and then
+    # calculate the required ratio, which will be NaN for any
+    # observation with missing net assets. Finally, we backfill this
+    # new column so that each polation group can see the discrepancy of
+    # the next nonmissing observation.
+    df_main["asset_discrepancy"] = (
+        np.where((df_main.polation_id == 0) | (df_main.polation_id == "00"),
+                1, df_main.net_assets/df_main.net_assets_recalculated_exflows)
+    )
+    df_main["asset_discrepancy"] = (
+        df_main.groupby("secid").asset_discrepancy.bfill()
+    )
+
+    # Although the total discrepancy is known to each observation within
+    # a polation group, for interpolations we must still determine how
+    # far through the interpolation that observation appears so that the
+    # impact of fund flows can be evenly distributed across the group.
+    # For that we must know the total duration of the time series for
+    # that interpolation group as well as where each observation appears
+    # within the time series.
+
+    # First, create a new dataframe that holds the duration of each
+    # interpolation group time series, then merge that field back into
+    # the original dataframe so that each observation within the group
+    # can see that total.
+    df_polationduration = (
+        df_main.groupby(["secid", "polation_id"]).polation_id.count()
+            .to_frame().rename(columns={"polation_id": "polation_duration"})
+            .reset_index()
+    )
+
+    df_main = pd.merge(df_main, df_polationduration,
+                    on=["secid", "polation_id"],
+                    how="left").reset_index(drop=True)
+
+    # Second, assign a cumulative count column within each polation
+    # group.
+    df_main["polation_progress"] = (
+        df_main.groupby(["secid", "polation_id"]).cumcount() + 1
+    )
+    
+    # Update recaluculated net assets by taking into acccount asset
+    # discrepancies (for polation groups 0 and "00", where
+    # asset_discrepancy is 1, this will have no effect)
+    df_main["net_assets_recalculated"] = (
+        df_main.net_assets_recalculated_exflows
+        * df_main.asset_discrepancy**(df_main.polation_progress
+                                    / df_main.polation_duration)
+    )
+    
+    # If only "interpolation" is desired, nullify recalculated assets
+    # over extrapolation groups. Likewise, if only "extrapolation" is
+    # desired, nullify recalculated assets over interpolation groups.
+    if(how=="interpolate"):
+        df_main.loc[df_main.polation_id.isin([0,"00"]),
+                    "net_assets_recalculated"] = np.nan
+    elif(how=="extrapolate"):
+        df_main.loc[~df_main.polation_id.isin([0,"00"]),
+                    "net_assets_recalculated"] = np.nan
+    
+    # Ensure that the index of the inputted dataframe will align with
+    # the index of the recalculated asset values.
+    df_return = df_in.copy().reset_index(drop=True)
+
+    # Retain the original net assets if either of keep or
+    # retain_testdata is True.
+    if keep or retain_testdata:
+        df_return["net_assets_original"] = df_return.net_assets
+    
+    # If retain_testdata is True, also retain some of the intermediate
+    # columns.
+    if retain_testdata:
+        df_return = (
+            pd.concat([df_return, df_main.loc[:, ["multret_net",
+                                                "cumret_net",
+                                                "net_assets_recalculated",
+                                                "net_assets_recalculated_exflows",
+                                                "asset_discrepancy",
+                                                "polation_id",
+                                                "polation_duration",
+                                                "polation_progress"]]],
+                    axis=1)
+        )
+            
+    # Fill null values of net_assets with the recalculated series.
+    df_return.net_assets.fillna(df_main.net_assets_recalculated, inplace=True)
+    
+    return df_return
+
 def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_method,
                       strict_eq, exc_finre, inv_targets, inc_agefilter):
     """
@@ -254,6 +552,9 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         If True, additional DataFrames will be saved that include only age-filtered mutual
         fund data, as well as the non-filtered DataFrames.
     """    
+    # Grab the process ID and start time
+    process_id = os.getpid()
+    start_time = datetime.now()
 
     # Fund information
     df_mfinfo = load_data("info", country_group_code, series_type="cross",
@@ -283,6 +584,9 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     df_mfcat = load_data("monthly-morningstar-category", country_group_code,
                         series_type="panel", value_name="morningstar_category",
                         exp_dtype=object)
+    
+    elapsed_time = datetime.now() - start_time
+    print(f"Process {process_id} ({country_group_code}): Finished loading data ({elapsed_time} passed since process start)")
     
     # Combine panel data
     # Combine only the data that is required to remove unneccessary return rows, that being
@@ -328,11 +632,14 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     # Merge in country of domicile.
     df_mf = (
-        df_mf.merge(df_mfinfo.loc[:,["secid", "country"]])
+        df_mf.merge(df_mfinfo.loc[:,["secid", "domicile"]])
     )
 
     # Clear unused memory
     del df_mfrets, df_mfna, df_mfcat
+    
+    elapsed_time = datetime.now() - start_time
+    print(f"Process {process_id} ({country_group_code}): Finished merging data ({elapsed_time} passed since process start)")
 
     # For the age-filtered funds dataset, we want eventually to only include
     # observations after the first 24 months, but many other filters need to
@@ -371,313 +678,11 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         "United States": "USA"
     }
 
-    df_mf.country = df_mf.country.apply(lambda x: ISO[x])
+    df_mf.domicile = df_mf.domicile.apply(lambda x: ISO[x])
 
     # Clean net assets
     # Filter out asset observations equal to zero.
     df_mf.loc[df_mf.net_assets == 0, "net_assets"] = np.nan
-
-    # Define a function that will interpolate and extrapolate net assets in a given
-    # dataframe
-
-    def polate_assets(df_in, how="interpolate", keep=False, retain_testdata=False):
-        """
-        This function either interpolates, extrapolates or both interpolates
-        and extrapolates values of net assets within fund classes within a
-        given dataframe.
-        
-        Parameters
-        ----------
-        df_in : DataFrame
-            The data to be interpolated and/or extrapolated.
-        how : {"interpolate", "extrapolate", "both", False},
-            default "interpolate"
-            The method to be used to add additional observations
-        keep : bool, default False
-            If True, the returned dataframe will retain the original net
-            assets column
-        retain_testdata : bool, default False
-            If true, the returned dataframe will contain some additional
-            columns useful for testing the accuracy of the algorithm
-            
-        Returns
-        -------
-        df_return : DataFrame
-            A DataFrame containing the extended version of the original data.
-        """
-        
-        # --- SCRUB INPUTS ---
-        # Validate how, and immediately return if how=False.
-        if not how:
-            return df_in
-        elif how not in ["interpolate", "extrapolate", "both"]:
-            raise ValueError("how must be 'interpolate', 'extrapolate',"
-                            "'both' or False.")
-        
-        # Validate keep
-        if keep not in [True, False]:
-            raise ValueError("keep must be True or False.")
-            
-        # Validate retain_testdata
-        if retain_testdata not in [True, False]:
-            raise ValueError("retain_testdata must be True or False.")
-        
-        # --- PREPARE DATA ---
-        # Copy the input DataFrame, and drop all missing values of net
-        # assets, ensuring that all observations are ordered by secid and
-        # date. 
-        df_assetobs = (
-            df_in.copy().sort_values(by=["fundid", "secid", "date"])
-                        .dropna(subset=["net_assets"])
-                        .loc[:, ["secid", "date"]]
-        )
-        
-        # --- PROCESS DATA ---
-        # Assign a cumulative count column grouped by secid.
-        df_assetobs["polation_id"] = df_assetobs.groupby("secid").cumcount()
-        
-        # Left merge the cumulative count column back into the original
-        # DataFrame by secid and date, providing a unique ID to each
-        # nonmissing observation of net_assets for a given secid.
-        df_main = pd.merge(df_in, df_assetobs, on=["secid", "date"], how="left")
-
-        # Back fill the polation ID within each secid. The purpose of this
-        # backfilling is so to group together consecutive missing
-        # observations with the next available nonmissing observation.
-        df_main["polation_id"] = df_main.groupby("secid").polation_id.bfill()
-        
-        # All nan values of polation_id now occur either after the last
-        # non-missing observation for a given fund class or where a fund
-        # class has no non-missing values of net assets. The latter case
-        # will fail when extrapolating anyway, so there is no need to
-        # distinguish these two groups. Assign all missing values of
-        # polation ID a value of "00", which will be used for extrapolation.
-        df_main.polation_id.fillna("00", inplace=True)
-
-        # Each polation group (except groups labelled 0) should be
-        # associated with a base value of net assets which was the value
-        # of net assets in the nonmissing observation immediately preceeding
-        # the start of that interpolation group. This can be obtained by
-        # forward filling net asset observations within a secid and then
-        # shifting the forward-filled data forward by one place within that
-        # secid. By forward filling net assets, we ensure that every missing
-        # observation of net assets can see the most recent nonmissing
-        # value. Still, the nonmissing value immediately following that
-        # sequence of missing values cannot yet see the base value.
-        # Additionally, the most recent nonmissing observation itself can
-        # see the base value for that group (it's own value of net assets),
-        # but does not need to see this value during the interpolation. So,
-        # by shifting the forward-filled column forward once, the entire
-        # polation group can see the most recent nonmissing value of net
-        # assets.
-        df_main["polation_group_asset_base"] = (
-            df_main.groupby("secid").net_assets.ffill()
-        )
-        df_main["polation_group_asset_base"] = (
-            df_main.groupby("secid").polation_group_asset_base.shift(1)
-        )
-
-        # For polation groups labelled 0, the asset target should be the net
-        # assets of the first nonmissing observation. These polation groups
-        # are now the only ones with a nan value for
-        # polation_group_asset_base, so we achieve this by filling nan
-        # values with a backfilled series of net assets within each secid.
-        df_main.polation_group_asset_base.fillna(df_main.groupby("secid")
-                                                        .net_assets
-                                                        .bfill(), inplace=True)
-        
-        # Define a multiplicative net return column (1 + net return/100),
-        # from which a cumulative net return column can be defined
-        df_main["multret_net"] = df_main.ret_net_m/100 + 1
-        
-        # Multiplicative return will be NaN if net return is missing. To
-        # ensure that interpolation completes even where some return values
-        # are missing within a polation group, these NaN values will be
-        # replaced by 1. The error this introduces into the interpolation
-        # will be redistributed evenly across the group when the discrepancy
-        # is accounted for. The error introduced into extrapolation in this
-        # way would be significant and impossible to account for, so NaNs
-        # will later be placed back into the cumulative return series for
-        # extrapolation groups and propogated outwards away from the
-        # nonmissing net asset series.
-        df_main.multret_net.fillna(1, inplace=True)
-
-        # Define a cumulative net return column within each polation group
-        # for use in predicting net assets within that group absent the
-        # impact of fund inflows and outflows.
-        df_main["cumret_net"] = (
-            df_main.groupby(["secid", "polation_id"]).multret_net.cumprod()
-        )
-    
-        # Cumulative return can be multiplied by the asset base to arrive at
-        # a predicted value for net assets excluding discrepancies for that
-        # position for any polation group not labelled 0. To achieve the
-        # same functionality for polation groups labelled 0, all cumulative
-        # returns for that group should be divided by the value for
-        # cumulative return of the first nonmissing net assets observation
-        # for that secid. By dividing all cumulative returns by the same
-        # value, we don't change the property that each return within that
-        # group is equal to the cumulative return of the previous observation
-        # multiplied by the net return of the current observation, but now
-        # the cumulative product for the final observation in that group
-        # (the observation with the first nonmissing value of net assets)
-        # will be 1. So, multiplying net assets for each observation in that
-        # group with the new cumulative return will result in a series of
-        # net asset values that are each equal to the previous net assests
-        # value grown by the current net return in a way that ends up
-        # equalling the known value of net assets for the first nonmissing
-        # observation.
-            
-        # Define a column to hold the next available value of multiplicative
-        # return within each secid. Begin by copying the multiplicative
-        # returns column but setting all values for observations with
-        # missing net assets back to NaN so that the first non-NaN value
-        # can be backfilled, then backfill the new column within each secid.
-        df_main["cumret_divisor"] = np.where(df_main.net_assets.isnull(),
-                                            np.nan, df_main.cumret_net)
-        df_main["cumret_divisor"] = df_main.groupby(["secid"]).cumret_divisor.bfill()
-        
-        # Divide the cumulative return by the divisor value for that
-        # observation only if the polation group id is 0.
-        df_main["cumret_net"] = np.where(df_main.polation_id == 0,
-                                        df_main.cumret_net/df_main.cumret_divisor,
-                                        df_main.cumret_net)
-
-
-        # Missing values of multiplicative return have previously been
-        # replaced with 1, but this solution does not work for
-        # extrapolation, so the first observation with a missing return in
-        # a polation group labelled 0 or 00 should have its cumulative
-        # return set to NaN, and this NaN value should be propogated outward
-        # away from the series of nonmissing asset observations. It is
-        # possible to propogate non-NaN values across NaN values, but not
-        # the other way around, so we create a column to flag observations
-        # that should be set to NaN and set the value of this flag to NaN
-        # for non-flagged observations, then propogate the flag.
-        df_main["stop_backextrapolation_flag"] = (
-            np.where((df_main.polation_id == 0) & (df_main.ret_net_m.isnull()),
-                    1, np.nan)
-        )
-        df_main["stop_backextrapolation_flag"] = (
-            df_main.groupby("secid").stop_backextrapolation_flag.bfill()
-        )
-        
-        df_main["stop_forwardextrapolation_flag"] = (
-            np.where((df_main.polation_id == "00") & (df_main.ret_net_m.isnull()),
-                    1, np.nan)
-        )
-        df_main["stop_forwardextrapolation_flag"] = (
-            df_main.groupby("secid").stop_forwardextrapolation_flag.ffill()
-        )
-        
-        # Now nullify flagged values of cumulative return
-        df_main["cumret_net"] = (
-            np.where((df_main.stop_backextrapolation_flag == 1)
-                    | (df_main.stop_forwardextrapolation_flag == 1),
-                    np.nan, df_main.cumret_net)
-        )
-    
-        # Predict net assets absent the impact of fund inflows and outflows
-        # (and other errors).
-        df_main["net_assets_recalculated_exflows"] = (
-            df_main.cumret_net * df_main.polation_group_asset_base
-        )
-        
-        # The effect of fund inflows and outflows (and other errors if they
-        # exist) across the time-series of a single polation group is given
-        # by the ratio of the actual value of net assets in the final
-        # observation for that polation group (which is always nonmissing)
-        # and the calculated net assets excluding fund flows for that
-        # observation. We define a discrepancy column which is equal to 1
-        # (no change) both before the first nonmissing observation and
-        # after the final nonmissing observation in each group, and then
-        # calculate the required ratio, which will be NaN for any
-        # observation with missing net assets. Finally, we backfill this
-        # new column so that each polation group can see the discrepancy of
-        # the next nonmissing observation.
-        df_main["asset_discrepancy"] = (
-            np.where((df_main.polation_id == 0) | (df_main.polation_id == "00"),
-                    1, df_main.net_assets/df_main.net_assets_recalculated_exflows)
-        )
-        df_main["asset_discrepancy"] = (
-            df_main.groupby("secid").asset_discrepancy.bfill()
-        )
-
-        # Although the total discrepancy is known to each observation within
-        # a polation group, for interpolations we must still determine how
-        # far through the interpolation that observation appears so that the
-        # impact of fund flows can be evenly distributed across the group.
-        # For that we must know the total duration of the time series for
-        # that interpolation group as well as where each observation appears
-        # within the time series.
-
-        # First, create a new dataframe that holds the duration of each
-        # interpolation group time series, then merge that field back into
-        # the original dataframe so that each observation within the group
-        # can see that total.
-        df_polationduration = (
-            df_main.groupby(["secid", "polation_id"]).polation_id.count()
-                .to_frame().rename(columns={"polation_id": "polation_duration"})
-                .reset_index()
-        )
-
-        df_main = pd.merge(df_main, df_polationduration,
-                        on=["secid", "polation_id"],
-                        how="left").reset_index(drop=True)
-
-        # Second, assign a cumulative count column within each polation
-        # group.
-        df_main["polation_progress"] = (
-            df_main.groupby(["secid", "polation_id"]).cumcount() + 1
-        )
-        
-        # Update recaluculated net assets by taking into acccount asset
-        # discrepancies (for polation groups 0 and "00", where
-        # asset_discrepancy is 1, this will have no effect)
-        df_main["net_assets_recalculated"] = (
-            df_main.net_assets_recalculated_exflows
-            * df_main.asset_discrepancy**(df_main.polation_progress
-                                        / df_main.polation_duration)
-        )
-        
-        # If only "interpolation" is desired, nullify recalculated assets
-        # over extrapolation groups. Likewise, if only "extrapolation" is
-        # desired, nullify recalculated assets over interpolation groups.
-        if(how=="interpolate"):
-            df_main.loc[df_main.polation_id.isin([0,"00"]),
-                        "net_assets_recalculated"] = np.nan
-        elif(how=="extrapolate"):
-            df_main.loc[~df_main.polation_id.isin([0,"00"]),
-                        "net_assets_recalculated"] = np.nan
-        
-        # Ensure that the index of the inputted dataframe will align with
-        # the index of the recalculated asset values.
-        df_return = df_in.copy().reset_index(drop=True)
-
-        # Retain the original net assets if either of keep or
-        # retain_testdata is True.
-        if keep or retain_testdata:
-            df_return["net_assets_original"] = df_return.net_assets
-        
-        # If retain_testdata is True, also retain some of the intermediate
-        # columns.
-        if retain_testdata:
-            df_return = (
-                pd.concat([df_return, df_main.loc[:, ["multret_net",
-                                                    "cumret_net",
-                                                    "net_assets_recalculated",
-                                                    "net_assets_recalculated_exflows",
-                                                    "asset_discrepancy",
-                                                    "polation_id",
-                                                    "polation_duration",
-                                                    "polation_progress"]]],
-                        axis=1)
-            )
-                
-        # Fill null values of net_assets with the recalculated series.
-        df_return.net_assets.fillna(df_main.net_assets_recalculated, inplace=True)
-        
-        return df_return
     
     # Run the interpolation/extrapolation function under the declared
     # method. Results must be resorted by date to allow for further
@@ -779,26 +784,15 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     if inv_targets:
         agg_check = agg_verify(df_mf_anyeq, ["inv_msci_class", "inv_region",
-                                                "inv_group", "inv_country",
-                                                "country"])
+                                             "inv_group", "inv_country",
+                                             "domicile"])
     else:
-        agg_check = agg_verify(df_mf_anyeq, "country")
-
-    del df_mf_anyeq
+        agg_check = agg_verify(df_mf_anyeq, "domicile")
         
-    if agg_check == []:
-        print("It is safe to aggregate across all fields.")
-    else:
-        df_mf_cat_updated_debug = df_mf_anyeq.copy()
-        agg_updated_debug = (
-            agg_verify(df_mf_anyeq, ["inv_msci_class", "inv_region",
-                                                "inv_group", "inv_country",
-                                                "country"],
-                    return_concurrents=True).reset_index()
-        )
+    if agg_check != []:
         for i in agg_check:
             print("Warning: Some fundid-date pairs contain at least two secids "
-                  "that have different classifications of "+i+".")
+                  "that have different classifications of "+i+". ("+country_group_code+")")
             
     # Lag total net assets for use in weighting fund returns
     df_mf_anyeq["net_assets_m1"] = (
@@ -855,7 +849,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         "mean_costs": ("rep_costs", lambda x: np.sum(x.values)),
         "approx_morningstar_category": ("morningstar_category",
                                         lambda x: stats.mode(x)[0][0]),
-        "dom_country": ("country", "first")
+        "domicile": ("domicile", "first")
     }
 
     # Add aggregate fund_age as the maximum age of all secids in a 
@@ -887,6 +881,9 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
                         .reset_index()
                         .sort_values(by=["fundid", "date"])
     )
+    
+    elapsed_time = datetime.now() - start_time
+    print(f"Process {process_id} ({country_group_code}): Finished aggregating funds ({elapsed_time} passed since process start)")
 
     # Calculate fund flows
     # Remove all fund assets observations of less than $100,000 USD
@@ -914,12 +911,12 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # data around those observations. Winsorise the fund_flows variable
     # at the 1st and 99th percentiles.
     df_mf_agg.fund_flow = (
-        df_mf_agg.fund_flow.clip(lower=df_mf_agg.fund_flow
-                                                .quantile(0.01,
-                                                        interpolation="lower"),
-                                upper=df_mf_agg.fund_flow
-                                                .quantile(0.99,
-                                                        interpolation="higher"))
+        df_mf_agg.fund_flow.copy().clip(lower=df_mf_agg.fund_flow
+                                                       .quantile(0.01,
+                                                                 interpolation="lower"),
+                                        upper=df_mf_agg.fund_flow
+                                                       .quantile(0.99,
+                                                                 interpolation="higher"))
     )
 
     # Correct for unrealistic mean costs
@@ -985,37 +982,31 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # Save refined data
     # Declare a filename suffix based on the particular run options that
     # were selected for this run.
-    file_suffix = ""
     if currency_type == "local":
-        file_suffix += "_local-rets"
-    elif currency_type == "usd":
-        file_suffix += "_usd-rets"
+        folder_name = "local-rets"
+    else:
+        folder_name = "usd-rets"
 
     if not raw_ret_only:
-        file_suffix += "_gret-filled"
+        folder_name += "_gret-filled"
 
     if polation_method == "both":
-        file_suffix += "_na-int-exp"
+        folder_name += "_na-int-exp"
     elif polation_method == "interpolate":
-        file_suffix += "_na-int"
+        folder_name += "_na-int"
     elif polation_method == "extrapolate":
-        file_suffix += "_na-exp"
+        folder_name += "_na-exp"
         
     if strict_eq:
         if exc_finre:
-            file_suffix += "_eq-strict-exfinre"
+            folder_name += "_eq-strict-exfinre"
         else:
-            file_suffix += "_eq-strict"
+            folder_name += "_eq-strict"
     elif exc_finre:
-            file_suffix += "_eq-exfinre"
+            folder_name += "_eq-exfinre"
 
     if inv_targets:
-        file_suffix += "_targets"
-
-    if file_suffix == "":
-        folder_name = "default"
-    else:
-        folder_name = file_suffix[1:]
+        folder_name += "_targets"
 
     folder_dir = (
         "./data/transformed/mutual-funds/{}".format(folder_name)
@@ -1026,13 +1017,13 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     df_mf.to_csv("{fld}\\mf_{ctry}.csv"
                 .format(fld=folder_dir,
-                        ctry=country_groups[country_group_code]),
+                        ctry=country_group_code),
                 index=False)
 
     if inc_agefilter:
         folder_name = (
             "./data/transformed/mutual-funds/{}_age-filtered"
-            .format(file_suffix[1:])
+            .format(folder_name[1:])
         ) 
         
         if not os.path.exists(folder_dir):
@@ -1040,7 +1031,24 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
         df_mf.to_csv("{fld}\\mf_{ctry}.csv"
                     .format(fld=folder_dir,
-                            ctry=country_groups[country_group_code]),
+                            ctry=country_group_code),
                     index=False)
+    
+    elapsed_time = datetime.now() - start_time
+    print(f"Process {process_id} ({country_group_code}): Data saved and processed ended ({elapsed_time} passed since process start)")
 
-process_fund_data("other", "local", False, False, False, False, False, True)
+def process_fund_data_wrapped(process_id):
+    process_fund_data(
+        COUNTRY_GROUPS[process_id], currency_type="local", raw_ret_only=True,
+        polation_method=False, strict_eq=False, exc_finre=False,
+        inv_targets=False, inc_agefilter=True
+    )
+
+if __name__ == "__main__":
+    main_start_time = datetime.now()
+    num_groups = len(COUNTRY_GROUPS)
+    
+    with multiprocessing.Pool(processes=4) as pool:
+        pool.map(process_fund_data_wrapped, range(num_groups))
+
+    print(f"All processes complete in {datetime.now() - main_start_time}")
