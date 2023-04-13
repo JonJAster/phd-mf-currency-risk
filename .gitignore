@@ -1,6 +1,4 @@
-data/raw/mutual-funds/
-data/raw/currencies/
-data/raw/morningstar_categories.csv
+data/raw/
 data/prepared/currencies/
 data/prepared/mutual-funds/
 data/transformed/mutual-funds/
