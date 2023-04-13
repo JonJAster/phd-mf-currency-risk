@@ -1,9 +1,9 @@
 module CommonFunctions
 
-function push_with_currency_code!(datalist, df, currency_code)
+function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)
     append_data.cur_code .= currency_code
-    append_data = append_data[:, [:cur_code, :date, :mkt]]
+    append_data = append_data[:, [:cur_code, :date, value_columns]]
     push!(datalist, append_data)
 end
 

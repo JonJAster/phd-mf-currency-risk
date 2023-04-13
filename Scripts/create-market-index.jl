@@ -27,14 +27,14 @@ function build_local_indices(market_data, rates_data)
     currency_list = unique(rates_data.cur_code)
 
     local_market_data_set = DataFrame[]
-    push_with_currency_code!(local_market_data_set, market_data, "USD")
+    push_with_currency_code!(local_market_data_set, market_data, "USD", :mkt)
 
     for currency in currency_list
         rates = rates_data[rates_data.cur_code .== currency, :]
         country_market_data = innerjoin(market_data, rates, on=:date)
         country_market_data.mkt = country_market_data.mkt .* country_market_data.spot_mid
 
-        push_with_currency_code!(local_market_data_set, country_market_data, currency)
+        push_with_currency_code!(local_market_data_set, country_market_data, currency, :mkt)
     end
 
     output = vcat(local_market_data_set...)

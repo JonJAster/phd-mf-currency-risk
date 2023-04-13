@@ -7,22 +7,33 @@ using .CommonFunctions
 const INPUT_FILESTRING_RF = "./data/raw/equities/usd_riskfree.csv"
 const INPUT_FILESTRING_FX = "./data/prepared/currencies/currency_rates.csv"
 const OUTPUT_FILESTRING_BASE = "./data/transformed/equities"
-const READ_COLUMNS_FX = [:cur_code, :date, :spot_mid, :for_mid]
+const READ_COLUMNS_FX = [:cur_code, :date, :spot_mid, :forward_mid]
 
-function build_local_rf(usd_rf, fx_data)
-    currency_list = unique(fx_data.cur_code)
+function build_local_rf(usd_rf, rates_data)
+    currency_list = unique(rates_data.cur_code)
 
     local_riskfree_set = DataFrame[]
-    push_with_currency_code!(local_riskfree_set, usd_rf, "USD")
-    
+    push_with_currency_code!(local_riskfree_set, usd_rf, "USD", :rf)
+
     for currency in currency_list
-        currency_riskfree = calculate_riskfree_by_cip(usd_rf, fx_data, currency)
-        push_with_currency_code!(local_riskfree_set, currency_riskfree, currency)
+        currency_riskfree = calculate_riskfree_by_cip(usd_rf, rates_data, currency)
+        push_with_currency_code!(local_riskfree_set, currency_riskfree, currency, :rf)
     end
 
     output = vcat(local_riskfree_set...)
     sort!(output, [:cur_code, :date])
     return output
+end
+
+function calculate_riskfree_by_cip(base_rf, rates_data, currency_code)
+    country_rates = rates_data[rates_data.cur_code .== currency_code, :]
+
+    country_riskfree = innerjoin(country_rates, base_rf, on=:date)
+    country_riskfree.rf = (
+        country_riskfree.rf ./ country_riskfree.spot_mid .* country_riskfree.forward_mid
+    )
+
+    return country_riskfree
 end
 
 function main()
