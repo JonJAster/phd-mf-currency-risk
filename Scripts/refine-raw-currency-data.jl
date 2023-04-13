@@ -197,11 +197,18 @@ function main()
     currency_table[!, :date] = lastdayofmonth.(currency_table[!, :date])
 
     dropmissing!(currency_table, RATE_TYPE_NAMES, disallowmissing=false)
-    remove_cip_violations!(currency_table)
     end_euro_constituents!(currency_table)
+
+    currency_table_cip_violated = copy(currency_table)
+    remove_cip_violations!(currency_table)
+
     sort!(currency_table, [:cur_code, :date])
-    
+    sort!(currency_table_cip_violated, [:cur_code, :date])
+
     CSV.write("$OUTPUT_FILESTRING_BASE/currency_rates.csv", currency_table)
+    CSV.write(
+        "$OUTPUT_FILESTRING_BASE/currency_rates_full.csv", currency_table_cip_violated
+    )
 
     time_duration = round(time() - time_start, digits=2)
     println("Finished refining currency data in $time_duration seconds")
