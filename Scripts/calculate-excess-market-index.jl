@@ -20,7 +20,7 @@ function main()
         mkpath(OUTPUT_FILESTRING_BASE)
     end
 
-    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, "global_MKT_excess.csv")
+    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, "global_MKT.csv")
     CSV.write(output_filestring, excess_market)
 
     time_duration = round(time() - time_start, digits=2)
