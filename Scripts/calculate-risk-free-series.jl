@@ -49,9 +49,9 @@ function main()
         mkpath(OUTPUT_FILESTRING_BASE)
     end
 
-    OUTPUT_FILESTRING = joinpath(OUTPUT_FILESTRING_BASE, "riskfree.csv")
+    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, "riskfree.csv")
 
-    CSV.write(OUTPUT_FILESTRING, local_rf)
+    CSV.write(output_filestring, local_rf)
 
     time_duration = round(time() - time_start, digits=2)
     println("Finished building local risk-free rates in $time_duration seconds")

@@ -66,9 +66,9 @@ function main()
         mkpath(OUTPUT_FILESTRING_BASE)
     end
 
-    OUTPUT_FILESTRING = joinpath(OUTPUT_FILESTRING_BASE, "global_MKT_gross.csv")
+    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, "global_MKT_gross.csv")
 
-    CSV.write(OUTPUT_FILESTRING, world_index_local)
+    CSV.write(output_filestring, world_index_local)
 
     time_duration = round(time() - time_start, digits=2)
     println("Finished creating market index in $time_duration seconds")

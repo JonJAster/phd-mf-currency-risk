@@ -32,9 +32,9 @@ function main()
         mkpath(OUTPUT_FILESTRING_BASE)
     end
 
-    OUTPUT_FILESTRING = joinpath(OUTPUT_FILESTRING_BASE, "equity_factors.csv")
+    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, "equity_factors.csv")
 
-    CSV.write(OUTPUT_FILESTRING, combined_factors)
+    CSV.write(output_filestring, combined_factors)
 
     time_duration = round(time() - time_start, digits=2)
     println("Finished combining equity factors in $time_duration seconds")
