@@ -32,7 +32,7 @@ function build_local_indices(market_data, rates_data)
     for currency in currency_list
         rates = rates_data[rates_data.cur_code .== currency, :]
         country_market_data = innerjoin(market_data, rates, on=:date)
-        country_market_data.mkt = country_market_data.mkt .* country_market_data.spot_mid
+        country_market_data.mkt_gross = country_market_data.mkt_gross .* country_market_data.spot_mid
 
         push_with_currency_code!(local_market_data_set, country_market_data, currency, :mkt_gross)
     end
@@ -40,13 +40,6 @@ function build_local_indices(market_data, rates_data)
     output = vcat(local_market_data_set...)
     sort!(output, [:cur_code, :date])
     return output
-end
-
-function push_with_currency_code!(datalist, df, currency_code)
-    append_data = copy(df)
-    append_data.cur_code .= currency_code
-    append_data = append_data[:, [:cur_code, :date, :mkt_gross]]
-    push!(datalist, append_data)
 end
 
 function main()
