@@ -8,12 +8,17 @@ include("CommonFunctions.jl")
 using .CommonFunctions
 
 const INPUT_FILESTRING_BASE_FUNDS = "./data/transformed/mutual-funds"
+const INPUT_FILESTRING_CURRENCY_FACTORS = "./data/prepared/currencies/currency_factors.csv"
 const INPUT_FILESTRING_LONGSHORT_FACTORS = "./data/prepared/equities/equity_factors.csv"
 const INPUT_FILESTRING_MARKET = "./data/transformed/equities/global_MKT_gross.csv"
 const INPUT_FILESTRING_RISKFREE = "./data/transformed/equities/riskfree.csv"
 const INPUT_FILESTRING_CURRENCY_MAP = "./data/raw/currency_to_country.csv"
 const READ_COLUMNS_FUNDS = [:fundid, :date, :ret_gross_m, :domicile]
 const OUTPUT_FILESTRING_BASE = ".data/results/"
+
+const BENCHMARK_MODELS = Dict(
+    :world_capm => 
+)
 
 function main(options_folder)
     time_start = time()
@@ -48,9 +53,9 @@ function main(options_folder)
     ]
 
     println("Running regressions...")
-    betas = timevarying_beta_regression(
-        regression_table, :fundid, :date, :ret_gross_m,
-        [:mkt, :SMB, :HML, :RMW, :CMA, :WML]
+    compute_timevarying_betas!(
+        regression_table; id_col=:fundid, date_col=:date,
+        y=:ret_gross_m, X=[:MKT, :SMB, :HML, :RMW, :CMA, :WML]
     )
 
     if !isdir(OUTPUT_FILESTRING_BASE)
