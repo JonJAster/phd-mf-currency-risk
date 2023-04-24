@@ -18,7 +18,7 @@ function aggregate_by_market_equity(df)
 
     output = groupby(df, :eom) |> x->combine(x, :weighted_mkt_vw => sum => :mkt_vw)
     output = output[:, [:eom, :mkt_vw]]
-    rename!(output, [:eom => :date, :mkt_vw => :mkt])
+    rename!(output, [:eom => :date, :mkt_vw => :mkt_gross])
     sort!(output, :date)
     return output
 end
@@ -27,14 +27,14 @@ function build_local_indices(market_data, rates_data)
     currency_list = unique(rates_data.cur_code)
 
     local_market_data_set = DataFrame[]
-    push_with_currency_code!(local_market_data_set, market_data, "USD", :mkt)
+    push_with_currency_code!(local_market_data_set, market_data, "USD", :mkt_gross)
 
     for currency in currency_list
         rates = rates_data[rates_data.cur_code .== currency, :]
         country_market_data = innerjoin(market_data, rates, on=:date)
         country_market_data.mkt = country_market_data.mkt .* country_market_data.spot_mid
 
-        push_with_currency_code!(local_market_data_set, country_market_data, currency, :mkt)
+        push_with_currency_code!(local_market_data_set, country_market_data, currency, :mkt_gross)
     end
 
     output = vcat(local_market_data_set...)
@@ -45,7 +45,7 @@ end
 function push_with_currency_code!(datalist, df, currency_code)
     append_data = copy(df)
     append_data.cur_code .= currency_code
-    append_data = append_data[:, [:cur_code, :date, :mkt]]
+    append_data = append_data[:, [:cur_code, :date, :mkt_gross]]
     push!(datalist, append_data)
 end
 
