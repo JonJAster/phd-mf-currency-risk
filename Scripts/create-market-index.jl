@@ -60,7 +60,7 @@ function main()
     end
 
     output_filestring = joinpath(OUTPUT_FILESTRING_BASE, "global_MKT_gross.csv")
-
+    println(first(world_index_local, 5))
     CSV.write(output_filestring, world_index_local)
 
     time_duration = round(time() - time_start, digits=2)

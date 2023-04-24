@@ -1,5 +1,7 @@
 module CommonFunctions
 
+using DataFrames
+
 function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)
     append_data.cur_code .= currency_code
@@ -54,7 +56,21 @@ function option_foldername(; currency_type, kwargs...)
     return folder_name
 end
 
+function group_transform!(df, group_cols, input_cols, f::Function, output_cols)
+    groupby(df, group_cols) |> x -> transform!(x, input_cols => f => output_cols)
+end
+
+function group_combine(df, group_cols, input_cols, f::Function, output_cols; cast=true)
+    if cast
+        groupby(df, group_cols) |> x -> combine(x, input_cols .=> f .=> output_cols)
+    else
+        groupby(df, group_cols) |> x -> combine(x, input_cols => f => output_cols)
+    end
+end
+
 export push_with_currency_code!
 export option_foldername
+export group_transform!
+export group_combine
 
 end

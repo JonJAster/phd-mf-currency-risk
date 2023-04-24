@@ -3,6 +3,9 @@ using DataFrames
 using Statistics
 using ShiftedArrays: lead, lag
 
+include("CommonFunctions.jl")
+using .CommonFunctions
+
 const INPUT_FILESTRING = "./data/prepared/currencies/currency_rates.csv"
 const OUTPUT_FILESTRING_BASE = "./data/transformed/currencies"
 
@@ -15,18 +18,6 @@ const BASKET_ALLOCATION_ORDER = Dict(
     5 => 3,
     6 => 1
 )
-
-function group_transform!(df, group_cols, input_cols, f::Function, output_cols)
-    groupby(df, group_cols) |> x -> transform!(x, input_cols => f => output_cols)
-end
-
-function group_combine(df, group_cols, input_cols, f::Function, output_cols; cast=true)
-    if cast
-        groupby(df, group_cols) |> x -> combine(x, input_cols .=> f .=> output_cols)
-    else
-        groupby(df, group_cols) |> x -> combine(x, input_cols => f => output_cols)
-    end
-end
 
 function compute_delta_spot!(df)
     group_on = :cur_code

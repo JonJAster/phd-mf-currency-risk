@@ -2,13 +2,15 @@ using DataFrames
 using CSV
 using GLM
 using Dates
+using Base.Threads
 
 include("CommonFunctions.jl")
 using .CommonFunctions
 
 const INPUT_FILESTRING_BASE_FUNDS = "./data/transformed/mutual-funds"
 const INPUT_FILESTRING_LONGSHORT_FACTORS = "./data/prepared/equities/equity_factors.csv"
-const INPUT_FILESTRING_MARKET = "./data/transformed/equities/global_MKT.csv"
+const INPUT_FILESTRING_MARKET = "./data/transformed/equities/global_MKT_gross.csv"
+const INPUT_FILESTRING_RISKFREE = "./data/transformed/equities/riskfree.csv"
 const INPUT_FILESTRING_CURRENCY_MAP = "./data/raw/currency_to_country.csv"
 const READ_COLUMNS_FUNDS = [:fundid, :date, :ret_gross_m, :domicile]
 const OUTPUT_FILESTRING_BASE = ".data/results/"
@@ -19,7 +21,8 @@ function main(options_folder)
     println("Loading data...")
     fund_data = load_fund_data(options_folder, select=READ_COLUMNS_FUNDS)
     longshort_factors = CSV.read(INPUT_FILESTRING_LONGSHORT_FACTORS, DataFrame)
-    market_factor = CSV.read(INPUT_FILESTRING_MARKET, DataFrame, dateformat="dd/mm/yyyy")
+    market_factor = CSV.read(INPUT_FILESTRING_MARKET, DataFrame)
+    risk_free = CSV.read(INPUT_FILESTRING_RISKFREE, DataFrame)
     currency_map = CSV.read(INPUT_FILESTRING_CURRENCY_MAP, DataFrame)
 
     fund_data.date = Dates.lastdayofmonth.(fund_data.date)
@@ -28,16 +31,24 @@ function main(options_folder)
     fund_data.cur_code = map_currency(fund_data.date, fund_data.domicile, currency_map)
 
     full_data = (
-        innerjoin(fund_data, longshort_factors, on=:date) |> partialjoin ->
-        innerjoin(partialjoin, market_factor, on=[:cur_code, :date], matchmissing=:notequal)
+        innerjoin(fund_data, longshort_factors, on=:date) |>
+        partialjoin -> innerjoin(
+            partialjoin, risk_free, on=[:cur_code, :date], matchmissing=:notequal
+        ) |>
+        partialjoin -> innerjoin(
+            partialjoin, market_factor, on=[:cur_code, :date], matchmissing=:notequal
+        )
     )
     
+    full_data.MKT = full_data.mkt_gross - full_data.rf
+    full_data.ret = full_data.ret_gross_m - full_data.rf
+
     regression_table = full_data[:,
-        [:fundid, :date, :ret_gross_m, :mkt, :SMB, :HML, :RMW, :CMA, :WML]
+        [:fundid, :date, :ret, :MKT, :SMB, :HML, :RMW, :CMA, :WML]
     ]
 
     println("Running regressions...")
-    betas = regress_timevarying_betas(
+    betas = timevarying_beta_regression(
         regression_table, :fundid, :date, :ret_gross_m,
         [:mkt, :SMB, :HML, :RMW, :CMA, :WML]
     )
@@ -69,7 +80,7 @@ end
 function map_currency(date_series, country_series, currency_map)
     currency_series = Vector{Union{Missing, String}}(fill(missing, length(date_series)))
 
-    for i in 1:length(date_series)
+    @threads for i in 1:length(date_series)
         date = date_series[i]
         country = country_series[i]
 
@@ -93,6 +104,14 @@ function not_outside(date, start_date, end_date)
     !ismissing(start_date) && date < start_date && return false
     !ismissing(end_date) && date > end_date && return false
     return true
+end
+
+function timevarying_beta_regression(regression_table, group_col, date_col, y, X)
+    regression_groups = groupby(regression_table, group_col)
+    betas_by_group = transform(
+        regression_groups,
+        [date_col, y, X] => (date, y, X) -> regress_group(date, y, X) => :beta
+    )
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
