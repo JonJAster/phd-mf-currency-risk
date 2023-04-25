@@ -22,6 +22,7 @@ function build_local_rf(usd_rf, rates_data)
 
     output = vcat(local_riskfree_set...)
     sort!(output, [:cur_code, :date])
+    dropmissing!(output, :rf)
     return output
 end
 

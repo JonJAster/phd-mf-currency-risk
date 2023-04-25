@@ -1,6 +1,8 @@
 module CommonFunctions
 
 using DataFrames
+using Base.Threads
+using Dates
 
 function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)
@@ -60,17 +62,33 @@ function group_transform!(df, group_cols, input_cols, f::Function, output_cols)
     groupby(df, group_cols) |> x -> transform!(x, input_cols => f => output_cols)
 end
 
+function group_transform(df, group_cols, input_cols, f::Function, output_cols)
+    output = groupby(df, group_cols) |> x -> transform(x, input_cols => f => output_cols)
+
+    return output
+end
+
 function group_combine(df, group_cols, input_cols, f::Function, output_cols; cast=true)
     if cast
-        groupby(df, group_cols) |> x -> combine(x, input_cols .=> f .=> output_cols)
+        output = (
+            groupby(df, group_cols) |> x -> combine(x, input_cols .=> f .=> output_cols)
+        )
     else
-        groupby(df, group_cols) |> x -> combine(x, input_cols => f => output_cols)
+        output = (
+            groupby(df, group_cols) |> x -> combine(x, input_cols => f => output_cols)
+        )
     end
+
+    return output
 end
+
+offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofmonth
 
 export push_with_currency_code!
 export option_foldername
 export group_transform!
+export group_transform
 export group_combine
+export offset_monthend
 
 end

@@ -17,14 +17,27 @@ const READ_COLUMNS_FUNDS = [:fundid, :date, :ret_gross_m, :domicile]
 const OUTPUT_FILESTRING_BASE = ".data/results/"
 
 const BENCHMARK_MODELS = Dict(
-    :world_capm => 
+    :world_capm => [:MKT],
+    :world_ff3 => [:MKT, :SMB, :HML],
+    :world_ff5 => [:MKT, :SMB, :HML, :RMW, :CMA],
+    :world_ffcarhart => [:MKT, :SMB, :HML, :WML],
+    :world_ff6 => [:MKT, :SMB, :HML, :RMW, :CMA, :WML]
 )
+const CURRENCYRISK_MODELS = Dict(
+    :lrv => [:hml_fx, :rx],
+    :lrv_net => [:hml_fx_net, :rx_net],
+    :verdelhan => [:carry, :dollar]
+)
+const COMPLETE_MODELS = Iterators.product(keys(CURRENCYRISK_MODELS), keys(BENCHMARK_MODELS))
+
+const BETA_LAGS = 24
 
 function main(options_folder)
     time_start = time()
 
     println("Loading data...")
     fund_data = load_fund_data(options_folder, select=READ_COLUMNS_FUNDS)
+    currency_factors = CSV.read(INPUT_FILESTRING_CURRENCY_FACTORS, DataFrame)
     longshort_factors = CSV.read(INPUT_FILESTRING_LONGSHORT_FACTORS, DataFrame)
     market_factor = CSV.read(INPUT_FILESTRING_MARKET, DataFrame)
     risk_free = CSV.read(INPUT_FILESTRING_RISKFREE, DataFrame)
@@ -37,6 +50,7 @@ function main(options_folder)
 
     full_data = (
         innerjoin(fund_data, longshort_factors, on=:date) |>
+        partialjoin -> innerjoin(partialjoin, currency_factors, on=:date) |>
         partialjoin -> innerjoin(
             partialjoin, risk_free, on=[:cur_code, :date], matchmissing=:notequal
         ) |>
@@ -48,15 +62,27 @@ function main(options_folder)
     full_data.MKT = full_data.mkt_gross - full_data.rf
     full_data.ret = full_data.ret_gross_m - full_data.rf
 
-    regression_table = full_data[:,
-        [:fundid, :date, :ret, :MKT, :SMB, :HML, :RMW, :CMA, :WML]
-    ]
-
     println("Running regressions...")
-    compute_timevarying_betas!(
-        regression_table; id_col=:fundid, date_col=:date,
-        y=:ret_gross_m, X=[:MKT, :SMB, :HML, :RMW, :CMA, :WML]
-    )
+    results_lock = ReentrantLock()
+
+    @threads for (currency_risk_model, benchmark_model) in COMPLETE_MODELS
+        benchmark_factors = BENCHMARK_MODELS[benchmark_model]
+        currency_risk_factors = CURRENCYRISK_MODELS[currency_risk_model]
+        complete_factors = vcat(benchmark_factors, currency_risk_factors)
+        model_name = Symbol("$(benchmark_model)_$(currency_risk_model)_betas")
+        
+        model_results = compute_timevarying_betas(
+            full_data; id_col=:fundid, date_col=:date, y=:ret, X=complete_factors
+        )
+
+        regressors = vcat(:const, complete_factors)
+        add_factor_names(r) = ismissing(r) ? missing : (factors=regressors, r...)
+        model_results = map(add_factor_names, model_results)
+
+        lock(results_lock) do 
+            full_data[!, model_name] = model_results
+        end
+    end
 
     if !isdir(OUTPUT_FILESTRING_BASE)
         mkpath(OUTPUT_FILESTRING_BASE)
@@ -111,15 +137,174 @@ function not_outside(date, start_date, end_date)
     return true
 end
 
-function timevarying_beta_regression(regression_table, group_col, date_col, y, X)
-    regression_groups = groupby(regression_table, group_col)
-    betas_by_group = transform(
-        regression_groups,
-        [date_col, y, X] => (date, y, X) -> regress_group(date, y, X) => :beta
+function compute_timevarying_betas(regression_table; id_col, date_col, y, X)
+    regression_results = group_transform(
+        regression_table, id_col,
+        [date_col, y, X...], timevarying_regressions, :results
     )
+
+    return regression_results.results
+end
+
+function timevarying_regressions(date, y, X_cols...)
+    datasize = length(y)
+    X_no_constant = reduce(hcat, X_cols)
+    X = hcat(ones(datasize), X_no_constant)
+    
+    data_start_date = first(date)
+    first_beta_date = offset_monthend(data_start_date, BETA_LAGS)
+    first_beta_index = findfirst(>=(first_beta_date), date)
+
+    result = Vector{Union{Missing, NamedTuple}}(fill(missing, datasize))
+    isnothing(first_beta_index) && return result
+    for i in first_beta_index:datasize
+        sub_start_date = offset_monthend(date[i], -BETA_LAGS)
+        sub_start_index = findfirst(>=(sub_start_date), date)
+        sub_y = y[sub_start_index:i]
+        sub_X = X[sub_start_index:i, :]
+
+        nonmissing_y = findall(!ismissing, sub_y)
+        complete_sub_y = Vector{Float64}(sub_y[nonmissing_y])
+        complete_sub_X = sub_X[nonmissing_y, :]
+
+        regfit = lm(complete_sub_X, complete_sub_y)
+        regvalues = coeftable(regfit).cols
+        
+        result[i] = (betas=regvalues[1], pvalues=regvalues[4])
+    end
+    return result
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     options_folder = option_foldername(currency_type="local")
     main(options_folder)
 end
+
+# AUTOTEST SECTION
+if false
+    options_folder = option_foldername(currency_type="local")
+    println("Loading data...")
+    fund_data = load_fund_data(options_folder, select=READ_COLUMNS_FUNDS)
+    currency_factors = CSV.read(INPUT_FILESTRING_CURRENCY_FACTORS, DataFrame)
+    longshort_factors = CSV.read(INPUT_FILESTRING_LONGSHORT_FACTORS, DataFrame)
+    market_factor = CSV.read(INPUT_FILESTRING_MARKET, DataFrame)
+    risk_free = CSV.read(INPUT_FILESTRING_RISKFREE, DataFrame)
+    currency_map = CSV.read(INPUT_FILESTRING_CURRENCY_MAP, DataFrame)
+
+    fund_data.date = Dates.lastdayofmonth.(fund_data.date)
+
+    println("Mapping countries to currencies...")
+    fund_data.cur_code = map_currency(fund_data.date, fund_data.domicile, currency_map)
+
+    full_data = (
+        innerjoin(fund_data, longshort_factors, on=:date) |>
+        partialjoin -> innerjoin(partialjoin, currency_factors, on=:date) |>
+        partialjoin -> innerjoin(
+            partialjoin, risk_free, on=[:cur_code, :date], matchmissing=:notequal
+        ) |>
+        partialjoin -> innerjoin(
+            partialjoin, market_factor, on=[:cur_code, :date], matchmissing=:notequal
+        )
+    )
+
+    full_data.MKT = full_data.mkt_gross - full_data.rf
+    full_data.ret = full_data.ret_gross_m - full_data.rf
+
+    id_col=:fundid
+    date_col=:date
+    y=:ret
+
+    (currency_risk_model, benchmark_model) = first(COMPLETE_MODELS)
+
+    if false
+        benchmark_factors = BENCHMARK_MODELS[benchmark_model]
+        currency_risk_factors = CURRENCYRISK_MODELS[currency_risk_model]
+        complete_factors = vcat(benchmark_factors, currency_risk_factors)
+        model_name = Symbol("$(benchmark_model)_plus_$(currency_risk_model)")
+        X=complete_factors
+
+        regression_table = copy(full_data)
+
+        gb = groupby(regression_table, :fundid)
+        gb1 = first(gb)
+        date = gb1[:, date_col]
+        y = gb1[:, y]
+        X_cols = [gb1[:, factor] for factor in X]
+
+        datasize = length(y)
+        X_no_constant = reduce(hcat, X_cols)
+        X = hcat(ones(datasize), X_no_constant)
+
+        nonmissing_rets = findall(!ismissing, y)
+        date = date[nonmissing_rets]
+        y = Vector{Float64}(y[nonmissing_rets])
+        X = X[nonmissing_rets, :]
+    end
+end
+#END AUTOTEST SECTION
+
+# for i in unique(full_data.fundid)
+#     df = full_data[full_data.fundid .== i, :]
+#     count = length(df.ret)
+#     fullcount = length(collect(skipmissing(df.ret)))
+
+#     if count == 49 && fullcount == 48
+#         println(i)
+#     end
+# end
+
+# findfirst(==("FSUSA0BHKE"), full_data.fundid)
+# println(size(full_data))
+
+# possible_matches = [
+#     "FS00008RNR", "FS00008RNS", "FS0000C4UW", "FSUSA0ALMH", "FS0000ADD7", "FS0000CDZ2",
+#     "FS0000CU2H", "FS0000CXN3", "FS0000CXXS", "FS0000CY4I", "FS0000D0DK", "FS00009XS4",
+#     "FS0000AHCA", "FS0000CY2I", "FS0000DJ8K", "FSGBR04NIQ", "FSGBR05DB9", "FSUSA08G1P",
+#     "FS0000AB4Q", "FS0000C5NL", "FS0000DRW5", "FS0000AHI1", "FS0000CTV3", "FSUSA0AURR",
+#     "FS0000BPKX", "FS0000C1YB", "FS0000CPBV", "FS0000CT6T", "FS0000CYR9", "FSGBR04SI7",
+#     "FSHKG08B1X"
+# ]
+
+# for i in 1:size(full_data)[1]
+#     test = full_data[i:i+49, :MKT]
+#     println(test)
+#     println(testx[1])
+#     error("STOP")
+#     if full_data[i:i+49, :MKT] == testx[1]
+#         println(i)
+#     end
+# end
+
+# function testfunc()
+#     for i in unique(full_data.fundid)
+#         subdf = full_data[full_data.fundid .== i, :]
+#         for j in testy
+#             if j ∉ skipmissing(subdf.ret)
+#                 return
+#             end
+#         end
+#         if found
+#             println(i)
+#         end
+#     end
+# end
+# testfunc()
+
+# sample1 = full_data[full_data.ret == first(testy)]
+
+# df2 = full_data[full_data.fundid .== "FS00008RNR", :]
+# j1 = first(testy)
+
+# j1 ∉ skipmissing(df2.ret)
+
+# candidates = []
+# for i in testy
+#     subdf = full_data[isequal.(full_data.ret,  i), :]
+#     if size(subdf)[1] == 0
+#         continue
+#     end
+#     candidates_i = unique(subdf.fundid)
+#     push!(candidates, candidates_i)
+# end
+
+# candidates = intersect(candidates...)

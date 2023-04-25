@@ -70,3 +70,6 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
+
+x = world_index_local
+y = world_index_usd
