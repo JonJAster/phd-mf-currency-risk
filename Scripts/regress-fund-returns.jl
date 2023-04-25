@@ -28,7 +28,11 @@ const CURRENCYRISK_MODELS = Dict(
     :lrv_net => [:hml_fx_net, :rx_net],
     :verdelhan => [:carry, :dollar]
 )
-const COMPLETE_MODELS = Iterators.product(keys(CURRENCYRISK_MODELS), keys(BENCHMARK_MODELS))
+const COMPLETE_MODELS = (
+    Iterators.product(keys(CURRENCYRISK_MODELS), keys(BENCHMARK_MODELS)) |> collect |> vec
+)
+
+const RESULT_COLUMNS = [Symbol("$(a)_$(b)_betas") for (a, b) in COMPLETE_MODELS]
 
 const BETA_LAGS = 24
 
@@ -63,9 +67,11 @@ function main(options_folder)
     full_data.ret = full_data.ret_gross_m - full_data.rf
 
     println("Running regressions...")
+    full_results = copy(full_data[:, [:fundid, :date]])
     results_lock = ReentrantLock()
 
     @threads for (currency_risk_model, benchmark_model) in COMPLETE_MODELS
+        println("Running $(benchmark_model) with $(currency_risk_model)...")
         benchmark_factors = BENCHMARK_MODELS[benchmark_model]
         currency_risk_factors = CURRENCYRISK_MODELS[currency_risk_model]
         complete_factors = vcat(benchmark_factors, currency_risk_factors)
@@ -80,19 +86,23 @@ function main(options_folder)
         model_results = map(add_factor_names, model_results)
 
         lock(results_lock) do 
-            full_data[!, model_name] = model_results
+            full_results[!, model_name] = model_results
         end
     end
 
-    if !isdir(OUTPUT_FILESTRING_BASE)
-        mkpath(OUTPUT_FILESTRING_BASE)
+    output_folderstring = joinpath(OUTPUT_FILESTRING_BASE, options_folder)
+    if !isdir(output_folderstring)
+        mkdir(output_folderstring)
     end
 
-    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, options_folder, "betas.csv")
-    CSV.write(output_filestring, betas)
+    output_filestring = joinpath(output_folderstring, "betas.csv")
+    CSV.write(output_filestring, output_data)
 
     time_duration = round(time() - time_start, digits=2)
-    println("Finished fund regressions in $time_duration seconds")
+    println(
+        "Finished fund regressions in $time_duration seconds " *
+        "($(time_duration/60) minutes)"
+    )
 end
 
 function load_fund_data(options_folder; select)
@@ -241,6 +251,15 @@ if false
         X = X[nonmissing_rets, :]
     end
 end
+
+# test multithreading
+a = 1:20
+b = 21:40
+@threads for (i,j) in vec(collect(COMPLETE_MODELS))
+    println(i)
+end
+
+
 #END AUTOTEST SECTION
 
 # for i in unique(full_data.fundid)
