@@ -2,3 +2,4 @@ data/raw/
 data/prepared/currencies/
 data/prepared/mutual-funds/
 data/transformed/mutual-funds/
+data/results/local-rets/betas.csv

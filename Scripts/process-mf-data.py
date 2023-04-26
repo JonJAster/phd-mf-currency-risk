@@ -1040,7 +1040,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 def process_fund_data_wrapped(process_id):
     process_fund_data(
         COUNTRY_GROUPS[process_id], currency_type="local", raw_ret_only=True,
-        polation_method=False, strict_eq=False, exc_finre=False,
+        polation_method=False, strict_eq=True, exc_finre=False,
         inv_targets=False, inc_agefilter=True
     )
 

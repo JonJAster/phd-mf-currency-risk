@@ -5,8 +5,15 @@ using Dates
 using Base.Threads
 
 include("CommonFunctions.jl")
+include("CommonConstants.jl")
+include("DataReader.jl")
 using .CommonFunctions
+using .CommonConstants
+using .DataReader
 
+<<<<<<< HEAD
+const OUTPUT_FILESTRING_BASE = "./data/results/"
+=======
 const INPUT_FILESTRING_BASE_FUNDS = "./data/transformed/mutual-funds"
 const INPUT_FILESTRING_CURRENCY_FACTORS = "./data/prepared/currencies/currency_factors.csv"
 const INPUT_FILESTRING_LONGSHORT_FACTORS = "./data/prepared/equities/equity_factors.csv"
@@ -28,11 +35,7 @@ const CURRENCYRISK_MODELS = Dict(
     :lrv_net => [:hml_fx_net, :rx_net],
     :verdelhan => [:carry, :dollar]
 )
-const COMPLETE_MODELS = (
-    Iterators.product(keys(CURRENCYRISK_MODELS), keys(BENCHMARK_MODELS)) |> collect |> vec
-)
-
-const RESULT_COLUMNS = [Symbol("$(a)_$(b)_betas") for (a, b) in COMPLETE_MODELS]
+const COMPLETE_MODELS = Iterators.product(keys(CURRENCYRISK_MODELS), keys(BENCHMARK_MODELS))
 
 const BETA_LAGS = 24
 
@@ -67,11 +70,9 @@ function main(options_folder)
     full_data.ret = full_data.ret_gross_m - full_data.rf
 
     println("Running regressions...")
-    full_results = copy(full_data[:, [:fundid, :date]])
     results_lock = ReentrantLock()
 
     @threads for (currency_risk_model, benchmark_model) in COMPLETE_MODELS
-        println("Running $(benchmark_model) with $(currency_risk_model)...")
         benchmark_factors = BENCHMARK_MODELS[benchmark_model]
         currency_risk_factors = CURRENCYRISK_MODELS[currency_risk_model]
         complete_factors = vcat(benchmark_factors, currency_risk_factors)
@@ -86,23 +87,19 @@ function main(options_folder)
         model_results = map(add_factor_names, model_results)
 
         lock(results_lock) do 
-            full_results[!, model_name] = model_results
+            full_data[!, model_name] = model_results
         end
     end
 
-    output_folderstring = joinpath(OUTPUT_FILESTRING_BASE, options_folder)
-    if !isdir(output_folderstring)
-        mkdir(output_folderstring)
+    if !isdir(OUTPUT_FILESTRING_BASE)
+        mkpath(OUTPUT_FILESTRING_BASE)
     end
 
-    output_filestring = joinpath(output_folderstring, "betas.csv")
-    CSV.write(output_filestring, output_data)
+    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, options_folder, "betas.csv")
+    CSV.write(output_filestring, betas)
 
     time_duration = round(time() - time_start, digits=2)
-    println(
-        "Finished fund regressions in $time_duration seconds " *
-        "($(time_duration/60) minutes)"
-    )
+    println("Finished fund regressions in $time_duration seconds")
 end
 
 function load_fund_data(options_folder; select)
@@ -146,6 +143,7 @@ function not_outside(date, start_date, end_date)
     !ismissing(end_date) && date > end_date && return false
     return true
 end
+>>>>>>> parent of 5c65851 (pre-final-run with test code included)
 
 function compute_timevarying_betas(regression_table; id_col, date_col, y, X)
     regression_results = group_transform(
@@ -162,15 +160,16 @@ function timevarying_regressions(date, y, X_cols...)
     X = hcat(ones(datasize), X_no_constant)
     
     data_start_date = first(date)
-    first_beta_date = offset_monthend(data_start_date, BETA_LAGS)
+    first_beta_date = offset_monthend(data_start_date, DEFAULT_BETA_LAGS)
     first_beta_index = findfirst(>=(first_beta_date), date)
 
     result = Vector{Union{Missing, NamedTuple}}(fill(missing, datasize))
     isnothing(first_beta_index) && return result
     for i in first_beta_index:datasize
-        sub_start_date = offset_monthend(date[i], -BETA_LAGS)
+        sub_start_date = offset_monthend(date[i], -DEFAULT_BETA_LAGS)
         sub_start_index = findfirst(>=(sub_start_date), date)
         sub_y = y[sub_start_index:i]
+        length(sub_y) <= DEFAULT_MIN_REGRESSION_OBS && continue
         sub_X = X[sub_start_index:i, :]
 
         nonmissing_y = findall(!ismissing, sub_y)
@@ -178,88 +177,74 @@ function timevarying_regressions(date, y, X_cols...)
         complete_sub_X = sub_X[nonmissing_y, :]
 
         regfit = lm(complete_sub_X, complete_sub_y)
-        regvalues = coeftable(regfit).cols
-        
-        result[i] = (betas=regvalues[1], pvalues=regvalues[4])
+
+        v_coef = coef(regfit)
+        v_se = stderror(regfit)
+        v_df = dof_residual(regfit)
+
+        result[i] = (coef=v_coef, se=v_se, df=v_df)
     end
     return result
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    options_folder = option_foldername(currency_type="local")
-    main(options_folder)
-end
+function main(options_folder)
+    time_start = time()
 
-# AUTOTEST SECTION
-if false
-    options_folder = option_foldername(currency_type="local")
-    println("Loading data...")
-    fund_data = load_fund_data(options_folder, select=READ_COLUMNS_FUNDS)
-    currency_factors = CSV.read(INPUT_FILESTRING_CURRENCY_FACTORS, DataFrame)
-    longshort_factors = CSV.read(INPUT_FILESTRING_LONGSHORT_FACTORS, DataFrame)
-    market_factor = CSV.read(INPUT_FILESTRING_MARKET, DataFrame)
-    risk_free = CSV.read(INPUT_FILESTRING_RISKFREE, DataFrame)
-    currency_map = CSV.read(INPUT_FILESTRING_CURRENCY_MAP, DataFrame)
+    full_data = initialise_main_data(options_folder)
+    
+    println("Running regressions...")
+    full_results = copy(full_data[:, [:fundid, :date]])
+    results_lock = ReentrantLock()
 
-    fund_data.date = Dates.lastdayofmonth.(fund_data.date)
-
-    println("Mapping countries to currencies...")
-    fund_data.cur_code = map_currency(fund_data.date, fund_data.domicile, currency_map)
-
-    full_data = (
-        innerjoin(fund_data, longshort_factors, on=:date) |>
-        partialjoin -> innerjoin(partialjoin, currency_factors, on=:date) |>
-        partialjoin -> innerjoin(
-            partialjoin, risk_free, on=[:cur_code, :date], matchmissing=:notequal
-        ) |>
-        partialjoin -> innerjoin(
-            partialjoin, market_factor, on=[:cur_code, :date], matchmissing=:notequal
-        )
-    )
-
-    full_data.MKT = full_data.mkt_gross - full_data.rf
-    full_data.ret = full_data.ret_gross_m - full_data.rf
-
-    id_col=:fundid
-    date_col=:date
-    y=:ret
-
-    (currency_risk_model, benchmark_model) = first(COMPLETE_MODELS)
-
-    if false
+    @threads for (currency_risk_model, benchmark_model) in COMPLETE_MODELS
+        process_start = time()
         benchmark_factors = BENCHMARK_MODELS[benchmark_model]
         currency_risk_factors = CURRENCYRISK_MODELS[currency_risk_model]
         complete_factors = vcat(benchmark_factors, currency_risk_factors)
-        model_name = Symbol("$(benchmark_model)_plus_$(currency_risk_model)")
-        X=complete_factors
+        model_name = Symbol("$(benchmark_model)_$(currency_risk_model)_betas")
+        
+        model_results = compute_timevarying_betas(
+            full_data; id_col=:fundid, date_col=:date, y=:ret, X=complete_factors
+        )
 
-        regression_table = copy(full_data)
+        add_regressornames(r) = ismissing(r) ? missing : (regressors=complete_factors, r...)
+        model_results = map(add_regressornames, model_results)
 
-        gb = groupby(regression_table, :fundid)
-        gb1 = first(gb)
-        date = gb1[:, date_col]
-        y = gb1[:, y]
-        X_cols = [gb1[:, factor] for factor in X]
+        lock(results_lock) do
+            full_results[!, model_name] = model_results
+        end
 
-        datasize = length(y)
-        X_no_constant = reduce(hcat, X_cols)
-        X = hcat(ones(datasize), X_no_constant)
-
-        nonmissing_rets = findall(!ismissing, y)
-        date = date[nonmissing_rets]
-        y = Vector{Float64}(y[nonmissing_rets])
-        X = X[nonmissing_rets, :]
+        process_elapsed = round(time() - process_start, digits=2)
+        println(
+            "Process finished regressing on $(benchmark_model) with " *
+            "$(currency_risk_model) in $process_elapsed seconds ($(process_elapsed/60) " *
+            "minutes))"
+        )
     end
+
+    dropmissing!(full_results)
+
+    output_folderstring = joinpath(OUTPUT_FILESTRING_BASE, options_folder)
+    if !isdir(output_folderstring)
+        mkdir(output_folderstring)
+    end
+
+    output_filestring = joinpath(output_folderstring, "betas.csv")
+    CSV.write(output_filestring, full_results)
+
+    time_duration = round(time() - time_start, digits=2)
+    println(
+        "Finished fund regressions in $time_duration seconds " *
+        "($(time_duration/60) minutes)"
+    )
 end
+<<<<<<< HEAD
 
-# test multithreading
-a = 1:20
-b = 21:40
-@threads for (i,j) in vec(collect(COMPLETE_MODELS))
-    println(i)
+if abspath(PROGRAM_FILE) == @__FILE__
+    options_folder = option_foldername(currency_type="local", strict_eq=true)
+    main(options_folder)
 end
-
-
+=======
 #END AUTOTEST SECTION
 
 # for i in unique(full_data.fundid)
@@ -327,3 +312,4 @@ end
 # end
 
 # candidates = intersect(candidates...)
+>>>>>>> parent of 5c65851 (pre-final-run with test code included)
