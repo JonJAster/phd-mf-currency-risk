@@ -58,17 +58,18 @@ function option_foldername(; currency_type, kwargs...)
     return folder_name
 end
 
-function group_transform!(df, group_cols, input_cols, f::Function, output_cols)
+@inline function group_transform!(df, group_cols, input_cols, f::Function, output_cols)
     groupby(df, group_cols) |> x -> transform!(x, input_cols => f => output_cols)
 end
 
-function group_transform(df, group_cols, input_cols, f::Function, output_cols)
+@inline function group_transform(df, group_cols, input_cols, f::Function, output_cols)
     output = groupby(df, group_cols) |> x -> transform(x, input_cols => f => output_cols)
 
     return output
 end
 
-function group_combine(df, group_cols, input_cols, f::Function, output_cols; cast=true)
+@inline function group_combine(df, group_cols, input_cols, f::Function, output_cols;
+                               cast=true)
     if cast
         output = (
             groupby(df, group_cols) |> x -> combine(x, input_cols .=> f .=> output_cols)
@@ -82,7 +83,7 @@ function group_combine(df, group_cols, input_cols, f::Function, output_cols; cas
     return output
 end
 
-offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofmonth
+@inline offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofmonth
 
 export push_with_currency_code!
 export option_foldername
