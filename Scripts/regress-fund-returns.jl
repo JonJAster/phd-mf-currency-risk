@@ -1,9 +1,8 @@
 using DataFrames
-using CSV
+using Arrow
 using GLM
 using Dates
 using Base.Threads
-using Arrow
 
 include("CommonFunctions.jl")
 include("CommonConstants.jl")
@@ -54,11 +53,11 @@ function timevarying_regressions(date, y, X_cols...)
 			sub_start_date = offset_monthend(date[i], -DEFAULT_BETA_LAGS)
 			sub_start_index = findfirst(>=(sub_start_date), date)
 			sub_y = y[sub_start_index:i]
-			length(sub_y) <= DEFAULT_MIN_REGRESSION_OBS && continue
 			sub_X = X[sub_start_index:i, :]
 
 			nonmissing_y = findall(!ismissing, sub_y)
 			complete_sub_y = Vector{Float64}(sub_y[nonmissing_y])
+            length(complete_sub_y) <= DEFAULT_MIN_REGRESSION_OBS && continue
 			complete_sub_X = sub_X[nonmissing_y, :]
 
 			regfit = lm(complete_sub_X, complete_sub_y)
@@ -111,8 +110,10 @@ function main(options_folder)
         mkdir(output_folderstring)
     end
 
-    for (currency_risk, benchmark) in COMPLETE_MODELS
-		filestring = joinpath(output_folderstring, "$(benchmark)_$currency_risk.arrow")
+    for model in COMPLETE_MODELS
+        model_name = name_model(model)
+		filestring = joinpath(output_folderstring, "$model_name.arrow")
+
         Arrow.write(filestring, model_results[(currency_risk, benchmark)])
     end
 

@@ -1,6 +1,8 @@
 module CommonConstants
 
 export 
+    FIELD_FOLDERS,
+    COUNTRY_GROUPS,
     BENCHMARK_MODELS,
     CURRENCYRISK_MODELS,
     COMPLETE_MODELS,
@@ -8,6 +10,23 @@ export
     DEFAULT_BETA_LAGS,
     DEFAULT_MIN_REGRESSION_OBS
 
+const FIELD_FOLDERS = [
+    "info", "local-monthly-gross-returns", "local-monthly-net-returns", "monthly-costs",
+    "monthly-morningstar-category", "monthly-net-assets", "usd-monthly-gross-returns",
+    "usd-monthly-net-returns"
+]
+const COUNTRY_GROUPS = Dict(
+    "lux" => ["Luxembourg"],
+    "kor" => ["South Korea"],
+    "usa" => ["United States"],
+    "can-chn-jpn" => ["Canada", "China", "Japan"],
+    "irl-bra" => ["Ireland", "Brazil"],
+    "gbr-fra-ind" => ["United Kingdom", "France", "India"],
+    "esp-tha-aus-zaf-mex-aut-che" => [
+        "Spain", "Thailand", "Australia", "South Africa",
+        "Mexico", "Austria", "Switzerland"
+    ]
+)
 const BENCHMARK_MODELS = Dict(
     :world_capm => [:MKT],
     :world_ff3 => [:MKT, :SMB, :HML],
@@ -26,7 +45,7 @@ const COMPLETE_MODELS = (
 
 const RESULT_COLUMNS = [Symbol("$(a)_$(b)_betas") for (a, b) in COMPLETE_MODELS]
 
-const DEFAULT_BETA_LAGS = 24
-const DEFAULT_MIN_REGRESSION_OBS = 12
+const DEFAULT_BETA_LAGS = 60
+const DEFAULT_MIN_REGRESSION_OBS = 36
 
 end
