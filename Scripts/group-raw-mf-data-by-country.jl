@@ -2,24 +2,8 @@ using DataFrames
 using CSV
 using Dates
 
-const FIELD_FOLDERS = [
-    "info", "local-monthly-gross-returns", "local-monthly-net-returns", "monthly-costs",
-    "monthly-morningstar-category", "monthly-net-assets", "usd-monthly-gross-returns",
-    "usd-monthly-net-returns"
-]
-
-const COUNTRY_GROUPS = Dict(
-    "lux" => ["Luxembourg"],
-    "kor" => ["South Korea"],
-    "usa" => ["United States"],
-    "can-chn-jpn" => ["Canada", "China", "Japan"],
-    "irl-bra" => ["Ireland", "Brazil"],
-    "gbr-fra-ind" => ["United Kingdom", "France", "India"],
-    "esp-tha-aus-zaf-mex-aut-che" => [
-        "Spain", "Thailand", "Australia", "South Africa",
-        "Mexico", "Austria", "Switzerland"
-    ]
-)
+include("CommonConstants.jl")
+using .CommonConstants
 
 const INPUT_FILESTRING_BASE = "./data/raw/mutual-funds"
 const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds"
