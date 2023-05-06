@@ -1,17 +1,32 @@
-using CSV
-using DataFrames
-using DataStructures
-using Dates
+using
+    DataFrames,
+    CSV,
+    Arrow,
+    Dates
 
-const INPUT_FILESTRING_BASE = "./data/raw/currencies"
-const OUTPUT_FILESTRING_BASE = "./data/prepared/currencies"
+using DataStructures: OrderedDict
 
-const RATE_SETTLEMENTS = ["spot", "forward"]
-const RATE_LEVELS = ["bid", "mid", "ask"]
-const INVERTED_RATE_LEVELS = Dict("bid" => "ask", "mid" => "mid", "ask" => "bid")
-const RATE_TYPES =  Iterators.product(RATE_SETTLEMENTS, RATE_LEVELS)
-const RATE_TYPE_NAMES = (vec ∘ collect)("$(a)_$b" for (a,b) in RATE_TYPES)
-const DATE_FORMAT = DateFormat("dd/mm/yyyy")
+include("shared/CommonConstants.jl")
+include("shared/CommonFunctions.jl")
+using
+    .CommonConstants,
+    .CommonFunctions
+
+const
+    INPUT_DIR = joinpath(DIRS.currency, "raw")
+    OUTPUT_DIR = joinpath(DIRS.currency, "combined")
+
+const
+    RATE_SETTLEMENTS = ["spot", "forward"]
+    RATE_LEVELS = ["bid", "mid", "ask"]
+    INVERTED_RATE_LEVELS = Dict("bid" => "ask", "mid" => "mid", "ask" => "bid")
+    RATE_TYPES =  Iterators.product(RATE_SETTLEMENTS, RATE_LEVELS)
+    RATE_TYPE_NAMES = (vec ∘ collect)("$(a)_$b" for (a,b) in RATE_TYPES)
+    DATE_FORMAT = DateFormat("dd/mm/yyyy")
+
+const 
+    RateType = Tuple{String, String}
+    RateSet = Vector{Vector{Union{Missing,Float64}}}
 
 const CIP_VIOLATIONS = [
     (currency="AED", start_date="2006-06-30", end_date="2006-11-30"),
@@ -34,7 +49,54 @@ const EURO_CONSTITUENTS = [
     (currency="GRD", start_date="2001-01-01"),
 ]
 
-const RateSet = Vector{Vector{Union{Missing,Float64}}}
+function main()
+    time_start = time()
+    
+    println("Reading currency info...")
+    filestring_info = joinpath(INPUT_DIR, "currency_info.csv")
+    info = CSV.read(filestring_info, DataFrame)
+    
+    println("Reading raw rate data...")
+    rate_data = Dict{RateType, DataFrame}()
+    for (a, b) in RATE_TYPES
+        filestring = joinpath(INPUT_DIR, "$(a)_$b.csv")
+        rate_data[(a, b)] = CSV.read(
+            filestring, DataFrame, missingstring="NA",
+            dateformat=DATE_FORMAT, types=Dict(:date => Date)
+        )
+    end
+
+    assert_equal_dates!(rate_data)
+
+    currency_series = DataFrame[]
+    unique_currencies = unique(info[:, :cur_code])
+
+    println("Processing rate data...")
+    for i in unique_currencies
+        push!(currency_series, build_rate_series(i, info, rate_data))
+    end
+
+    currency_table = vcat(currency_series...)
+    currency_table[!, :date] = lastdayofmonth.(currency_table[!, :date])
+
+    dropmissing!(currency_table, RATE_TYPE_NAMES, disallowmissing=false)
+    end_euro_constituents!(currency_table)
+
+    currency_table_cip_violated = copy(currency_table)
+    remove_cip_violations!(currency_table)
+
+    sort!(currency_table, [:cur_code, :date])
+    sort!(currency_table_cip_violated, [:cur_code, :date])
+
+    output_filestring = makepath(OUTPUT_DIR, "currency_rates.arrow")
+    output_filestring_unfiltered = makepath(OUTPUT_DIR, "currency_rates_unfiltered.arrow")
+
+    Arrow.write(output_filestring, currency_table)
+    Arrow.write(output_filestring_unfiltered, currency_table_cip_violated)
+
+    time_duration = round(time() - time_start, digits=2)
+    println("Finished refining currency data in $time_duration seconds")
+end
 
 function termcheck(level::String, term)
     if term == "european"
@@ -165,53 +227,6 @@ function end_euro_constituents!(currency_table)
 
         deleteat!(currency_table, euro_constituent_mask)
     end
-end
-
-function main()
-    time_start = time()
-    
-    println("Reading currency info...")
-    info = CSV.read("$INPUT_FILESTRING_BASE/currency_info.csv", DataFrame)
-    
-    println("Reading raw rate data...")
-    rate_data = Dict{Tuple{String, String}, DataFrame}()
-    for (a, b) in RATE_TYPES
-        filestring = "$INPUT_FILESTRING_BASE/$(a)_$b.csv"
-        rate_data[(a, b)] = CSV.read(
-            filestring, DataFrame, missingstring="NA",
-            dateformat=DATE_FORMAT, types=Dict(:date => Date)
-        )
-    end
-
-    assert_equal_dates!(rate_data)
-
-    currency_series = DataFrame[]
-    unique_currencies = unique(info[:, :cur_code])
-
-    println("Processing rate data...")
-    for i in unique_currencies
-        push!(currency_series, build_rate_series(i, info, rate_data))
-    end
-
-    currency_table = vcat(currency_series...)
-    currency_table[!, :date] = lastdayofmonth.(currency_table[!, :date])
-
-    dropmissing!(currency_table, RATE_TYPE_NAMES, disallowmissing=false)
-    end_euro_constituents!(currency_table)
-
-    currency_table_cip_violated = copy(currency_table)
-    remove_cip_violations!(currency_table)
-
-    sort!(currency_table, [:cur_code, :date])
-    sort!(currency_table_cip_violated, [:cur_code, :date])
-
-    CSV.write("$OUTPUT_FILESTRING_BASE/currency_rates.csv", currency_table)
-    CSV.write(
-        "$OUTPUT_FILESTRING_BASE/currency_rates_unfiltered.csv", currency_table_cip_violated
-    )
-
-    time_duration = round(time() - time_start, digits=2)
-    println("Finished refining currency data in $time_duration seconds")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

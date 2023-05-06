@@ -6,6 +6,7 @@ using
     Dates
 
 export
+    makepath,
     push_with_currency_code!,
     option_foldername,
     group_transform!,
@@ -15,6 +16,17 @@ export
     name_model,
     offset_monthend
 
+function makepath(paths...)
+    filestring = joinpath(paths...)
+    dirstring = dirname(filestring)
+    
+    if !isdir(dirstring)
+        mkpath(dirstring)
+        println("Missing directory created: $dirstring")
+    end
+
+    return filestring
+end
 
 function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)
