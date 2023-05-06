@@ -3,7 +3,7 @@ using CSV
 using Arrow
 using Dates
 
-include("CommonConstants.jl")
+include("modules/CommonConstants.jl")
 using .CommonConstants
 
 const
@@ -137,13 +137,13 @@ function save_file_by_country_group(data, folder, group_map)
         data_split = data[map(secid -> get(group_map, secid, ""),
                           data[!, :secid]) .== group, :]
 
-        filestring = joinpath(OUTPUT_FILESTRING_BASE, folder, "mf_$(folder)_$group.csv")
+        filestring = joinpath(OUTPUT_DIR, folder, "mf_$(folder)_$group.arrow")
 
         if !isdir(dirname(filestring))
             mkpath(dirname(filestring))
         end
 
-        CSV.write(filestring, data_split)
+        Arrow.write(filestring, data_split)
     end
 end
 
@@ -183,3 +183,5 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
+
+groupby
