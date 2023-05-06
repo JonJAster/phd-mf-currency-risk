@@ -1,24 +1,23 @@
 using DataFrames
 using CSV
+using Arrow
 using Dates
 
 include("CommonConstants.jl")
 using .CommonConstants
 
-const INPUT_FILESTRING_BASE = "./data/raw/mutual-funds"
-const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds"
-const DATESTRING = r"\d{4}-\d{2}"
+const
+    INPUT_DIR = joinpath(DIRS.fund, "raw")
+    OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
 
-const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
-const DATA_COLS = Not([:name, :fundid, :secid])
-const NONDATA_COL_OFFSET = 3
-
-filestring = "./data/raw/mutual-funds/monthly-net-assets/mf_monthly-net-assets_part-1.csv"
-
-ismissing_or_blank(x) = ismissing(x) || x == ""
+const 
+    DATESTRING = r"\d{4}-\d{2}"
+    EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
+    DATA_COLS = Not([:name, :fundid, :secid])
+    NONDATA_COL_OFFSET = 3
 
 function load_file_by_parts(folder)
-    folderstring = joinpath(INPUT_FILESTRING_BASE, folder)
+    folderstring = joinpath(INPUT_DIR, folder)
     files = readdir(folderstring)
     data_parts = DataFrame[]
 
@@ -175,14 +174,12 @@ function main()
         regroup_data(folder, secid_to_group, info)
     end
 
-    main_duration = round(time() - main_time_start, digits=2)
-    println("Finished refining mutual fund data in $main_duration seconds")
+    main_duration_s = round(time() - main_time_start, digits=2)
+    main_duration_m = round(main_duration_s / 60, digits=2)
+    println("Finished refining mutual fund data in $main_duration_s seconds " *
+            "($main_duration_m minutes)")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
-
-# Set filestring to net assets "other" group from the prepared folder
-filestring = joinpath(OUTPUT_FILESTRING_BASE, "monthly-net-assets", "mf_monthly-net-assets_other.csv")
-data = CSV.read(filestring, DataFrame)

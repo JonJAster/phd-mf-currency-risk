@@ -207,7 +207,7 @@ function main()
 
     CSV.write("$OUTPUT_FILESTRING_BASE/currency_rates.csv", currency_table)
     CSV.write(
-        "$OUTPUT_FILESTRING_BASE/currency_rates_full.csv", currency_table_cip_violated
+        "$OUTPUT_FILESTRING_BASE/currency_rates_unfiltered.csv", currency_table_cip_violated
     )
 
     time_duration = round(time() - time_start, digits=2)

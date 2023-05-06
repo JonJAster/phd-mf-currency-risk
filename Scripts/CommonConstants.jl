@@ -1,6 +1,7 @@
 module CommonConstants
 
-export 
+export
+    DIRS,
     FIELD_FOLDERS,
     COUNTRY_GROUPS,
     BENCHMARK_MODELS,
@@ -9,6 +10,13 @@ export
     RESULT_COLUMNS,
     DEFAULT_BETA_LAGS,
     DEFAULT_MIN_REGRESSION_OBS
+
+const DIRS = (
+    fund = "data/mutual-funds",
+    currency = "data/currencies",
+    equity = "data/equities",
+    map = "data/maps"
+)
 
 const FIELD_FOLDERS = [
     "info", "local-monthly-gross-returns", "local-monthly-net-returns", "monthly-costs",

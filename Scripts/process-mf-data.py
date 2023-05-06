@@ -89,6 +89,9 @@ def load_data(filename_base, country_group_code, series_type, value_name=None,\
         # Reshape panel data to tall format
         df_return = df_return.melt(id_vars=["fundid","secid"],
                                    var_name="date", value_name=value_name)
+
+        # Align dates to the end of the month
+        df_return.date = df_return.date + MonthEnd(0)
         
     else:
         raise ValueError("Parameter series_type must be either 'panel' "

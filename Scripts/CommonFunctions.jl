@@ -1,8 +1,20 @@
 module CommonFunctions
 
-using DataFrames
-using Base.Threads
-using Dates
+using
+    DataFrames,
+    Base.Threads,
+    Dates
+
+export
+    push_with_currency_code!,
+    option_foldername,
+    group_transform!,
+    group_transform,
+    group_combine,
+    ismissing_or_blank,
+    name_model,
+    offset_monthend
+
 
 function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)
@@ -85,13 +97,6 @@ end
 
 @inline name_model(model) = "$(model[2])_$(model[1])"
 @inline offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofmonth
-
-export push_with_currency_code!
-export option_foldername
-export group_transform!
-export group_transform
-export group_combine
-export offset_monthend
-export name_model
+@inline ismissing_or_blank(x) = ismissing(x) || x == ""
 
 end
