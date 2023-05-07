@@ -12,21 +12,18 @@ using
     .CommonConstants,
     .CommonFunctions
 
-const
-    INPUT_DIR = joinpath(DIRS.currency, "raw")
-    OUTPUT_DIR = joinpath(DIRS.currency, "combined")
+const INPUT_DIR = joinpath(DIRS.currency, "raw")
+const OUTPUT_DIR = joinpath(DIRS.currency, "combined")
 
-const
-    RATE_SETTLEMENTS = ["spot", "forward"]
-    RATE_LEVELS = ["bid", "mid", "ask"]
-    INVERTED_RATE_LEVELS = Dict("bid" => "ask", "mid" => "mid", "ask" => "bid")
-    RATE_TYPES =  Iterators.product(RATE_SETTLEMENTS, RATE_LEVELS)
-    RATE_TYPE_NAMES = (vec ∘ collect)("$(a)_$b" for (a,b) in RATE_TYPES)
-    DATE_FORMAT = DateFormat("dd/mm/yyyy")
+const RATE_SETTLEMENTS = ["spot", "forward"]
+const RATE_LEVELS = ["bid", "mid", "ask"]
+const INVERTED_RATE_LEVELS = Dict("bid" => "ask", "mid" => "mid", "ask" => "bid")
+const RATE_TYPES =  Iterators.product(RATE_SETTLEMENTS, RATE_LEVELS)
+const RATE_TYPE_NAMES = (vec ∘ collect)("$(a)_$b" for (a,b) in RATE_TYPES)
+const DATE_FORMAT = DateFormat("dd/mm/yyyy")
 
-const 
-    RateType = Tuple{String, String}
-    RateSet = Vector{Vector{Union{Missing,Float64}}}
+const RateType = Tuple{String, String}
+const RateSet = Vector{Vector{Union{Missing,Float64}}}
 
 const CIP_VIOLATIONS = [
     (currency="AED", start_date="2006-06-30", end_date="2006-11-30"),

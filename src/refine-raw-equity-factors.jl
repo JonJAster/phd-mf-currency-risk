@@ -9,13 +9,11 @@ using
     .CommonFunctions,
     .CommonConstants
 
-const
-    INPUT_DIR = joinpath(DIRS.equity, "raw/factors")
-    OUTPUT_DIR = joinpath(DIRS.equity, "factor-series")
+const INPUT_DIR = joinpath(DIRS.equity, "raw/factors")
+const OUTPUT_DIR = joinpath(DIRS.equity, "factor-series")
 
-const
-    FACTOR_LIST = ["SMB", "HML", "CMA", "RMW", "WML"]
-    READ_COLUMNS = [:date, :ret]
+const FACTOR_LIST = ["SMB", "HML", "CMA", "RMW", "WML"]
+const READ_COLUMNS = [:date, :ret]
 
 function main()
     time_start = time()

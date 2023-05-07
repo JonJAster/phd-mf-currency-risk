@@ -52,7 +52,7 @@ def load_data(filename_base, country_group_code, series_type, value_name=None,\
         
     # Declare the filename of the file to be loaded
     filename = (
-        "./data/prepared/mutual-funds/{base}/mf_{base}_{country}.csv"
+        "data/mutual-funds/domicile-grouped/{base}/mf_{base}_{country}.csv"
         .format(base=filename_base,country=country_group_code)
     )
     if series_type == "cross":
@@ -698,7 +698,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # Eliminate non-equity fund classes
     # Read a list of accepted morningstar categories
     df_equity_categories = (
-        pd.read_csv("./data/raw/morningstar_categories.csv")
+        pd.read_csv("./data/mappings/morningstar_categories.csv")
     )
 
     # If desired, merge Morningstar category fields into the main DataFrame.
@@ -1012,7 +1012,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         folder_name += "_targets"
 
     folder_dir = (
-        "./data/transformed/mutual-funds/{}".format(folder_name)
+        "./data/mutual-funds/post-processing/initialised/{}".format(folder_name)
     )
 
     if not os.path.exists(folder_dir):
@@ -1025,8 +1025,8 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     if inc_agefilter:
         folder_name = (
-            "./data/transformed/mutual-funds/{}_age-filtered"
-            .format(folder_name[1:])
+            "./data/mutual-funds/post-processing/initialised/{}_age-filtered"
+            .format(folder_name)
         ) 
         
         if not os.path.exists(folder_dir):

@@ -1,7 +1,6 @@
 using
     DataFrames,
     CSV,
-    Arrow,
     Dates
 
 include("shared/CommonConstants.jl")
@@ -10,17 +9,13 @@ using
     .CommonFunctions,
     .CommonConstants
 
-const
-    INPUT_DIR = joinpath(DIRS.fund, "raw")
-    OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
+const INPUT_DIR = joinpath(DIRS.fund, "raw")
+const OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
 
-const 
-    DATESTRING = r"\d{4}-\d{2}"
-    EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
-    DATA_COLS = Not([:name, :fundid, :secid])
-    NONDATA_COL_OFFSET = 3
-
-
+const DATESTRING = r"\d{4}-\d{2}"
+const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
+const DATA_COLS = Not([:name, :fundid, :secid])
+const NONDATA_COL_OFFSET = 3
 
 function main()
     main_time_start = time()
@@ -164,7 +159,7 @@ function save_file_by_country_group(data, folder, group_map)
         
         output_filestring = makepath(OUTPUT_DIR, folder, "mf_$(folder)_$group.csv")
 
-        Arrow.write(output_filestring, data_split)
+        CSV.write(output_filestring, data_split)
     end
 end
 
@@ -185,5 +180,3 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
-
-groupby
