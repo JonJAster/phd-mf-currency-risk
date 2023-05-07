@@ -1,23 +1,21 @@
-using DataFrames
-using CSV
+using
+    DataFrames,
+    CSV,
+    Arrow
 
-const INPUT_FILESTRING_BASE = "./data/raw/equities/factors"
-const OUTPUT_FILESTRING_BASE = "./data/prepared/equities"
-const FACTOR_LIST = ["SMB", "HML", "CMA", "RMW", "WML"]
-const READ_COLUMNS = [:date, :ret]
+include("shared/CommonConstants.jl")
+include("shared/CommonFunctions.jl")
+using
+    .CommonFunctions,
+    .CommonConstants
 
-function read_factors_data()
-    factors_list = []
+const
+    INPUT_DIR = joinpath(DIRS.equity, "raw/factors")
+    OUTPUT_DIR = joinpath(DIRS.equity, "factor-series")
 
-    for factor_code in FACTOR_LIST
-        filestring = joinpath(INPUT_FILESTRING_BASE, "global_$factor_code.csv")
-        factor_data = CSV.read(filestring, DataFrame, select=READ_COLUMNS)
-        rename!(factor_data, :ret => Symbol(factor_code))
-        push!(factors_list, factor_data)
-    end
-
-    return factors_list
-end
+const
+    FACTOR_LIST = ["SMB", "HML", "CMA", "RMW", "WML"]
+    READ_COLUMNS = [:date, :ret]
 
 function main()
     time_start = time()
@@ -27,17 +25,26 @@ function main()
 
     println("Combining data...")
     combined_factors = reduce((x,y)->innerjoin(x, y, on=:date), factors_list)
+    
+    output_filestring = makepath(OUTPUT_DIR, "equity_factors.arrow")
 
-    if !isdir(OUTPUT_FILESTRING_BASE)
-        mkpath(OUTPUT_FILESTRING_BASE)
-    end
-
-    output_filestring = joinpath(OUTPUT_FILESTRING_BASE, "equity_factors.csv")
-
-    CSV.write(output_filestring, combined_factors)
+    Arrow.write(output_filestring, combined_factors)
 
     time_duration = round(time() - time_start, digits=2)
     println("Finished combining equity factors in $time_duration seconds")
+end
+
+function read_factors_data()
+    factors_list = []
+
+    for factor_code in FACTOR_LIST
+        filestring = joinpath(INPUT_DIR, "global_$factor_code.csv")
+        factor_data = CSV.read(filestring, DataFrame, select=READ_COLUMNS)
+        rename!(factor_data, :ret => Symbol(factor_code))
+        push!(factors_list, factor_data)
+    end
+
+    return factors_list
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
