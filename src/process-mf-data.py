@@ -1012,7 +1012,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         folder_name += "_targets"
 
     folder_dir = (
-        "./data/mutual-funds/post-processing/initialised/{}".format(folder_name)
+        "./data/mutual-funds/post-processing/{}/initialised".format(folder_name)
     )
 
     if not os.path.exists(folder_dir):
@@ -1025,7 +1025,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     if inc_agefilter:
         folder_name = (
-            "./data/mutual-funds/post-processing/initialised/{}_age-filtered"
+            "./data/mutual-funds/post-processing/{}_age-filtered/initialised"
             .format(folder_name)
         ) 
         

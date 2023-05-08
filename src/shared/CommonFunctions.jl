@@ -12,6 +12,7 @@ export
     group_transform!,
     group_transform,
     group_combine,
+    savecols,
     ismissing_or_blank,
     name_model,
     offset_monthend
@@ -80,6 +81,10 @@ function option_foldername(; currency_type, kwargs...)
     end
 
     return folder_name
+end
+
+function savecols()
+    println(stacktrace(backtrace()))
 end
 
 @inline function group_transform!(df, group_cols, input_cols, f::Function, output_cols)

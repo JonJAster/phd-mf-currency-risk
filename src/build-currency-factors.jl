@@ -1,13 +1,47 @@
-using CSV
-using DataFrames
-using Statistics
+using
+    DataFrames,
+    Arrow,
+    Statistics
+    
 using ShiftedArrays: lead, lag
 
-include("CommonFunctions.jl")
-using .CommonFunctions
+include("shared/CommonConstants.jl")
+include("shared/CommonFunctions.jl")
+using
+    .CommonFunctions,
+    .CommonConstants
 
-const INPUT_FILESTRING = "./data/prepared/currencies/currency_rates.csv"
-const OUTPUT_FILESTRING_BASE = "./data/transformed/currencies"
+const INPUT_DIR = joinpath(DIRS.currency, "combined")
+const OUTPUT_DIR = joinpath(DIRS.currency, "factor-series")
+
+function main()
+    time_start = time()
+    println("Loading currency rates...")
+    filename = joinpath(INPUT_DIR, "currency_rates.arrow")
+
+    rates = Arrow.Table(filename) |> DataFrame
+    
+    println("Computing currency factors...")
+    compute_delta_spot!(rates)
+    compute_forward_discount!(rates)
+    compute_carry_returns!(rates)
+
+    compute_interest_rate_ranking!(rates)
+    assign_interest_rate_baskets!(rates)
+    combine_net_carry_returns!(rates)
+
+    basket_rates = aggregate_baskets(rates)
+
+    currency_factors = compute_factors(basket_rates)
+
+    output_filestring = makepath(OUTPUT_DIR, "currency_factors.arrow")
+
+    Arrow.write(output_filestring, currency_factors)
+
+    duration_s = round(time() - time_start, digits=2)
+
+    println("Finished computing currency factors in $duration_s seconds ")
+end
 
 const BASKET_ALLOCATION_ORDER = Dict(
     # Quantile number => Order that that quantile receives a currency added to the sample
@@ -161,30 +195,6 @@ function compute_factors(df)
     factors = group_combine(df, group_on, input, factor_computations, output, cast=false)
 
     return factors
-end
-    
-
-function main()
-    rates = CSV.read(INPUT_FILESTRING, DataFrame)
-    
-    compute_delta_spot!(rates)
-    compute_forward_discount!(rates)
-    compute_carry_returns!(rates)
-
-    compute_interest_rate_ranking!(rates)
-    assign_interest_rate_baskets!(rates)
-    combine_net_carry_returns!(rates)
-
-    basket_rates = aggregate_baskets(rates)
-
-    currency_factors = compute_factors(basket_rates)
-
-    if !isdir(OUTPUT_FILESTRING_BASE)
-        mkpath(OUTPUT_FILESTRING_BASE)
-    end
-
-    OUTPUT_FILESTRING = joinpath(OUTPUT_FILESTRING_BASE, "currency_factors.csv")
-    CSV.write(OUTPUT_FILESTRING, currency_factors)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

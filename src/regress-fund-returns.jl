@@ -129,5 +129,3 @@ if abspath(PROGRAM_FILE) == @__FILE__
     options_folder = option_foldername(currency_type="local", strict_eq=true)
     main(options_folder)
 end
-
-dfb = CSV.read("data/prepared/mutual-funds/local-monthly-gross-returns/mf_local-monthly-gross-returns_can-chn-jpn.csv", DataFrame)
