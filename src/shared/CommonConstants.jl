@@ -9,13 +9,14 @@ export
     COMPLETE_MODELS,
     RESULT_COLUMNS,
     DEFAULT_BETA_LAGS,
-    DEFAULT_MIN_REGRESSION_OBS
+    DEFAULT_MIN_REGRESSION_OBS,
+    DEFAULT_OPTIONS
 
 const DIRS = (
     fund = "data/mutual-funds",
     currency = "data/currencies",
     equity = "data/equities",
-    map = "data/maps"
+    map = "data/mappings"
 )
 
 const FIELD_FOLDERS = [
@@ -55,5 +56,9 @@ const RESULT_COLUMNS = [Symbol("$(a)_$(b)_betas") for (a, b) in COMPLETE_MODELS]
 
 const DEFAULT_BETA_LAGS = 60
 const DEFAULT_MIN_REGRESSION_OBS = 36
+const DEFAULT_OPTIONS = Dict(
+    :currency_type => :local,
+    :strict_eq => true
+)
 
 end

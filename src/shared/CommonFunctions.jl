@@ -37,46 +37,52 @@ function push_with_currency_code!(datalist, df, currency_code, value_columns)
 end
 
 function option_foldername(; currency_type, kwargs...)
-    if currency_type == "local"
-        folder_name = "local-rets"
-    elseif currency_type == "usd"
-        folder_name = "usd-rets"
-    else
-        error("Invalid currency type: $(kwargs[:currency_type]). Must be 'local' or 'usd'.")
+    options_in = Dict{Symbol, Any}()
+    for (key, value) in kwargs
+        typeof(value) <: AbstractString && (value = Symbol(value))
+        options_in[key] = value
     end
 
-    if haskey(kwargs, :raw_ret_only) && kwargs[:raw_ret_only] == false
+    if currency_type == :local
+        folder_name = "local-rets"
+    elseif currency_type == :usd
+        folder_name = "usd-rets"
+    else
+        error("Invalid currency type: $(options_in[:currency_type]). Must be :local or :usd.")
+    end
+
+    if haskey(options_in, :raw_ret_only) && options_in[:raw_ret_only] == false
         folder_name *= "_gret-filled"
     end
 
-    if haskey(kwargs, :polation_method)
-        if kwargs[:polation_method] == "both"
+    if haskey(options_in, :polation_method)
+        if options_in[:polation_method] == :both
             folder_name *= "_na-int-exp"
-        elseif kwargs[:polation_method] == "interpolate"
+        elseif options_in[:polation_method] == :interpolate
             folder_name *= "_na-int"
-        elseif kwargs[:polation_method] == "extrapolate"
+        elseif options_in[:polation_method] == :extrapolate
             folder_name *= "_na-exp"
-        elseif kwargs != false
-            error("Invalid polation method: $(kwargs[:polation_method]). Must be 'both', "*
-                  "'interpolate', 'extrapolate', or false.")
+        elseif options_in != false
+            error("Invalid polation method: $(options_in[:polation_method]). Must be :both, "*
+                  ":interpolate, :extrapolate, or false.")
         end
     end
     
-    if haskey(kwargs, :strict_eq) && kwargs[:strict_eq] == true
-        if haskey(kwargs, :exc_finre) && kwargs[:exc_finre] == true
+    if haskey(options_in, :strict_eq) && options_in[:strict_eq] == true
+        if haskey(options_in, :exc_finre) && options_in[:exc_finre] == true
             folder_name *= "_eq-strict-exfinre"
         else
             folder_name *= "_eq-strict"
         end
-    elseif haskey(kwargs, :exc_finre) && kwargs[:exc_finre] == true
+    elseif haskey(options_in, :exc_finre) && options_in[:exc_finre] == true
         folder_name *= "_eq-exfinre"
     end
 
-    if haskey(kwargs, :inv_targets) && kwargs[:inv_targets] == true
+    if haskey(options_in, :inv_targets) && options_in[:inv_targets] == true
         folder_name *= "_targets"
     end
 
-    if haskey(kwargs, :age_filter) && kwargs[:age_filter] == true
+    if haskey(options_in, :age_filter) && options_in[:age_filter] == true
         folder_name *= "_age-filtered"
     end
 
