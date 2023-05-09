@@ -17,7 +17,7 @@ const READ_COLUMNS = [
     :fundid, :date, :ret_gross_m, :mean_costs, :fund_assets, :fund_flow, :domicile
 ]
 const OUTPUT_COLUMNS = [
-    :fundid, :date, :cur_code, :ret, :fund_flow, :fund_assets, :mean_costs
+    :fundid, :date, :cur_code, :ret, :fund_flow, :domicile, :fund_assets, :mean_costs
 ]
 
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))

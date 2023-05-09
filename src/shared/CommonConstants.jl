@@ -37,11 +37,11 @@ const COUNTRY_GROUPS = Dict(
     ]
 )
 const BENCHMARK_MODELS = Dict(
-    :world_capm => [:MKT],
-    :world_ff3 => [:MKT, :SMB, :HML],
-    :world_ff5 => [:MKT, :SMB, :HML, :RMW, :CMA],
-    :world_ffcarhart => [:MKT, :SMB, :HML, :WML],
-    :world_ff6 => [:MKT, :SMB, :HML, :RMW, :CMA, :WML]
+    :world_capm => [:mkt],
+    :world_ff3 => [:mkt, :smb, :hml],
+    :world_ff5 => [:mkt, :smb, :hml, :rmw, :cma],
+    :world_ffcarhart => [:mkt, :smb, :hml, :wml],
+    :world_ff6 => [:mkt, :smb, :hml, :rmw, :cma, :wml]
 )
 const CURRENCYRISK_MODELS = Dict(
     :lrv => [:hml_fx, :rx],
