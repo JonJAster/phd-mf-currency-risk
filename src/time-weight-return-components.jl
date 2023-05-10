@@ -89,12 +89,13 @@ end
 
 function decay_weighted(returns, decay_rate)
     window_size = length(returns)
-    decay_factor = ℯ .^ (-decay_rate .* (window_size-1:-1:0))
-    decayed_returns = returns .* decay_factor
+    decay_factors = ℯ .^ (-decay_rate .* (window_size-1:-1:0))
+    weights = decay_factors ./ sum(decay_factors)
+    weighted_returns = returns .* weights
 
-    count(!ismissing, decayed_returns) == 0 && return missing
+    count(!ismissing, weighted_returns) == 0 && return missing
 
-    time_weighted_return = sum(skipmissing(decayed_returns))
+    time_weighted_return = sum(skipmissing(weighted_returns))
     return time_weighted_return
 end
 

@@ -9,6 +9,7 @@ using
     Arrow,
     CSV,
     Base.Threads,
+    Statistics
     Dates
 
 include("CommonConstants.jl")
@@ -44,16 +45,53 @@ function initialise_base_data(options_folder)
     return main_data
 end
 
-function initialise_flow_data(options_folder; ret)
-    if ret == :raw
-        filename_return = 
+function initialise_flow_data(options_folder, model; ret)
     println("Reading data...")
+    model_name = name_model(model)
+    
+    if ret == :raw
+        filename_decomposition = joinpath(
+            INPUT_DIR_MF, options_folder, "decompositions/$model_name.arrow"
+        )
+    elseif ret == :weighted
+        filename_decomposition = joinpath(
+            INPUT_DIR_MF, options_folder, "weighted-decompositions/$model_name.arrow"
+        )
+    else
+        error("ret must be :raw or :weighted")
+    end
+
     filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
-    filename_info = joinpath(INPUT_DIR_MFINFO, "fund_info.csv")
+    filename_info = joinpath(INPUT_DIR_MFINFO, "mf_info.arrow")
+
+    fund_base_data = Arrow.Table(filename_mf) |> DataFrame
+    fund_info = Arrow.Table(filename_info) |> DataFrame
+    decomposed_returns = Arrow.Table(filename_decomposition) |> DataFrame
+
+    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ret, 12)
+
+    select!(fund_base_data, ["fundid", "date", "fund_flow", "fund_assets", "mean_costs"])
+    select!(fund_info, ["fundid", "true-no-load", "inception-date"])
+
+    fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
+    fund_full_data = innerjoin(
+        fund_rets_data, fund_info, on=:fundid, matchmissing=:notequal
+    )
+
+    fund_full_data.age = (
+        12*(year.(fund_full_data.date) .- year.(fund_full_data."inception-date")) .+
+        (month.(fund_full_data.date) .- month.(fund_full_data."inception-date"))
+    )
+
+    output_data = fund_full_data[fund_full_data.age .>= 0, :]
+
+    select!(output_data, Not("inception-date"))
+
+    return output_data
 end
 
 function rolling_std(data, col, window)
-    data[!, :std] = Vector{Union{Missing, Float64}}(missing, size(data, 1))
+    rolling_std = Vector{Union{Missing, Float64}}(missing, size(data, 1))
 
     for i in 1:size(data, 1)
         i < window && continue
@@ -64,8 +102,10 @@ function rolling_std(data, col, window)
 
         start_date = Dates.lastdayofmonth((data[window_end, :date] - Month(window-1)))
         data[window_start, :date] != start_date && continue
-        data[i, :std] = std(data[window_start:window_end, col])
+        rolling_std[i] = std(data[window_start:window_end, col])
     end
+
+    return rolling_std
 end
 
 end
