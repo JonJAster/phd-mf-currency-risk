@@ -6,10 +6,10 @@ using Base.Threads
 
 include("shared/CommonFunctions.jl")
 include("shared/CommonConstants.jl")
-include("shared/DataPrep.jl")
+include("shared/DataInit.jl")
 using .CommonFunctions
 using .CommonConstants
-using .DataPrep
+using .DataInit
 
 const OUTPUT_DIR = joinpath(DIRS.fund, "post-processing")
 
@@ -23,7 +23,7 @@ combine_reg_results(date, rr...) = zip(repeat(date, inner=size(first(rr),1)), ve
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     time_start = time()
 
-    full_data = initialise_data(options_folder)
+    full_data = initialise_base_data(options_folder)
     
     println("Running regressions...")
     model_results = Dict(model=>full_data[:, [:fundid, :date]] for model in COMPLETE_MODELS)

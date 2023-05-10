@@ -5,11 +5,11 @@ using
 
 include("shared/CommonConstants.jl")
 include("shared/CommonFunctions.jl")
-include("shared/DataPrep.jl")
+include("shared/DataInit.jl")
 using
     .CommonFunctions,
     .CommonConstants,
-    .DataPrep
+    .DataInit
 
 const INPUT_DIR = joinpath(DIRS.fund, "post-processing")
 const OUTPUT_DIR = INPUT_DIR
@@ -17,9 +17,9 @@ const OUTPUT_DIR = INPUT_DIR
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     time_start = time()
 
-    main_data = initialise_data(options_folder)
+    main_data = initialise_base_data(options_folder)
     betas_folderstring = joinpath(INPUT_DIR, options_folder, "factor-betas")
-    output_folderstring = makepath(OUTPUT_DIR, options_folder, "decompositions")
+    output_folderstring = joinpath(OUTPUT_DIR, options_folder, "decompositions")
 
     savelock = ReentrantLock()
     @threads for model in COMPLETE_MODELS
@@ -74,7 +74,7 @@ end
 
 function save_decomposition(decomposed_returns, output_folderstring, model_name, savelock)
     lock(savelock) do
-        output_filestring = joinpath(output_folderstring, "$model_name.arrow")
+        output_filestring = makepath(output_folderstring, "$model_name.arrow")
         Arrow.write(output_filestring, decomposed_returns)
     end
 end
@@ -83,5 +83,5 @@ if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
 
-dftest = initialise_data(option_foldername(; DEFAULT_OPTIONS...))
+dftest = initialise_base_data(option_foldername(; DEFAULT_OPTIONS...))
 regression_table(dftest, :fundid, :date, :ret, :lag, 10, :domicile, :cat, :tfe, :quarter)

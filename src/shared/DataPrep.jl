@@ -1,7 +1,7 @@
-module DataPrep
+module DataInit
 
 export
-    initialise_data,
+    initialise_base_data,
     prepare_flow_controls
 
 using
@@ -18,12 +18,13 @@ using
     .CommonConstants
 
 const INPUT_DIR_MF = joinpath(DIRS.fund, "post-processing")
+const INPUT_DIR_MFINFO = joinpath(DIRS.fund, "info")
 const INPUT_DIR_FX = joinpath(DIRS.currency, "factor-series")
 const INPUT_DIR_EQ = joinpath(DIRS.equity, "factor-series")
 
 const READ_COLUMNS_MF = [:fundid, :date, :ret_gross_m, :domicile]
 
-function initialise_data(options_folder)
+function initialise_base_data(options_folder)
     println("Reading data...")
     filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
     filename_fx = joinpath(INPUT_DIR_FX, "currency_factors.arrow")
@@ -43,8 +44,12 @@ function initialise_data(options_folder)
     return main_data
 end
 
-function prepare_flow_controls(data)
-    
+function initialise_flow_data(options_folder; ret)
+    if ret == :raw
+        filename_return = 
+    println("Reading data...")
+    filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
+    filename_info = joinpath(INPUT_DIR_MFINFO, "fund_info.csv")
 end
 
 function rolling_std(data, col, window)
