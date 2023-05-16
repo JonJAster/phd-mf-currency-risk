@@ -67,14 +67,16 @@ function timeweight_returns(model_returns, decay_rate, lags)
         window_startdate = window_enddate - Dates.Month(lags)
 
         extract_start = i-lags
-        extract_end = i
+        extract_end = i-1
 
         model_returns[extract_start, :fundid] != window_fundid && continue
         date_extract = model_returns[extract_start:extract_end, :date]
         date_start_offset = findfirst(>=(window_startdate), date_extract)
 
+        isnothing(date_start_offset) && continue
+
         window_start = extract_start + date_start_offset - 1
-        window_end = i
+        window_end = i-1
 
         for factor in factor_return_cols
             window_returns = model_returns[window_start:window_end, factor]
@@ -102,6 +104,3 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
-
-returns = [0.23, 0.12, -0.02, .11, .02, -.03]
-        

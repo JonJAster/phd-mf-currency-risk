@@ -2,6 +2,7 @@ module CommonFunctions
 
 using
     DataFrames,
+    CSV,
     Base.Threads,
     Dates
 
@@ -15,14 +16,18 @@ export
     group_transform,
     group_combine,
     regression_table,
+    load_data_in_parts,
     ismissing_or_blank,
     name_model,
     offset_monthend
 
 const REGRESSION_ARGS = [
-    :lags, :lag, :categories, :cat, :time_fixed_effects, :tfe, :entity_fixed_effects, :efe
+    :plus_lags, :plus_lag, :lags, :lag, :categories, :cat, :time_fixed_effects, :tfe,
+    :entity_fixed_effects, :efe
 ]
-const PARAMETER_REGRESSION_ARGS = [:lags, :lag, :time_fixed_effects, :tfe]
+const PARAMETER_REGRESSION_ARGS = [
+    :plus_lags, :plus_lag, :lags, :lag, :time_fixed_effects, :tfe
+]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
 function makepath(paths...)
@@ -160,7 +165,7 @@ function regression_table(data, entity_col, date_col, column_args...)
 
         if arg ∈ data_cols
             active_column = arg
-            regression_table[!, arg] = data[!, arg]
+            regression_table[!, arg] = data[:, arg]
             continue
         end
 
@@ -189,6 +194,9 @@ end
 function do_arg_call!(arg, data, col; parameter=nothing)
     if arg == :lags || arg == :lag
         add_lags!(data, col, nlags=parameter)
+        select!(data, Not(col))
+    elseif arg == :plus_lags || arg == :plus_lag
+        add_lags!(data, col, nlags=parameter)
     elseif arg == :categories || arg == :cat
         convert_to_category_dummies!(data, col)
     elseif arg == :time_fixed_effects || arg == :tfe
@@ -209,7 +217,7 @@ function add_lags!(data, col; nlags)
 end
 
 function convert_to_category_dummies!(data, col)
-    categories = unique(data[!, col])
+    categories = unique(data[!, col])[2:end]
     for category in categories
         data[!, "$(col)_$category"] = Int.(data[!, col] .== category)
     end
@@ -225,10 +233,10 @@ function add_time_fe!(data; frequency)
         data[!, date_category] = get.(Ref(unique_dates_indexer), data.date, nothing)
     elseif frequency ∈ [:d, :day, :daily]
         date_category = :fe_date
-        data[!, date_category] = Dates.format(data.date, "yyyymmdd")
+        data[!, date_category] = Dates.format.(data.date, "yyyymmdd")
     elseif frequency ∈ [:m, :month, :monthly]
         date_category = :fe_month
-        data[!, date_category] = Dates.format(data.date, "yyyymm")
+        data[!, date_category] = Dates.format.(data.date, "yyyymm")
     elseif frequency ∈ [:q, :quarter, :quarterly]
         date_category = :fe_quarter
         yearstr = string.(Dates.year.(data.date))
@@ -236,7 +244,7 @@ function add_time_fe!(data; frequency)
         data[!, date_category] = String.(yearstr) .* "Q" .* String.(quarterstr)
     elseif frequency ∈ [:y, :year, :yearly]
         date_category = :fe_year
-        data[!, date_category] = Dates.format(data.date, "yyyy")
+        data[!, date_category] = Dates.format.(data.date, "yyyy")
     else
         error("Invalid frequency: $frequency. Must be :month, :quarter, or :year.")
     end
@@ -247,6 +255,44 @@ end
 function add_entity_fe!(data)
     data[!, :fe_entity] = data[!, :entity]
     convert_to_category_dummies!(data, :fe_entity)
+end
+
+function fund_filter!(data, filters...)
+    length(filters) % 2 == 0 || error("Odd number of arguments.")
+    args_index = 1
+    while arg_index <= length(filters)
+        filter_type = filters[arg_index]
+        filter_value = filters[arg_index + 1]
+        
+        _filteronce!(data, filter_type, filter_value)
+
+        arg_index += 2
+    end
+    return data
+end
+
+function _filteronce!(data, filter_type, filter_value)
+    if filter_type == :active
+        filter!("management-style---active"=> ==(filter_value), data)
+        nrow(data) == 0 && println("Warning: No funds selected by active filter.") 
+    elseif filter_type == :passive
+        filter!("management-style---passive"=> ==(filter_value), data)
+        nrow(data) == 0 && println("Warning: No funds selected by passive filter.")
+    elseif filter_type == :domicile
+        filter!(:domicile=> ==(filter_value), data)
+        nrow(data) == 0 && println("Warning: No funds selected by domicile filter.")
+    elseif filter_type == :domestic
+        nothing
+        # domestic_filter!(data, filter_value)
+    elseif filter_type == :international
+        nothing
+        # international_filter!(data, filter_value)
+    else
+        error(
+            "Invalid filter type: $filter_type. Must be :active, :passive, :domicile, " *
+            ":domestic, or :international."
+        )
+    end
 end
 
 function group_transform!(df, group_cols, input_cols, f::Function, output_cols)
@@ -274,8 +320,21 @@ function group_combine(df, group_cols, input_cols, f::Function, output_cols;
     return output
 end
 
+function load_data_in_parts(dirstring; select=nothing)
+    output_data = DataFrame[]
+
+    for file in readdir(dirstring)
+        filestring = joinpath(dirstring, file)
+        file_data = CSV.read(filestring, DataFrame, select=select)
+        push!(output_data, file_data)
+    end
+
+    return vcat(output_data...)
+end
+
 name_model(model) = "$(model[2])_$(model[1])"
 offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofmonth
 ismissing_or_blank(x) = ismissing(x) || x == ""
+nonmissing(v) = coalesce.(v, false)
 
-end
+filter!

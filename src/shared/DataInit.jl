@@ -2,14 +2,14 @@ module DataInit
 
 export
     initialise_base_data,
-    prepare_flow_controls
+    initialise_flow_data
 
 using
     DataFrames,
     Arrow,
     CSV,
     Base.Threads,
-    Statistics
+    Statistics,
     Dates
 
 include("CommonConstants.jl")
@@ -26,7 +26,6 @@ const INPUT_DIR_EQ = joinpath(DIRS.equity, "factor-series")
 const READ_COLUMNS_MF = [:fundid, :date, :ret_gross_m, :domicile]
 
 function initialise_base_data(options_folder)
-    println("Reading data...")
     filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
     filename_fx = joinpath(INPUT_DIR_FX, "currency_factors.arrow")
     filename_longshort = joinpath(INPUT_DIR_EQ, "equity_factors.arrow")
@@ -46,7 +45,6 @@ function initialise_base_data(options_folder)
 end
 
 function initialise_flow_data(options_folder, model; ret)
-    println("Reading data...")
     model_name = name_model(model)
     
     if ret == :raw
@@ -60,7 +58,7 @@ function initialise_flow_data(options_folder, model; ret)
     else
         error("ret must be :raw or :weighted")
     end
-
+    
     filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
     filename_info = joinpath(INPUT_DIR_MFINFO, "mf_info.arrow")
 
@@ -70,7 +68,10 @@ function initialise_flow_data(options_folder, model; ret)
 
     fund_base_data.std_return_12m = rolling_std(fund_base_data, :ret, 12)
 
-    select!(fund_base_data, ["fundid", "date", "fund_flow", "fund_assets", "mean_costs"])
+    select!(
+        fund_base_data,
+        ["fundid", "date", "fund_flow", "fund_assets", "mean_costs", "std_return_12m"]
+    )
     select!(fund_info, ["fundid", "true-no-load", "inception-date"])
 
     fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
@@ -80,12 +81,16 @@ function initialise_flow_data(options_folder, model; ret)
 
     fund_full_data.age = (
         12*(year.(fund_full_data.date) .- year.(fund_full_data."inception-date")) .+
-        (month.(fund_full_data.date) .- month.(fund_full_data."inception-date"))
+        (month.(fund_full_data.date) .- month.(fund_full_data."inception-date")) .+ 1
     )
 
     output_data = fund_full_data[fund_full_data.age .>= 0, :]
 
-    select!(output_data, Not("inception-date"))
+    output_data.log_size = log.(output_data.fund_assets)
+    output_data.log_age = log.(output_data.age)
+    
+    sort!(output_data, [:fundid, :date])
+    select!(output_data, Not(["inception-date", "age", "fund_assets"]))
 
     return output_data
 end

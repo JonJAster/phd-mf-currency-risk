@@ -10,10 +10,8 @@ using
     .CommonFunctions,
     .CommonConstants
 
-const INPUT_DIR_MF = joinpath(DIRS.fund, "post-processing")
-const INPUT_DIR_MFINFO = joinpath(DIRS.fund, "domicile-grouped/info")
-const OUTPUT_DIR_MF = INPUT_DIR_MF
-const OUTPUT_DIR_MFINFO = joinpath(DIRS.fund, "info")
+const INPUT_DIR = joinpath(DIRS.fund, "post-processing")
+const OUTPUT_DIR = INPUT_DIR
 
 const READ_COLUMNS = [
     :fundid, :date, :ret_gross_m, :mean_costs, :fund_assets, :fund_flow, :domicile
@@ -41,7 +39,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     rename!(fund_data, :ret_gross_m => :ret)
     select!(fund_data, OUTPUT_COLUMNS)
 
-    output_filestring = makepath(OUTPUT_DIR_MF, options_folder, "main/fund_data.arrow")
+    output_filestring = makepath(OUTPUT_DIR, options_folder, "main/fund_data.arrow")
     Arrow.write(output_filestring, fund_data)
 
     duration_s = round(time() - time_start, digits=2)
@@ -49,21 +47,9 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
 end
 
 function load_fund_data(options_folder)
-    dirstring = joinpath(INPUT_DIR_MF, options_folder, "initialised")
+    dirstring = joinpath(INPUT_DIR, options_folder, "initialised")
     output_data = load_data_in_parts(dirstring, select=READ_COLUMNS)
     return output_data
-end
-
-function load_data_in_parts(dirstring; select=nothing)
-    output_data = DataFrame[]
-
-    for file in readdir(dirstring)
-        filestring = joinpath(dirstring, file)
-        file_data = CSV.read(filestring, DataFrame, select=select)
-        push!(output_data, file_data)
-    end
-
-    return vcat(output_data...)
 end
 
 function map_currency(date_series, country_series, currency_map)
