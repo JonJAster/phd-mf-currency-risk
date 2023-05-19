@@ -13,7 +13,7 @@ const INPUT_DIR_MARKET = joinpath(DIRS.equity, "raw")
 const INPUT_DIR_FX = joinpath(DIRS.currency, "combined")
 const OUTPUT_DIR = joinpath(DIRS.equity, "factor-series")
 const READ_COLUMNS_MARKET = [:excntry, :eom, :me_lag1, :mkt_vw]
-const READ_COLUMNS_FX = [:cur_code, :date, :spot_mid, :forward_mid]
+const READ_COLUMNS_FX = [:currency, :date, :spot_mid, :forward_mid]
 
 function main()
     time_start = time()
@@ -27,19 +27,19 @@ function main()
     usd_rf = CSV.read(filename_rf, DataFrame)
     fx_rates = Arrow.Table(filename_fx) |> DataFrame
 
+    println("Building local risk-free series...")
+    local_rf = build_local_rf(usd_rf, fx_rates)
+
     println("Aggregating to global...")
     world_index_usd = aggregate_by_market_equity(market_returns)
 
     println("Copying to local currencies...")
     world_index_local = build_local_indices(world_index_usd, fx_rates)
 
-    println("Building local risk-free series...")
-    local_rf = build_local_rf(usd_rf, fx_rates)
-
-    global_market_data = innerjoin(world_index_local, local_rf, on=[:cur_code, :date])
+    global_market_data = innerjoin(world_index_local, local_rf, on=[:currency, :date])
     global_market_data.mkt = global_market_data.mkt_gross .- global_market_data.rf
 
-    output_filestring = makepath(OUTPUT_DIR, "global_mkt_data.arrow")
+    output_filestring = makepath(OUTPUT_DIR, "unhedged_global_mkt.arrow")
 
     Arrow.write(output_filestring, global_market_data)
 
@@ -75,7 +75,7 @@ function build_local_indices(market_data, rates_data)
     end
 
     output = vcat(local_market_data_set...)
-    sort!(output, [:cur_code, :date])
+    sort!(output, [:currency, :date])
     return output
 end
 
@@ -91,7 +91,7 @@ function build_local_rf(usd_rf, rates_data)
     end
 
     output = vcat(local_riskfree_set...)
-    sort!(output, [:cur_code, :date])
+    sort!(output, [:currency, :date])
     dropmissing!(output, :rf)
     return output
 end

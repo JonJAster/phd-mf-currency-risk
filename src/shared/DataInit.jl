@@ -29,7 +29,7 @@ function initialise_base_data(options_folder)
     filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
     filename_fx = joinpath(INPUT_DIR_FX, "currency_factors.arrow")
     filename_longshort = joinpath(INPUT_DIR_EQ, "equity_factors.arrow")
-    filename_market = joinpath(INPUT_DIR_EQ, "global_mkt_data.arrow")
+    filename_market = joinpath(INPUT_DIR_EQ, "unhedged_global_mkt.arrow")
 
     fund_data = Arrow.Table(filename_mf) |> DataFrame
     currency_factors = Arrow.Table(filename_fx) |> DataFrame
@@ -38,7 +38,7 @@ function initialise_base_data(options_folder)
     
     partialjoin = innerjoin(fund_data, longshort_factors, currency_factors, on=:date)
     main_data = innerjoin(
-        partialjoin, market_data, on=[:cur_code, :date], matchmissing=:notequal
+        partialjoin, market_data, on=[:currency, :date], matchmissing=:notequal
     )
 
     return main_data

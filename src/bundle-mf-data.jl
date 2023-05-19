@@ -17,16 +17,11 @@ const READ_COLUMNS = [
     :fundid, :date, :ret_gross_m, :mean_costs, :fund_assets, :fund_flow, :domicile
 ]
 const OUTPUT_COLUMNS = [
-    :fundid, :date, :cur_code, :ret, :fund_flow, :domicile, :fund_assets, :mean_costs
+    :fundid, :date, :currency, :ret, :fund_flow, :domicile, :fund_assets, :mean_costs
 ]
 
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     time_start = time()
-    println("Bundling mutual fund info...")
-    fund_info = load_data_in_parts(INPUT_DIR_MFINFO)
-    output_filestring = makepath(OUTPUT_DIR_MFINFO, "mf_info.arrow")
-    Arrow.write(output_filestring, fund_info)
-
     println("Reading data...")
     filename_map = joinpath(DIRS.map, "currency_to_country.csv")
     
@@ -34,7 +29,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     currency_map = CSV.read(filename_map, DataFrame)
 
     println("Mapping countries to currencies...")
-    fund_data.cur_code = map_currency(fund_data.date, fund_data.domicile, currency_map)
+    fund_data.currency = map_currency(fund_data.date, fund_data.domicile, currency_map)
 
     rename!(fund_data, :ret_gross_m => :ret)
     select!(fund_data, OUTPUT_COLUMNS)

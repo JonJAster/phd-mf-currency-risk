@@ -54,7 +54,7 @@ const BASKET_ALLOCATION_ORDER = Dict(
 )
 
 function compute_delta_spot!(df)
-    group_on = :cur_code
+    group_on = :currency
     input = :spot_mid
     output = :delta_spot
 
@@ -64,7 +64,7 @@ function compute_delta_spot!(df)
 end
 
 function compute_forward_discount!(df)
-    group_on = :cur_code
+    group_on = :currency
     input = [:spot_mid, :forward_mid]
     output = :forward_discount
 
@@ -79,7 +79,7 @@ function compute_forward_discount!(df)
 end
 
 function compute_carry_returns!(df)
-    group_on = :cur_code
+    group_on = :currency
     input = [
         :delta_spot, :forward_discount, :forward_bid, :forward_ask, :spot_bid, :spot_ask
     ]

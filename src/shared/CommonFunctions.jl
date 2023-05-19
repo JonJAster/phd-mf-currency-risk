@@ -2,11 +2,15 @@ module CommonFunctions
 
 using
     DataFrames,
+    Arrow,
     CSV,
     Base.Threads,
     Dates
 
 using ShiftedArrays: lag
+
+include("CommonConstants.jl")
+using .CommonConstants
 
 export
     makepath,
@@ -16,10 +20,13 @@ export
     group_transform,
     group_combine,
     regression_table,
+    infofilter,
+    infolookup,
     load_data_in_parts,
     ismissing_or_blank,
     name_model,
-    offset_monthend
+    offset_monthend,
+    nonmissing
 
 const REGRESSION_ARGS = [
     :plus_lags, :plus_lag, :lags, :lag, :categories, :cat, :time_fixed_effects, :tfe,
@@ -44,8 +51,8 @@ end
 
 function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)
-    append_data.cur_code .= currency_code
-    append_data = append_data[:, [:cur_code, :date, value_columns]]
+    append_data.currency .= currency_code
+    append_data = append_data[:, [:currency, :date, value_columns]]
     push!(datalist, append_data)
 end
 
@@ -61,7 +68,7 @@ function option_foldername(; currency_type, kwargs...)
     elseif currency_type == :usd
         folder_name = "usd-rets"
     else
-        error("Invalid currency type: $(options_in[:currency_type]). Must be :local or :usd.")
+        error("Invalid currency type: $currency_type. Must be :local or :usd.")
     end
 
     if haskey(options_in, :raw_ret_only) && options_in[:raw_ret_only] == false
@@ -257,42 +264,31 @@ function add_entity_fe!(data)
     convert_to_category_dummies!(data, :fe_entity)
 end
 
-function fund_filter!(data, filters...)
-    length(filters) % 2 == 0 || error("Odd number of arguments.")
-    args_index = 1
-    while arg_index <= length(filters)
-        filter_type = filters[arg_index]
-        filter_value = filters[arg_index + 1]
-        
-        _filteronce!(data, filter_type, filter_value)
+function infofilter(f, data; notebook=false)
+    fund_info = _loadinfo(notebook)
+    
+    filtered_info = filter(f, fund_info)
+    filtered_ids = filtered_info.fundid |> Set
 
-        arg_index += 2
-    end
-    return data
+    return filter(:fundid => in(filtered_ids), data)
 end
 
-function _filteronce!(data, filter_type, filter_value)
-    if filter_type == :active
-        filter!("management-style---active"=> ==(filter_value), data)
-        nrow(data) == 0 && println("Warning: No funds selected by active filter.") 
-    elseif filter_type == :passive
-        filter!("management-style---passive"=> ==(filter_value), data)
-        nrow(data) == 0 && println("Warning: No funds selected by passive filter.")
-    elseif filter_type == :domicile
-        filter!(:domicile=> ==(filter_value), data)
-        nrow(data) == 0 && println("Warning: No funds selected by domicile filter.")
-    elseif filter_type == :domestic
-        nothing
-        # domestic_filter!(data, filter_value)
-    elseif filter_type == :international
-        nothing
-        # international_filter!(data, filter_value)
-    else
-        error(
-            "Invalid filter type: $filter_type. Must be :active, :passive, :domicile, " *
-            ":domestic, or :international."
-        )
+function infolookup(id; notebook=false)
+    fund_info = _loadinfo(notebook)
+    idrow = fund_info[fund_info.fundid .== id, :]
+    
+    for col in names(fund_info)
+        println("$col: $(idrow[1, col])")
     end
+
+    return idrow
+end
+
+function _loadinfo(notebook)
+    info_filename = joinpath(DIRS.fund, "info", "mf_info.arrow")
+    notebook && (info_filename = joinpath("..", info_filename))
+    fund_info = Arrow.Table(info_filename) |> DataFrame
+    return fund_info
 end
 
 function group_transform!(df, group_cols, input_cols, f::Function, output_cols)
@@ -337,4 +333,4 @@ offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofm
 ismissing_or_blank(x) = ismissing(x) || x == ""
 nonmissing(v) = coalesce.(v, false)
 
-filter!
+end

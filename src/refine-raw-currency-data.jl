@@ -66,7 +66,7 @@ function main()
     assert_equal_dates!(rate_data)
 
     currency_series = DataFrame[]
-    unique_currencies = unique(info[:, :cur_code])
+    unique_currencies = unique(info[:, :currency])
 
     println("Processing rate data...")
     for i in unique_currencies
@@ -82,8 +82,8 @@ function main()
     currency_table_cip_violated = copy(currency_table)
     remove_cip_violations!(currency_table)
 
-    sort!(currency_table, [:cur_code, :date])
-    sort!(currency_table_cip_violated, [:cur_code, :date])
+    sort!(currency_table, [:currency, :date])
+    sort!(currency_table_cip_violated, [:currency, :date])
 
     output_filestring = makepath(OUTPUT_DIR, "currency_rates.arrow")
     output_filestring_unfiltered = makepath(OUTPUT_DIR, "currency_rates_unfiltered.arrow")
@@ -115,7 +115,7 @@ function termcheck(rate::AbstractVector{T}, term) where T<:Union{Missing,Float64
 end
 
 function build_rate_series(currency, info, rate_data)
-    currency_info = info[info[:, :cur_code] .== currency, :]
+    currency_info = info[info[:, :currency] .== currency, :]
     dates = first(values(rate_data))[!, :date]
 
     currency_rate_sets = Dict(
@@ -126,7 +126,7 @@ function build_rate_series(currency, info, rate_data)
         push_source_to_rate_sets!(currency_rate_sets, series_source, rate_data)
     end
 
-    index_columns = OrderedDict(:cur_code => currency, :date => dates)
+    index_columns = OrderedDict(:currency => currency, :date => dates)
     rate_columns = OrderedDict(
         Symbol.("$(a)_$b") => layer_series(currency_rate_sets[(a, b)])
         for (a, b) in RATE_TYPES
@@ -205,7 +205,7 @@ end
 function remove_cip_violations!(currency_table)
     for i in CIP_VIOLATIONS
         cip_violation_mask = (
-            (currency_table[:, :cur_code] .== i.currency)
+            (currency_table[:, :currency] .== i.currency)
             .& (currency_table[:, :date] .>= Date(i.start_date))
             .& (currency_table[:, :date] .<= Date(i.end_date))
         )
@@ -218,7 +218,7 @@ end
 function end_euro_constituents!(currency_table)
     for i in EURO_CONSTITUENTS
         euro_constituent_mask = (
-            (currency_table[:, :cur_code] .== i.currency)
+            (currency_table[:, :currency] .== i.currency)
             .& (currency_table[:, :date] .>= Date(i.start_date))
         )
 
