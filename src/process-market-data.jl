@@ -21,7 +21,7 @@ function main()
     println("Reading data...")
     filename_market = joinpath(INPUT_DIR_MARKET, "country_market_data.csv")
     filename_rf = joinpath(INPUT_DIR_MARKET, "usd_riskfree.csv")
-    filename_fx = joinpath(INPUT_DIR_FX, "currency_rates_unfiltered.arrow")
+    filename_fx = joinpath(INPUT_DIR_FX, "currency_rates.arrow")
 
     market_returns = CSV.read(filename_market, DataFrame, select=READ_COLUMNS_MARKET)
     usd_rf = CSV.read(filename_rf, DataFrame)

@@ -328,7 +328,7 @@ function load_data_in_parts(dirstring; select=nothing)
     return vcat(output_data...)
 end
 
-name_model(model) = "$(model[2])_$(model[1])"
+name_model(model) = "$(model[1])_$(model[2])"
 offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofmonth
 ismissing_or_blank(x) = ismissing(x) || x == ""
 nonmissing(v) = coalesce.(v, false)

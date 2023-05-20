@@ -35,7 +35,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
             :fund_flow, :plus_lag, 19,
             return_component_cols...,
             :mean_costs, :plus_lag, 19,
-            Symbol("true-no-load"),
+            :no_load,
             :std_return_12m,
             :log_size, :lag,
             :log_age, :lag,
@@ -92,7 +92,7 @@ end
 
 # AUTO TESTS
 options_folder=option_foldername(; DEFAULT_OPTIONS...)
-model = (COMPLETE_MODELS)[6]
+model = (COMPLETE_MODELS)[4]
 using Dates
 using StatsBase
 
@@ -119,30 +119,4 @@ if false
         12*(year(rowdate) .- year(incdate)) .+
         (month(rowdate) .- month(incdate)) .+ 1
     )
-
-    fund_full_data = regression_data[regression_data.fundid .== "FSUSA002PR", [:fundid, :date]]
-    fund_full_data."inception-date" .= info[info.fundid .== "FSUSA002PR", "inception-date"]
-
-    fund_full_data.age = (
-            12*(year.(fund_full_data.date) .- year.(fund_full_data."inception-date")) .+
-            (month.(fund_full_data.date) .- month.(fund_full_data."inception-date")) .+ 1
-    )
-
-    flow_data[(flow_data.fundid .== "FSUSA002PR") .&& (flow_data.date .>= Date(2016,10,31)), :]
-
-    fund_full_data[fund_full_data.date .>= Date(2016,10,31), :]
-
-    regression_data[regression_data.fundid .== "FSUSA002PR", [:fundid, :date, :log_age_lag1]]
-
-    activeness = info[:, ["fundid", "management-approach---active", "management-approach---passive"]]
-    activeness_zip = zip(activeness."management-approach---active", activeness."management-approach---passive") |> collect
-
-    countmap(activeness_zip)
-
-
-    activeness_yes = activeness[activeness."management-approach---active" .== "Yes", :]
 end
-
-mwe = DataFrame(a=[1, missing, 3], b=[true,false,true])
-
-@enter mwe[mwe.a .>= 0,:]

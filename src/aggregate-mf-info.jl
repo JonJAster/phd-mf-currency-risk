@@ -19,7 +19,7 @@ const UNIQUE_AGG_COLS = [
 const RENAME_MAP = Dict(
     "base-currency" => "currency", "global-broad-category-group" => "broad_category",
     "management-approach---active" => "active", "management-approach---passive" => "passive",
-    "true-no-load" => "no_load"
+    "true-no-load" => "no_load", "inception-date" => "inception_date"
 )
 
 const ISO_MAP = Dict(
@@ -57,7 +57,7 @@ function main()
 
     println("Aggregating to fund level...")
     fund_info = groupby(fundsec_info, :fundid) |> gb->combine(
-        gb, UNIQUE_AGG_COLS .=> agg_if_unique, "inception-date" => minimum; renamecols=false
+        gb, UNIQUE_AGG_COLS .=> agg_if_unique, "inception_date" => minimum; renamecols=false
     )
 
     fund_info.domicile = map(country -> ISO_MAP[country], fund_info.domicile)

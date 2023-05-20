@@ -30,7 +30,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
 
     @threads for model in COMPLETE_MODELS
         process_start = time()
-        currency_risk_model_name, benchmark_model_name = model
+        benchmark_model_name, currency_risk_model_name = model
         benchmark_factors = BENCHMARK_MODELS[benchmark_model_name]
         currency_risk_factors = CURRENCYRISK_MODELS[currency_risk_model_name]
         complete_factors = vcat(benchmark_factors, currency_risk_factors)
@@ -57,10 +57,10 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
 
     for model in COMPLETE_MODELS
         model_name = name_model(model)
-        currency_risk, benchmark = model
+        benchmark, currency_risk = model
 		filestring = joinpath(output_folderstring, "$model_name.arrow")
 
-        Arrow.write(filestring, model_results[(currency_risk, benchmark)])
+        Arrow.write(filestring, model_results[(benchmark, currency_risk)])
     end
 
     time_duration_s = round(time() - time_start, digits=2)

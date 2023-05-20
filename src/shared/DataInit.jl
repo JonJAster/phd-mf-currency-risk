@@ -70,9 +70,9 @@ function initialise_flow_data(options_folder, model; ret)
 
     select!(
         fund_base_data,
-        ["fundid", "date", "fund_flow", "fund_assets", "mean_costs", "std_return_12m"]
+        [:fundid, :date, :fund_flow, :fund_assets, :mean_costs, :std_return_12m]
     )
-    select!(fund_info, ["fundid", "true-no-load", "inception-date"])
+    select!(fund_info, [:fundid, :no_load, :inception_date])
 
     fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
     fund_full_data = innerjoin(
@@ -80,8 +80,8 @@ function initialise_flow_data(options_folder, model; ret)
     )
 
     fund_full_data.age = (
-        12*(year.(fund_full_data.date) .- year.(fund_full_data."inception-date")) .+
-        (month.(fund_full_data.date) .- month.(fund_full_data."inception-date")) .+ 1
+        12*(year.(fund_full_data.date) .- year.(fund_full_data."inception_date")) .+
+        (month.(fund_full_data.date) .- month.(fund_full_data."inception_date")) .+ 1
     )
 
     output_data = fund_full_data[fund_full_data.age .>= 0, :]
@@ -90,7 +90,7 @@ function initialise_flow_data(options_folder, model; ret)
     output_data.log_age = log.(output_data.age)
     
     sort!(output_data, [:fundid, :date])
-    select!(output_data, Not(["inception-date", "age", "fund_assets"]))
+    select!(output_data, Not(["inception_date", "age", "fund_assets"]))
 
     return output_data
 end
