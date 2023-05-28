@@ -1,13 +1,10 @@
-using
-    DataFrames,
-    CSV,
-    Dates
+using Revise
+using FromFile
+using DataFrames
+using CSV
+using Dates
 
-include("shared/CommonConstants.jl")
-include("shared/CommonFunctions.jl")
-using
-    .CommonFunctions,
-    .CommonConstants
+@from "../../utils.jl" using ProjectUtilities
 
 const INPUT_DIR = joinpath(DIRS.fund, "raw")
 const OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
@@ -16,6 +13,10 @@ const DATESTRING = r"\d{4}-\d{2}"
 const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
 const DATA_COLS = Not([:name, :fundid, :secid])
 const NONDATA_COL_OFFSET = 3
+
+DIRS
+
+joinpath("abc", "usd")
 
 function main()
     main_time_start = time()
