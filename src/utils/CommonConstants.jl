@@ -1,25 +1,4 @@
-module CommonConstants
-
 using DataStructures
-
-export
-    DIRS,
-    FIELD_FOLDERS,
-    COUNTRY_GROUPS,
-    BENCHMARK_MODELS,
-    CURRENCYRISK_MODELS,
-    COMPLETE_MODELS,
-    RESULT_COLUMNS,
-    DEFAULT_BETA_LAGS,
-    DEFAULT_MIN_REGRESSION_OBS,
-    DEFAULT_DECAY,
-    DEFAULT_TIMEWEIGHT_LAGS,
-    DEFAULT_OPTIONS
-
-struct QFile
-    path::Vector{String}
-    type::Symbol
-end
 
 const DIRS = (
     fund = "data/mutual-funds",
@@ -81,6 +60,3 @@ const DEFAULT_OPTIONS = Dict(
     :polation_method => :interpolate,
     :inv_targets => true
 )
-
-end
-
