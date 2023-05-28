@@ -1,0 +1,4 @@
+name = "Currency Exposure of Mutual Funds"
+uuid = "d1cafb7e-5fdc-4769-931c-8a10bf6a671f"
+authors = ["Jon Aster <jonaster.mail@gmail.com>"]
+version = "0.1.0"

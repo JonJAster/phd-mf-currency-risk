@@ -49,6 +49,9 @@ function makepath(paths...)
     return filestring
 end
 
+function qfile(qfile_string, kwargs...)
+    
+
 function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)
     append_data.currency .= currency_code
@@ -56,7 +59,40 @@ function push_with_currency_code!(datalist, df, currency_code, value_columns)
     push!(datalist, append_data)
 end
 
+"""
+    option_foldername(; currency_type, kwargs...)
+
+Returns the formatted string for the folder name of the options folder given
+a list of input options. The options are:
+
+- `currency_type` [:local or :usd] [REQUIRED]
+    - The denomination of returns.
+- `raw_ret_only` [true or false]:
+    - If true, impute missing returns using net returns and costs.
+- `polation_method` [:both, :interpolate, :extrapolate]: If true, interpolate or
+                                                        extrapolate missing net assets.
+- `strict_eq` [true or false]: If true, use the strict equity categorisation when
+                              filtering for equity-based funds.
+- `exc_finre` [true or false]: If true, exclude financial real estate funds.
+- `inv_targets` [true or false]: If true, include investment targets in the saved data.
+- `age_filter` [true or false]: If true, save a second set of data with funds filtered
+                               by age.
+
+Arguments
+---------
+- `currency_type` : Symbol
+    - The required currency_type option value.
+
+- `kwargs` : Symbol
+    - All other options supplied as option name => option value pairs.
+
+Returns
+-------
+- `folder_name` : String
+    - The formatted folder name.
+"""
 function option_foldername(; currency_type, kwargs...)
+    
     options_in = Dict{Symbol, Any}()
     for (key, value) in kwargs
         typeof(value) <: AbstractString && (value = Symbol(value))
@@ -109,40 +145,46 @@ function option_foldername(; currency_type, kwargs...)
     return folder_name
 end
 
+"""
+    regression_table(data, entity_col, date_col, column_args...)
+
+Returns a DataFrame containing columns to be used as inputs in a regression as
+defined by the column_args. The column_args can be any combination of any number of the 
+following sequences:
+    - A column name in the data DataFrame.
+    - A column name followed by a regression argument (see REGRESSION_ARGS).
+    - A column name followed by a regression argument that takes a parameter followed
+        by the parameter value (see PARAMETER_REGRESSION_ARGS).
+    - A regression argument that takes no column name (see NOCOLUMN_REGRESSION_ARGS).
+
+Columns on their own will be included in the regression table as is. Columns followed
+by a regression argument will be included in the regression table with the regression
+argument applied to them or converted into a series of other columns, depending on the
+argument.
+
+Arguments
+---------
+data : DataFrame
+
+    The DataFrame containing the columns to be used in the regression.
+entity_col : Symbol
+
+    The name of the column in data containing the entity identifiers.
+date_col : Symbol
+
+    The name of the column in data containing the dates.
+column_args : Any
+
+    Any number of column names, column names followed by regression arguments followed
+    optionally by regression parameters, or regression arguments that take no column
+    name.
+
+Returns
+-------
+regression_table : DataFrame
+    A DataFrame containing the columns to be used in the regression.
+"""
 function regression_table(data, entity_col, date_col, column_args...)
-    """
-    Returns a DataFrame containing columns to be used as inputs in a regression as
-    defined by the column_args. The column_args can be any combination of any number of the 
-    following sequences:
-        - A column name in the data DataFrame.
-        - A column name followed by a regression argument (see REGRESSION_ARGS).
-        - A column name followed by a regression argument that takes a parameter followed
-            by the parameter value (see PARAMETER_REGRESSION_ARGS).
-        - A regression argument that takes no column name (see NOCOLUMN_REGRESSION_ARGS).
-
-    Columns on their own will be included in the regression table as is. Columns followed
-    by a regression argument will be included in the regression table with the regression
-    argument applied to them or converted into a series of other columns, depending on the
-    argument.
-
-    Arguments
-    ---------
-    data : DataFrame
-        The DataFrame containing the columns to be used in the regression.
-    entity_col : Symbol
-        The name of the column in data containing the entity identifiers.
-    date_col : Symbol
-        The name of the column in data containing the dates.
-    column_args : Any
-        Any number of column names, column names followed by regression arguments followed
-        optionally by regression parameters, or regression arguments that take no column
-        name.
-
-    Returns
-    -------
-    regression_table : DataFrame
-        A DataFrame containing the columns to be used in the regression.
-    """
     data_cols = propertynames(data)
     reserved_usage = REGRESSION_ARGS ∩ data_cols
     reserved_usage != [] && error("Reserved args used as column names: $reserved_usage.")

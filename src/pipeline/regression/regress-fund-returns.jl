@@ -58,7 +58,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     for model in COMPLETE_MODELS
         model_name = name_model(model)
         benchmark, currency_risk = model
-		filestring = joinpath(output_folderstring, "$model_name.arrow")
+		filestring = makepath(output_folderstring, "$model_name.arrow")
 
         Arrow.write(filestring, model_results[(benchmark, currency_risk)])
     end

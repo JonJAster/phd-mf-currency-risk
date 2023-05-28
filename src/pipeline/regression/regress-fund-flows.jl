@@ -1,7 +1,8 @@
 using
     DataFrames,
     Arrow,
-    GLM
+    GLM,
+    Base.Threads
 
 include("shared/CommonConstants.jl")
 include("shared/CommonFunctions.jl")
@@ -19,12 +20,27 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     start_time = time()
 
     output_folder = joinpath(OUTPUT_DIR, options_folder, "flow-betas")
+    
+    # SCRATCH CODE
+    main_folder = joinpath(DIRS.fund, "post-processing", options_folder, "initialised")
+    main_data = load_data_in_parts(main_folder)
 
+    main_data.inv_international = main_data.domicile .!= main_data.inv_country
+    gb = groupby(main_data, :fundid)
+    int_funds = combine(gb, :inv_international => all)
+    int_funds_filt = Set(int_funds[nonmissing(int_funds.inv_international_all), :fundid])
+    # END SCRATCH
+
+    test_results_filt = Dict()
     savelock = ReentrantLock()
-    for model in COMPLETE_MODELS
+    @threads for model in COMPLETE_MODELS[[1, 4, 6, 15]]
         process_start = time()
         model_name = name_model(model)
         flow_data = initialise_flow_data(options_folder, model; ret=:weighted)
+
+        # SCRATCH CODE
+        flow_data = infofilter(:domicile => ==("USA"), flow_data)
+        # END SCRATCH
 
         cols = names(flow_data)
         find_return_col(name) = !isnothing(match(r"ret_", name))
@@ -46,10 +62,11 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
         drop_zero_cols!(regression_data)
 
         flow_betas = flow_regression(regression_data, return_component_cols)
-
+        
         lock(savelock) do
-            output_filename = makepath(output_folder, "$model_name.arrow")
-            Arrow.write(flow_betas, output_filename)
+            test_results_filt[model] = flow_betas
+            # output_filename = makepath(output_folder, "$model_name.arrow")
+            # Arrow.write(flow_betas, output_filename)
         end
     end
 end
@@ -63,6 +80,7 @@ function flow_regression(data, return_cols)
     X = hcat(ones(n_obs), X_no_constant)
     
     regfit = lm(X, y)
+    println(r2(regfit))
     return_col_indices = findall(in(return_cols), X_cols)
 
     flow_betas = DataFrame(
@@ -92,12 +110,20 @@ end
 
 # AUTO TESTS
 options_folder=option_foldername(; DEFAULT_OPTIONS...)
-model = (COMPLETE_MODELS)[4]
+model = (COMPLETE_MODELS)[3]
 using Dates
 using StatsBase
 
 # MANUAL TESTS
 if false
+
+    for i in keys(test_results_filt)
+        println(i)
+        println(test_results_filt[i])
+    end
+
+    dftest = DataFrame(a=[1,2,3], b=[4,5,6], c=[7,8,9])
+
     data = regression_data
     return_cols = 1
 
@@ -120,3 +146,4 @@ if false
         (month(rowdate) .- month(incdate)) .+ 1
     )
 end
+

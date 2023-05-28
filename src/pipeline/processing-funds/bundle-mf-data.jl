@@ -34,6 +34,8 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     rename!(fund_data, :ret_gross_m => :ret)
     select!(fund_data, OUTPUT_COLUMNS)
 
+    fund_data.ret = fund_data.ret / 100
+
     output_filestring = makepath(OUTPUT_DIR, options_folder, "main/fund_data.arrow")
     Arrow.write(output_filestring, fund_data)
 

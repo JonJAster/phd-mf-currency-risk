@@ -16,11 +16,20 @@ export
     DEFAULT_TIMEWEIGHT_LAGS,
     DEFAULT_OPTIONS
 
+struct QFile
+    path::Vector{String}
+    type::Symbol
+end
+
 const DIRS = (
     fund = "data/mutual-funds",
     currency = "data/currencies",
     equity = "data/equities",
     map = "data/mappings"
+)
+
+const QFILES = (
+    fundinfo = ["data/mutual-funds/info/mf_info.arrow"]
 )
 
 const FIELD_FOLDERS = [
@@ -74,3 +83,4 @@ const DEFAULT_OPTIONS = Dict(
 )
 
 end
+

@@ -56,7 +56,7 @@ extract_betas(regression_outputs) = unstack(
 )
 
 function decompose_returns(data, model)
-    factors =  BENCHMARK_MODELS[model[2]] ∪ CURRENCYRISK_MODELS[model[1]]
+    factors =  BENCHMARK_MODELS[model[1]] ∪ CURRENCYRISK_MODELS[model[2]]
     decomposed_returns = data[!, [:fundid, :date, :ret]]
     decomposed_returns.ret_alpha .= 0.0
 
