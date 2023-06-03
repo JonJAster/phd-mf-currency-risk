@@ -38,37 +38,7 @@ const PARAMETER_REGRESSION_ARGS = [
 ]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
-function makepath(paths...)
-    filestring = joinpath(paths...)
-    dirstring = dirname(filestring)
-    
-    if !isdir(dirstring)
-        mkpath(dirstring)
-        println("Missing directory created: $dirstring")
-    end
 
-    return filestring
-end
-
-function qpath(qfile; kwargs...)
-    if get(kwargs, :notebook, false)
-        path_parts = ["..", qfile.path...]
-    else
-        path_parts = qfile.path
-    end
-
-    for i in eachindex(path_parts)
-        path_parts[i] == "" && continue
-        if first(path_parts[i]) == '$'
-            var_name = path_parts[i][2:end] |> Symbol
-            var_value = get(kwargs,var_name,nothing)
-            isnothing(var_value) && error("Expected '$var_name' to be provided.")
-            path_parts[i] = var_value
-        end
-    end
-    base_filepath = joinpath(path_parts)
-    return joinpath(path_parts)
-end
 
 function push_with_currency_code!(datalist, df, currency_code, value_columns)
     append_data = copy(df)

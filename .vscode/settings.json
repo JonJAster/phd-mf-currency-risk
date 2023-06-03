@@ -1,4 +1,6 @@
 {
     "python.analysis.typeCheckingMode": "off",
-    "julia.environmentPath": "c:\\Users\\ozboy\\OneDrive - The University of Queensland\\PHD\\Code\\Currency Exposure of Mutual Funds"
+    "editor.rulers": [
+        92
+    ]
 }

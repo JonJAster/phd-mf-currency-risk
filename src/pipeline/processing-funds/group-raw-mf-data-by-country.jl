@@ -6,24 +6,17 @@ using Dates
 
 @from "../../utils.jl" using ProjectUtilities
 
-const INPUT_DIR = joinpath(DIRS.fund, "raw")
-const OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
-
-const DATESTRING = r"\d{4}-\d{2}"
 const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
-const DATA_COLS = Not([:name, :fundid, :secid])
-const NONDATA_COL_OFFSET = 3
-
-DIRS
-
-joinpath("abc", "usd")
+const ID_COLS = [:name, :fundid, :secid]
 
 function main()
     main_time_start = time()
     # Load info data first to build a map from fundid to domicile country group
-    info = load_file_by_parts("info")
+    info = loadinfo()
+    countrygroup_map = build_groupmap()
 
-    info[!, :country_group] .= map_country_to_group.(info[!, :domicile])
+
+    info.country_group .= map_country_to_group.(info.domicile)
     secid_to_group = Dict(zip(info[!, :secid], info[!, :country_group]))
     println("Regrouping files...")
 
@@ -36,6 +29,15 @@ function main()
     println("Finished refining mutual fund data in $main_duration_s seconds " *
             "($main_duration_m minutes)")
 end
+
+function loadinfo()
+    info = qload(
+        PATHS.rawfunds, "info";
+        types=EXPLICIT_TYPES, stringtype=String, truestring=["Yes"], falsestrings=["No"]
+    )
+    normalise_headings!(info; infodata=true)
+end
+
     
 function load_file_by_parts(folder)
     folderstring = joinpath(INPUT_DIR, folder)
@@ -45,13 +47,13 @@ function load_file_by_parts(folder)
     for file in files
         filestring = joinpath(folderstring, file)
         
-        if folder == "info"
-            read_data = CSV.read(
-                filestring, DataFrame, types=EXPLICIT_TYPES, stringtype=String,
-                truestrings=["Yes"], falsestrings=["No"]
-            )
+        # if folder == "info"
+        #     read_data = CSV.read(
+        #         filestring, DataFrame, types=EXPLICIT_TYPES, stringtype=String,
+        #         truestrings=["Yes"], falsestrings=["No"]
+        #     )
 
-            normalise_headings!(read_data, infodata=true)
+        #     normalise_headings!(read_data, infodata=true)
         else
             read_data = CSV.read(
                 filestring, DataFrame, types=EXPLICIT_TYPES, stringtype=String,
@@ -77,29 +79,29 @@ end
 function normalise_headings!(data_part; infodata=false)
     if infodata
         raw_names = names(data_part)
-        re_whitespace_plus_bracket = r"\s+\("
-        re_close_bracket = r"\)"
-        re_remaining_whitespace = r"\s+"
+        re_underscored_chars = r"[\s\(\)\-]+(?!$)"
+        re_erased_chars = r"[\s\(\)\-]+$"
 
-        underscored_names = replace.(raw_names, re_whitespace_plus_bracket => "_")
-        bracket_stripped_names = replace.(underscored_names, re_close_bracket => "")
-        dashed_names = replace.(bracket_stripped_names, re_remaining_whitespace => "-")
+        underscored_names = replace.(raw_names, re_underscored_chars => "_")
+        tailclipped_names = replace.(underscored_names, re_erased_chars => "")
+        normalised_names = replace.(tailclipped_names, r"&" => "and")
 
-        rename!(data_part, lowercase.(dashed_names))
+        rename!(data_part, lowercase.(normalised_names))
     else
-        start_date = match(DATESTRING, names(data_part)[4]).match
-            number_of_other_dates = size(data_part, 2) - 4
-            data_dates = [Date(start_date) + Month(i) for i in 0:number_of_other_dates]
-            
-            column_names = Symbol.(
-                [lowercase.(names(data_part)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
-            )
+        datestring = r"\d{4}-\d{2}"
+        n_idcols = length(ID_COLS)
+        n_datacols = ncol(data_part) - n_idcols
+        first_datacol = n_idcols + 1
+        
+        start_date = match(datestring, names(data_part)[first_datacol]).match
+        data_dates = [Date(start_date) + Month(i) for i in 0:(n_datacols-1)]
+        column_names = [ID_COLS; Dates.format.(data_dates, "yyyy-mm")]
         rename!(data_part, column_names)
     end
 end
 
 function fix_thousands_commas(df)
-    col_types = map(col -> eltype(col), eachcol(df[!, DATA_COLS]))
+    col_types = map(col -> eltype(col), eachcol(df[!, Not(ID_COLS)]))
     isstring(T) = T <: Union{Missing, AbstractString} && T != Missing
     isnumber(T) = T <: Union{Missing, Number} && T != Missing
     data_contains_strings = any(isstring, col_types)
@@ -107,12 +109,12 @@ function fix_thousands_commas(df)
 
     mistyped_cols = Int[]
     if data_contains_strings && data_contains_numbers
-        mistyped_cols = findall(isstring, col_types) .+ NONDATA_COL_OFFSET
+        mistyped_cols = findall(isstring, col_types) .+ length(ID_COLS)
     elseif data_contains_strings
         data_query_idx = findfirst(!ismissing_or_blank, df[!, end])
         data_query = df[data_query_idx, end]
         valid_number = !occursin(r"[^\d.,]", data_query)
-        valid_number && (mistyped_cols = (1:length(col_types)) .+ NONDATA_COL_OFFSET)
+        valid_number && (mistyped_cols = (1:length(col_types))  .+ length(ID_COLS))
     end
 
     isempty(mistyped_cols) && return df
@@ -130,7 +132,7 @@ function strip_thousands_commas(df, mistyped_cols)
 end
 
 function drop_empty_rows(df)
-    where_data_exists = .!ismissing_or_blank.(df[!, DATA_COLS])
+    where_data_exists = .!ismissing_or_blank.(df[!, Not(ID_COLS)])
     any_data = reduce(.|, eachcol(where_data_exists))
     return df[any_data, :]
 end
