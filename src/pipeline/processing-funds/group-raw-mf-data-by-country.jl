@@ -1,4 +1,3 @@
-using Revise
 using FromFile
 using DataFrames
 using CSV
@@ -10,24 +9,32 @@ const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
 const ID_COLS = [:name, :fundid, :secid]
 
 function main()
-    main_time_start = time()
-    # Load info data first to build a map from fundid to domicile country group
+    startedat = time()
+
     info = loadinfo()
-    countrygroup_map = build_groupmap()
+    country_group_map = map_countrygroups()
 
-
-    info.country_group .= map_country_to_group.(info.domicile)
-    secid_to_group = Dict(zip(info[!, :secid], info[!, :country_group]))
+    info.country_group .= get.(Ref(country_group_map), info.domicile, "other")
+    secid_group_map = Dict(info.secid, info.country_group)
+    
     println("Regrouping files...")
+    for folder in FUND_DATA_FOLDERS
+        folder_startedat = time()
 
-    for folder in FIELD_FOLDERS
-        regroup_data(folder, secid_to_group, info)
+        data = loaddata(folder)
+
+        savegroups(folder, data; mapping=secid_group_map)
+
+        printtime(
+            "saving raw mutual fund data by country group", startedat;
+            process_subtask=folder, process_starttime=folder_startedat, minutes=true
+        )
     end
 
-    main_duration_s = round(time() - main_time_start, digits=2)
-    main_duration_m = round(main_duration_s / 60, digits=2)
-    println("Finished refining mutual fund data in $main_duration_s seconds " *
-            "($main_duration_m minutes)")
+    savegroups(info, "info"; mapping=secid_group_map)
+
+    printtime("regrouping all raw mutual fund data", startedat)
+    return nothing
 end
 
 function loadinfo()
@@ -36,8 +43,37 @@ function loadinfo()
         types=EXPLICIT_TYPES, stringtype=String, truestring=["Yes"], falsestrings=["No"]
     )
     normalise_headings!(info; infodata=true)
+    return nothing
 end
 
+function map_countrygroups()
+    group_names = keys(COUNTRY_GROUPS)
+    countries_in_group = values(COUNTRY_GROUPS)
+    country_group_pairs = Iterators.flatten(
+        [list .=> name for (name, list) in zip(group_names, countries_in_group)]
+    )
+
+    groupmap = Dict(country_group_pairs)
+    return groupmap
+end
+
+function loaddata(folder)
+    data = qload(PATHS.rawfunds, folder; types=EXPLICIT_TYPES, stringtype=String)
+    normalise_headings!(data)
+
+    dropempty!(data, [:fundid, :secid])
+    dropempty!(data; how=:all, dims=:both)
+    parsecommas!(data, Not(ID_COLS))
+
+    return data
+end
+
+function savegroups(folder, data; mapping)
+    data.group = get.(Ref(mapping), data.secid, "other")
+    groupby(data, :group) do group, group_data
+        qsave(PATHS.groupedfunds, "$folder.csv", group; data=group_data)
+    end
+end
     
 function load_file_by_parts(folder)
     folderstring = joinpath(INPUT_DIR, folder)
@@ -143,17 +179,6 @@ function drop_empty_cols(df)
     return df[:, any_data]
 end
 
-function map_country_to_group(country::AbstractString)
-    for (group, countries) in COUNTRY_GROUPS
-        if country in countries
-            return group
-        end
-    end
-
-    return "other"
-end
-map_country_to_group(::Missing) = return "other"
-
 function save_file_by_country_group(data, folder, group_map)
     for group in [keys(COUNTRY_GROUPS)..., "other"]
         # Split the dataframe into a subset of rows with the given country group
@@ -166,20 +191,13 @@ function save_file_by_country_group(data, folder, group_map)
     end
 end
 
-function regroup_data(folder, secid_to_group, info)
-    folder_time_start = time()
-    if folder == "info"
-        data = info[:, Not(:country_group)]
-    else
-        data = load_file_by_parts(folder)
-    end
-
-    save_file_by_country_group(data, folder, secid_to_group)
-        
-    folder_duration = round(time() - folder_time_start, digits=2)
-    println("Processed folder $folder in $folder_duration seconds")
-end
-
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
+end
+
+function printtime2(
+    task::AbstractString, start_time;
+    process_subtask=nothing
+)
+    nothing
 end

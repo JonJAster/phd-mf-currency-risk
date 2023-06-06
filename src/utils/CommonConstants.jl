@@ -11,24 +11,6 @@ const QFILES = (
     fundinfo = ["data/mutual-funds/info/mf_info.arrow"]
 )
 
-const FIELD_FOLDERS = [
-    "info", "local-monthly-gross-returns", "local-monthly-net-returns", "monthly-costs",
-    "monthly-morningstar-category", "monthly-net-assets", "usd-monthly-gross-returns",
-    "usd-monthly-net-returns"
-]
-const COUNTRY_GROUPS = Dict(
-    "lux" => ["Luxembourg"],
-    "kor" => ["South Korea"],
-    "usa" => ["United States"],
-    "can-chn-jpn" => ["Canada", "China", "Japan"],
-    "irl-bra" => ["Ireland", "Brazil"],
-    "gbr-fra-ind" => ["United Kingdom", "France", "India"],
-    "esp-tha-aus-zaf-mex-aut-che" => [
-        "Spain", "Thailand", "Australia", "South Africa",
-        "Mexico", "Austria", "Switzerland"
-    ]
-)
-
 const BENCHMARK_MODELS = OrderedDict(
     :world_capm => [:mkt],
     :world_ff3 => [:mkt, :smb, :hml],

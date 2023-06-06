@@ -30,8 +30,34 @@ function qpath(paths::AbstractString...; kwargs...)
     return output_path
 end
 
+"""
+    qsave(paths...; data, kwargs...)
+
+Save data to a file. The path can be specified as a string or as a series of
+strings and keywords. If the path contains a variable value, the variable
+should be specified as a keyword argument.
+
+# Examples
+```julia
+qsave("data/raw/info/mf_info_other.arrow"; data=info)
+qsave("data/raw/info/\\\$file"; data=info, file="mf_info_other.arrow")
+qsave(PATHS.mainfunds; data=info, options_folder="local-rets_eq-strict")
+```
+
+# Arguments
+- `paths...`: The path to the file to be saved. If the path
+    contains a variable value, the variable should be specified as a keyword
+    argument.
+- `data`: The data to be saved.
+- `kwargs...`: Keyword arguments. If the path contains a variable value, the
+    variable should be specified as a keyword argument.
+
+# Returns
+`nothing`
+"""
 function qsave(paths...; data, kwargs...)
     path = qpath(paths..., kwargs...)
+    filetype = _filetype(path)
     path_parent = dirname(path)
     
     if !isdir(path_parent)
@@ -41,7 +67,7 @@ function qsave(paths...; data, kwargs...)
 
     _savefile(path, data)
 
-    return path
+    return nothing
 end
 
 function qload(paths...; kwargs...)

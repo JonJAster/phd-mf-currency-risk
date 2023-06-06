@@ -1,3 +1,9 @@
+const FUND_DATA_FOLDERS = [
+    "local-monthly-gross-returns", "local-monthly-net-returns", "monthly-costs",
+    "monthly-morningstar-category", "monthly-net-assets", "usd-monthly-gross-returns",
+    "usd-monthly-net-returns"
+]
+
 const _FILE_EXTENSION = r"(?<=\.)[a-z]+$"
 
 function _loaddir(folderpath; kwargs...)
@@ -9,7 +15,9 @@ function _loaddir(folderpath; kwargs...)
         push!(data_parts, read_data)
     end
 
-    return vcat(data_parts...)
+    combined_data = vcat(data_parts...)
+
+    return combined_data
 end
 
 function _loadfile(filepath; kwargs...)
@@ -19,6 +27,8 @@ function _loadfile(filepath; kwargs...)
     elseif filetype == :arrow
         return Arrow.Table(filepath) |> DataFrame
     end
+
+    error("Internal error: filetype assertion failed")
 end
 
 function _savefile(filepath, datakwargs)
@@ -27,7 +37,11 @@ function _savefile(filepath, datakwargs)
         CSV.write(filepath, data)
     elseif filetype == :arrow
         Arrow.write(filepath, data)
+    else
+        error("Internal error: filetype assertion failed")
     end
+
+    return nothing
 end
 
 
@@ -35,7 +49,8 @@ function _filetype(path)
     (_, filetype) = splitext(path)
     filetype == "" && error("No valid file ext: $path")
     filetype ∉ [".csv", ".arrow"] && error("File must be of type 'csv' or 'arrow'")
-    return Symbol(filetype[2:end])
+    filetype_extract = Symbol(filetype[2:end])
+    return filetype_extract
 end
 
 # const INPUT_DIR_MF = joinpath(DIRS.fund, "post-processing")
