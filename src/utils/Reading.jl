@@ -1,18 +1,28 @@
-const FUND_DATA_FOLDERS = [
-    "local-monthly-gross-returns", "local-monthly-net-returns", "monthly-costs",
-    "monthly-morningstar-category", "monthly-net-assets", "usd-monthly-gross-returns",
-    "usd-monthly-net-returns"
-]
+const FUND_FIELDS = (
+    lgret = "local-monthly-gross-returns",
+    lnret = "local-monthly-net-returns",
+    cost = "monthly-costs",
+    cat = "monthly-morningstar-category",
+    na = "monthly-net-assets",
+    ugret = "usd-monthly-gross-returns",
+    unret = "usd-monthly-net-returns"
+)
 
 const _FILE_EXTENSION = r"(?<=\.)[a-z]+$"
 
 function _loaddir(folderpath; kwargs...)
-    filepaths = readdir(folderpath, join=true)
+    filepaths = readdir(folderpath; join=true)
 
     data_parts = DataFrame[]
+    colnames = nothing
     for filepath in filepaths
-        read_data = _loadfile(filepath)
-        push!(data_parts, read_data)
+        data_part = _loadfile(filepath)
+        if isnothing(colnames)
+            colnames = propertynames(data_part)
+        else
+            rename!(data_part, colnames)
+        end
+        push!(data_parts, data_part)
     end
 
     combined_data = vcat(data_parts...)
@@ -31,10 +41,10 @@ function _loadfile(filepath; kwargs...)
     error("Internal error: filetype assertion failed")
 end
 
-function _savefile(filepath, datakwargs)
+function _savefile(filepath, data; kwargs...)
     filetype = _filetype(filepath)
-    if filetype == :CSV
-        CSV.write(filepath, data)
+    if filetype == :csv
+        CSV.write(filepath, data; kwargs...)
     elseif filetype == :arrow
         Arrow.write(filepath, data)
     else

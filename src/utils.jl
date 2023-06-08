@@ -6,7 +6,7 @@ using CSV
 using Arrow
 
 export COUNTRY_GROUPS
-export FUND_DATA_FOLDERS
+export FUND_FIELDS
 export PATHS
 
 export printtime

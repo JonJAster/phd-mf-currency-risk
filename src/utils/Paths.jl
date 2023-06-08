@@ -1,6 +1,7 @@
 const PATHS = (
     rawfunds = "data/mutual-funds/raw",
     groupedfunds = "data/mutual-funds/domicile-grouped",
+    fxfactors = "data/currencies/factor-series/currency_factors.arrow"
 )
 
 const _PATH_KEYWORD = r"(?<=\$)[a-zA-Z_]+"
@@ -57,7 +58,6 @@ qsave(PATHS.mainfunds; data=info, options_folder="local-rets_eq-strict")
 """
 function qsave(paths...; data, kwargs...)
     path = qpath(paths..., kwargs...)
-    filetype = _filetype(path)
     path_parent = dirname(path)
     
     if !isdir(path_parent)
@@ -87,6 +87,36 @@ function qload(paths...; kwargs...)
 
 
     return data
+end
+
+function qnames(paths...; printout=false, kwargs...)
+    path = qpath(paths...; kwargs...)
+
+    if isdir(path)
+        filepath = readdir(path, join=true)
+    elseif isfile(path)
+        filepath = path
+    else
+        error("Path not found: $path")
+    end
+
+    filetype = _filetype(filepath)
+
+    if filetype == :csv
+        colnames = CSV.File(filepath, limit=1) |> propertynames
+    elseif filetype == :arrow
+        colnames = Arrow.Table(filepath) |> propertynames
+    else
+        error("Internal error: filetype assertion failed")
+    end
+
+    if printout
+        for name in colnames
+            strname = string(name) |> escape_string
+            println(strname)
+        end
+    end
+    return colnames
 end
 
 function _isnotebook()

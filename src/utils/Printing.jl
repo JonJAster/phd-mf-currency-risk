@@ -18,8 +18,7 @@ function printtime(
 
         printout = "Finished $task for $process_subtask in $process_duration_s seconds"
         minutes && (printout *= " ($process_duration_m minutes)")
-        printout *= ", total running time $duration_s seconds"
-        minutes && (printout *= " ($duration_m minutes)")
+        printout *= ", total running time $duration_s seconds ($duration_m minutes)"
     end
 
     println(printout)
