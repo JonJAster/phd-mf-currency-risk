@@ -63,9 +63,10 @@ function _loaddata(folder)
 
     data_parts = DataFrame[]
     for filepath in readdir(folderpath; join=true)
+        
         data_part = CSV.read(
             filepath, DataFrame;
-            types=EXPLICIT_TYPES, stringtype=String, groupmark=','
+            types=EXPLICIT_TYPES, stringtype=String, groupmark=',', rows_to_check=200
         )
 
         _normalise_headings!(data_part)
