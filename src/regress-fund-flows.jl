@@ -39,7 +39,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
             :std_return_12m,
             :log_size, :lag,
             :log_age, :lag,
-            :tfe
+            :tfe, :month
         )
         
         dropmissing!(regression_data)
