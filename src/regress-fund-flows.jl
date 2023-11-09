@@ -34,12 +34,12 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
             flow_data, :fundid, :date,
             :fund_flow, :plus_lag, 19,
             return_component_cols...,
-            :mean_costs, :plus_lag, 19,
+            :mean_costs, :lag, 19,
             :no_load,
             :std_return_12m,
             :log_size, :lag,
             :log_age, :lag,
-            :tfe, :month
+            :tfe
         )
         
         dropmissing!(regression_data)
