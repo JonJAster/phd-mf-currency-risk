@@ -1023,7 +1023,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
                 index=False)
 
     if inc_agefilter:
-        folder_name = (
+        folder_dir = (
             "./data/mutual-funds/post-processing/{}_age-filtered/initialised"
             .format(folder_name)
         ) 
@@ -1031,7 +1031,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         if not os.path.exists(folder_dir):
             os.makedirs(folder_dir)
 
-        df_mf.to_csv("{fld}\\mf_{ctry}.csv"
+        df_mf_filt.to_csv("{fld}\\mf_{ctry}.csv"
                     .format(fld=folder_dir,
                             ctry=country_group_code),
                     index=False)
