@@ -888,10 +888,6 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     elapsed_time = datetime.now() - start_time
     print(f"Process {process_id} ({country_group_code}): Finished aggregating funds ({elapsed_time} passed since process start)")
 
-    # Calculate fund flows
-    # Remove all fund assets observations of less than $100,000 USD
-    df_mf_agg.loc[df_mf_agg.fund_assets < 1000000, "fund_assets"] = np.nan
-
     # Lag fund_assets to calculate cash flows. Addtionally, lag the date
     # column to make sure changes in assets are only taken over a single
     # month.
@@ -903,14 +899,17 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # fund_assets in t-1 less the net returns to the fund at time t. If
     # month t is not one month after month t-1, set the fund flows to nan.
     df_mf_agg["fund_flow"] = (
-        np.where(df_mf_agg.date == df_mf_agg.date_m1+MonthEnd(1),
-                df_mf_agg.fund_assets/df_mf_agg.fund_assets_m1
-                - (1+df_mf_agg.ret_net_m/100),
-                np.nan)
+        np.where(
+            (df_mf_agg.date == df_mf_agg.date_m1+MonthEnd(1))
+            & (df_mf_agg.fund_assets_m1 >= 10_000_000),
+            df_mf_agg.fund_assets/df_mf_agg.fund_assets_m1
+            - (1+df_mf_agg.ret_net_m/100),
+            np.nan
+        )
     )
 
     # There are extreme outliers of fund_flows on both the high and the
-    # low end, which must be do to errors in either returns or net assets
+    # low end, which must be due to errors in either returns or net assets
     # data around those observations. Winsorise the fund_flows variable
     # at the 1st and 99th percentiles.
     df_mf_agg.fund_flow = (
@@ -1042,7 +1041,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
 def process_fund_data_wrapped(process_id):
     process_fund_data(
-        COUNTRY_GROUPS[process_id], currency_type="local", raw_ret_only=True,
+        COUNTRY_GROUPS[process_id], currency_type="usd", raw_ret_only=True,
         polation_method="interpolate", strict_eq=True, exc_finre=False,
         inv_targets=True, inc_agefilter=True
     )

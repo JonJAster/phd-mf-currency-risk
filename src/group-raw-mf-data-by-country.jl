@@ -87,12 +87,12 @@ function normalise_headings!(data_part; infodata=false)
         rename!(data_part, lowercase.(dashed_names))
     else
         start_date = match(DATESTRING, names(data_part)[4]).match
-            number_of_other_dates = size(data_part, 2) - 4
-            data_dates = [Date(start_date) + Month(i) for i in 0:number_of_other_dates]
-            
-            column_names = Symbol.(
-                [lowercase.(names(data_part)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
-            )
+        number_of_other_dates = size(data_part, 2) - 4
+        data_dates = [Date(start_date) + Month(i) for i in 0:number_of_other_dates]
+        
+        column_names = Symbol.(
+            [lowercase.(names(data_part)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
+        )
         rename!(data_part, column_names)
     end
 end
