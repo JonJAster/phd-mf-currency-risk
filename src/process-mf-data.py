@@ -561,7 +561,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     # Fund information
     df_mfinfo = load_data("info", country_group_code, series_type="cross",
-                            cs_dates = ["inception_date"])
+                            cs_dates = ["Inception Date"])
 
     # Gross monthly returns
     df_mfret_g = load_data(f"{currency_type}-monthly-gross-returns", country_group_code,
