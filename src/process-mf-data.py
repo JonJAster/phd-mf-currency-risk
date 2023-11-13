@@ -921,17 +921,12 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
                                                                  interpolation="higher"))
     )
 
-    # Correct for unrealistic mean costs
-    # Mean costs can never be negative, and should never be more than 100%.
-    df_mf_agg.loc[df_mf_agg.mean_costs < 0, "mean_costs"] = 0
-    df_mf_agg.loc[df_mf_agg.mean_costs > 1, "mean_costs"] = 1
-
     # Correct for incubation bias with an age filter
-    # If desired, filter out the first 2 years of observations using the
+    # If desired, filter out the first 3 years of observations using the
     # existing age field.
     if inc_agefilter:
         df_mf_filt = (
-            df_mf_agg[df_mf_agg.fund_age >= 24].copy() #  Age is zero-indexed.
+            df_mf_agg[df_mf_agg.fund_age >= 36].copy() #  Age is zero-indexed.
         )
 
         df_mf_agg.drop("fund_age", axis=1, inplace=True)

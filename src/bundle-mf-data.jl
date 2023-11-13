@@ -75,3 +75,5 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
+
+main("usd-rets_na-int_eq-strict_targets_age-filtered")
