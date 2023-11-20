@@ -13,7 +13,7 @@ using
 
 const OUTPUT_DIR = joinpath(DIRS.fund, "post-processing")
 
-const OFFSET_FOR_CONSTANT = 1
+const MAX_LAGS = 19
 
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     time_start = time()
@@ -32,9 +32,9 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
 
         regression_data = regression_table(
             flow_data, :fundid, :date,
-            :fund_flow, :plus_lag, 19,
+            :fund_flow, :plus_lag, MAX_LAGS,
             return_component_cols...,
-            :mean_costs, :lag, 19,
+            :mean_costs, :lag, MAX_LAGS,
             :no_load,
             :std_return_12m,
             :log_size, :lag,
@@ -94,10 +94,16 @@ end
 
 function drop_zero_cols!(data)
     zero_cols = []
-    for col in propertynames(data)
-        all(data[!, col] .== 0) && push!(zero_cols, col)
+    for col in names(data)
+        push!(zero_cols, col)
     end
     
+    if length(zero_cols) != MAX_LAGS
+        println(
+            "Warning: MAX_LAGS is $MAX_LAGS, but " *
+            "found $(length(zero_cols)) zero columns to drop."
+        )
+    end
     select!(data, Not(zero_cols))
 end
 
