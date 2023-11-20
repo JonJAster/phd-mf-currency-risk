@@ -70,7 +70,7 @@ function initialise_flow_data(options_folder, model; ret, us_only=true)
         fund_base_data = fund_base_data[fund_base_data.domicile .== "USA", :]
     end
 
-    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ret, 12)
+    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ret, 12; lagged=true)
 
     select!(
         fund_base_data,
@@ -99,17 +99,17 @@ function initialise_flow_data(options_folder, model; ret, us_only=true)
     return output_data
 end
 
-function rolling_std(data, col, window)
+function rolling_std(data, col, window; lagged)
     rolling_std = Vector{Union{Missing, Float64}}(missing, size(data, 1))
 
     for i in 1:size(data, 1)
         i < window && continue
         window_start = i - window + 1
-        window_end = i
+        lagged ? window_end = i - 1 : window_end = i
 
         data[window_start, :fundid] != data[window_end, :fundid] && continue
 
-        start_date = Dates.lastdayofmonth((data[window_end, :date] - Month(window-1)))
+        start_date = Dates.lastdayofmonth((data[window_end, :date] - Month(window-2)))
         data[window_start, :date] != start_date && continue
         rolling_std[i] = std(data[window_start:window_end, col])
     end
