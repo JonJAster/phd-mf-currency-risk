@@ -51,7 +51,7 @@ const BENCHMARK_MODELS = OrderedDict(
 
 const CURRENCYRISK_MODELS = OrderedDict(
     :lrv => [:hml_fx, :rx],
-    :lrv_net => [:hml_fx_net, :rx_net],
+    # :lrv_net => [:hml_fx_net, :rx_net], # Excluded in main
     :verdelhan => [:carry, :dollar]
 )
 
