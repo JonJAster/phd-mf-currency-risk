@@ -70,7 +70,8 @@ const DEFAULT_OPTIONS = Dict(
     :currency_type => :usd,
     :strict_eq => true,
     :polation_method => :interpolate,
-    :inv_targets => true
+    :inv_targets => true,
+    :age_filter => true
 )
 
 end
