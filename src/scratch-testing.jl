@@ -1,33 +1,49 @@
 using Arrow
 using CSV
 using DataFrames
+using Dates
+using StatsBase
+
+include("shared/CommonConstants.jl")
+include("shared/CommonFunctions.jl")
+include("shared/DataInit.jl")
+using .CommonFunctions
+using .CommonConstants
+using .DataInit
 
 function test()
-    df = CSV.read("data/mutual-funds/post-processing/usd-rets_na-int_eq-strict_targets_age-filtered/initialised/mf_usa.csv", DataFrame)
-    df_unfiltered = CSV.read("data/mutual-funds/post-processing/usd-rets_na-int_eq-strict_targets/initialised/mf_usa.csv", DataFrame)
-    df = dropmissing(df, [:ret_gross_m, :fund_flow])
-    df_unfiltered = dropmissing(df_unfiltered, [:ret_gross_m, :fund_flow])
 
-    obs_filt = size(df, 1)
-    obs_all = size(df_unfiltered, 1)
 
-    funds_filt = length(unique(df.fundid))
-    funds_all = length(unique(df_unfiltered.fundid))
+    path = joinpath(DIRS.fund, "domicile-grouped")
 
-    println("nonmissing observations for all age funds: $obs_all")
-    println("nonmissing observations for age-filtered funds: $obs_filt")
-    println()
-    println("unique funds without filtering: $funds_all")
-    println("unique age-filtered funds: $funds_filt")
-    println()
+    df = CSV.read(joinpath(path, "local-monthly-gross-returns/mf_local-monthly-gross-returns_usa.csv"), DataFrame)
 
-    println(
-        "obs filtered out: $(obs_all - obs_filt) "*
-        "($(round(100 * (obs_all - obs_filt) / obs_all, digits=2))%)"
-    )
+    melted_df = stack(df, Not(["name", "fundid", "secid"]), ["name", "fundid", "secid"])
 
-    println(
-        "funds filtered out: $(funds_all - funds_filt) "*
-        "($(round(100 * (funds_all - funds_filt) / funds_all, digits=2))%)"
-    )
+    nobs = size(melted_df, 1)
+    nfunds = length(unique(melted_df.fundid))
+
+    options_folder=option_foldername(; DEFAULT_OPTIONS...)
+
+    df_usa = initialise_flow_data(options_folder, COMPLETE_MODELS[1]; ret=:weighted)
+end
+
+function rolling_std(data, col, window; lagged)
+    rolling_stdx = Vector{Union{Missing, Float64}}(missing, size(data, 1))
+
+    i=216
+
+    for i in 1:size(data, 1)
+        i < window && continue
+        window_start = i - window + 1
+        lagged ? window_end = i - 1 : window_end = i
+
+        data[window_start, :fundid] != data[window_end, :fundid] && continue
+
+        start_date = Dates.lastdayofmonth((data[window_end, :date] - Month(window-2)))
+        data[window_start, :date] != start_date && continue
+        rolling_stdx[i] = std(data[window_start:window_end, col])
+    end
+
+    return rolling_stdx
 end

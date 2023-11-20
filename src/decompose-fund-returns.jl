@@ -56,7 +56,7 @@ extract_betas(regression_outputs) = unstack(
 )
 
 function decompose_returns(data, model)
-    factors =  BENCHMARK_MODELS[model[2]] ∪ CURRENCYRISK_MODELS[model[1]]
+    factors =  BENCHMARK_MODELS[model[1]] ∪ CURRENCYRISK_MODELS[model[2]]
     decomposed_returns = data[!, [:fundid, :date, :ret]]
     decomposed_returns.ret_alpha .= 0.0
 
@@ -82,6 +82,3 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
-
-dftest = initialise_base_data(option_foldername(; DEFAULT_OPTIONS...))
-regression_table(dftest, :fundid, :date, :ret, :lag, 10, :domicile, :cat, :tfe, :quarter)

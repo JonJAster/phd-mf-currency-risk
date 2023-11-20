@@ -53,12 +53,12 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     end
 
     println("Saving results...")
-    output_folderstring = makepath(OUTPUT_DIR, options_folder, "factor-betas")
+    output_folderstring = joinpath(OUTPUT_DIR, options_folder, "factor-betas")
 
     for model in COMPLETE_MODELS
         model_name = name_model(model)
         benchmark, currency_risk = model
-		filestring = joinpath(output_folderstring, "$model_name.arrow")
+		filestring = makepath(output_folderstring, "$model_name.arrow")
 
         Arrow.write(filestring, model_results[(benchmark, currency_risk)])
     end

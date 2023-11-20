@@ -37,16 +37,22 @@ const PARAMETER_REGRESSION_ARGS = [
 ]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
+const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
+
 function makepath(paths...)
-    filestring = joinpath(paths...)
-    dirstring = dirname(filestring)
+    pathstring = joinpath(paths...)
+    if match(FILE_SUFFIX, pathstring) |> isnothing
+        dirstring = pathstring
+    else
+        dirstring = dirname(pathstring)
+    end
     
     if !isdir(dirstring)
         mkpath(dirstring)
         println("Missing directory created: $dirstring")
     end
 
-    return filestring
+    return pathstring
 end
 
 function push_with_currency_code!(datalist, df, currency_code, value_columns)

@@ -45,13 +45,13 @@ const BENCHMARK_MODELS = OrderedDict(
     :world_capm => [:mkt],
     :world_ff3 => [:mkt, :smb, :hml],
     :world_ff5 => [:mkt, :smb, :hml, :rmw, :cma],
-    :world_ffcarhart => [:mkt, :smb, :hml, :wml],
+    # :world_ffcarhart => [:mkt, :smb, :hml, :wml], # Excluded in main
     :world_ff6 => [:mkt, :smb, :hml, :rmw, :cma, :wml]
 )
 
 const CURRENCYRISK_MODELS = OrderedDict(
     :lrv => [:hml_fx, :rx],
-    :lrv_net => [:hml_fx_net, :rx_net],
+    # :lrv_net => [:hml_fx_net, :rx_net], # Excluded in main
     :verdelhan => [:carry, :dollar]
 )
 
@@ -70,7 +70,8 @@ const DEFAULT_OPTIONS = Dict(
     :currency_type => :usd,
     :strict_eq => true,
     :polation_method => :interpolate,
-    :inv_targets => true
+    :inv_targets => true,
+    :age_filter => true
 )
 
 end
