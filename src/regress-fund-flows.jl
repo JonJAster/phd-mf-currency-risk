@@ -49,7 +49,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
 
         lock(savelock) do
             output_filename = makepath(output_folder, "$model_name.arrow")
-            Arrow.write(flow_betas, output_filename)
+            Arrow.write(output_filename, flow_betas)
         end
     end
 end

@@ -44,7 +44,7 @@ function initialise_base_data(options_folder)
     return main_data
 end
 
-function initialise_flow_data(options_folder, model; ret)
+function initialise_flow_data(options_folder, model; ret, us_only=true)
     model_name = name_model(model)
     
     if ret == :raw
@@ -65,6 +65,10 @@ function initialise_flow_data(options_folder, model; ret)
     fund_base_data = Arrow.Table(filename_mf) |> DataFrame
     fund_info = Arrow.Table(filename_info) |> DataFrame
     decomposed_returns = Arrow.Table(filename_decomposition) |> DataFrame
+
+    if us_only
+        fund_base_data = fund_base_data[fund_base_data.domicile .== "USA", :]
+    end
 
     fund_base_data.std_return_12m = rolling_std(fund_base_data, :ret, 12)
 
