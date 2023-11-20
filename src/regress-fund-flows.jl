@@ -1,7 +1,7 @@
-using
-    DataFrames,
-    Arrow,
-    GLM
+using DataFrames
+using Arrow
+using GLM
+using Base.Threads
 
 include("shared/CommonConstants.jl")
 include("shared/CommonFunctions.jl")
@@ -16,12 +16,12 @@ const OUTPUT_DIR = joinpath(DIRS.fund, "post-processing")
 const OFFSET_FOR_CONSTANT = 1
 
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
-    start_time = time()
+    time_start = time()
 
     output_folder = joinpath(OUTPUT_DIR, options_folder, "flow-betas")
 
     savelock = ReentrantLock()
-    for model in COMPLETE_MODELS
+    @threads for model in COMPLETE_MODELS
         process_start = time()
         model_name = name_model(model)
         flow_data = initialise_flow_data(options_folder, model; ret=:weighted)
@@ -51,7 +51,22 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
             output_filename = makepath(output_folder, "$model_name.arrow")
             Arrow.write(output_filename, flow_betas)
         end
+        
+        process_elapsed_s = round(time() - process_start, digits=2)
+        process_elapsed_m = round(process_elapsed_s/60, digits=2)
+        println(
+            "Process finished regressing on $model_name with " *
+            " in $process_elapsed_s seconds " *
+            "($process_elapsed_m minutes)"
+        )
     end
+
+    time_duration_s = round(time() - time_start, digits=2)
+    time_duration_m = round(time_duration_s/60, digits=2)
+    println(
+        "Finished flow regressions in $time_duration_s seconds " *
+        "($time_duration_m minutes)"
+    )
 end
 
 function flow_regression(data, return_cols)
