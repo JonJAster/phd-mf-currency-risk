@@ -89,34 +89,3 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
-
-# AUTO TESTS
-options_folder=option_foldername(; DEFAULT_OPTIONS...)
-model = (COMPLETE_MODELS)[4]
-using Dates
-using StatsBase
-
-# MANUAL TESTS
-if false
-    data = regression_data
-    return_cols = 1
-
-    for col in names(regression_data)
-        !(eltype(regression_data[!, col]) <: Number) && continue
-        println("sum of $col: ", sum(regression_data[!, col]))
-    end
-    
-    findfirst(<=(-100000), regression_data.log_age_lag1)
-
-    regression_data[480910:480915,[:fundid, :date, :log_age_lag1]]
-
-    info = Arrow.Table(joinpath(DIRS.fund, "info/mf_info.arrow")) |> DataFrame
-    info[info.fundid .== "FSUSA002PR", :] |> Matrix |> vec |> println
-
-    rowdate = Date(2016,11,30)
-    incdate = Date(1987,12,21)
-    age = (
-        12*(year(rowdate) .- year(incdate)) .+
-        (month(rowdate) .- month(incdate)) .+ 1
-    )
-end
