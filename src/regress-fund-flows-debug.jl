@@ -13,15 +13,14 @@ using
 
 const OUTPUT_DIR = joinpath(DIRS.fund, "post-processing")
 
-const OFFSET_FOR_CONSTANT = 1
-
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     time_start = time()
 
     output_folder = joinpath(OUTPUT_DIR, options_folder, "flow-betas")
 
     savelock = ReentrantLock()
-    @threads for model in COMPLETE_MODELS
+    # @threads
+    for model in COMPLETE_MODELS # model = COMPLETE_MODELS[1]
         process_start = time()
         model_name = name_model(model)
         flow_data = initialise_flow_data(options_folder, model; ret=:weighted)
@@ -32,14 +31,53 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
 
         regression_data = regression_table(
             flow_data, :fundid, :date,
-            :fund_flow,
-            return_component_cols
+            :fund_flow, :plus_lag, 19,
+            return_component_cols...,
+            :mean_costs, :lag, 19,
+            :no_load,
+            :std_return_12m,
+            :log_size, :lag,
+            :log_age, :lag,
+            :tfe, :month
         )
         
         dropmissing!(regression_data)
+
+        # Count the number of columns with all zeroes
+        zero_cols = 0
+        for col in names(regression_data)
+            if all(regression_data[!, col] .== 0)
+                zero_cols += 1
+            end
+        end
+
+        println("Number of columns with all zeroes: ", zero_cols)
+
+        # Count the number of columns not starting with "fe_month_" with all zeroes
+        zero_cols = 0
+        for col in names(regression_data)
+            if !startswith(col, "fe_month_") && all(regression_data[!, col] .== 0)
+                zero_cols += 1
+            end
+        end
+
+        println("Number of columns not starting with 'fe_month_' with all zeroes: ", zero_cols)
+
+        # find zero cols not starting with "fe_month_"
+        if zero_cols > 0
+            for col in names(regression_data)
+                !startswith(col, "fe_month_") && all(regression_data[!, col]) && println(col)
+            end
+        end
+    end
         drop_zero_cols!(regression_data)
 
-        flow_betas = flow_regression(regression_data, return_component_cols)
+        regression_data.fund_flow .*= 100
+
+        flow_betas1 = flow_regression(regression_data, return_component_cols)
+
+        regression_data2 = copy(regression_data)
+
 
         lock(savelock) do
             output_filename = makepath(output_folder, "$model_name.arrow")
