@@ -42,7 +42,7 @@ const COUNTRY_GROUPS = Dict(
 )
 
 const BENCHMARK_MODELS = OrderedDict(
-    :world_capm => [:mkt]
+    :world_capm => [:mkt],
     :world_ff3 => [:mkt, :smb, :hml],
     :world_ff5 => [:mkt, :smb, :hml, :rmw, :cma],
     # :world_ffcarhart => [:mkt, :smb, :hml, :wml], # Excluded in main
