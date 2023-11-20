@@ -6,56 +6,64 @@ using Plots
 
 include("shared/CommonConstants.jl")
 include("shared/CommonFunctions.jl")
-using
-    .CommonFunctions,
-    .CommonConstants
+include("shared/DataInit.jl")
+using .CommonFunctions
+using .CommonConstants
+using .DataInit
 
 const INPUT_DIR = joinpath(DIRS.fund, "post-processing")
-const LOG_SERIES = ["fund_assets", "fund_flow_dollars"]
+const LOG_SERIES = ["fund_size"]
 const UNITS = Dict(
-    :ret => "%",
-    :fund_flow => "%",
-    :fund_flow_dollars => "\$1M USD",
-    :fund_flow_percent => "%",
-    :fund_assets => "\$1M USD",
-    :mean_costs => "%",
+    :percentage_fund_flow => "%",
+    :fund_size => "\$1M USD",
+    :fund_age => "months",
+    :expense_ratio => "%",
+    :load_fund_dummy => "0/1",
+    :volatility_lag12_to_lag1 => "%",
 )
+const SUMMARY_COLS = [
+    :percentage_fund_flow,
+    :fund_size,
+    :fund_age,
+    :expense_ratio,
+    :load_fund_dummy,
+    :volatility_lag12_to_lag1,
+]
 
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
-    filename = joinpath(INPUT_DIR, options_folder, "main/fund_data.arrow")
+    df_usa = initialise_flow_data(options_folder, COMPLETE_MODELS[1]; ret=:weighted)
     
-    df_mf = Arrow.Table(filename) |> DataFrame
-
-    df_usa = df_mf[df_mf.domicile .== "USA", :]
-
     display_summary(df_usa)
 end
 
 function display_summary(df)
-    df_data = copy(df[:, [:ret, :fund_flow, :fund_assets, :mean_costs]])
+    df_data = copy(df)
 
-    dropmissing!(df_data, [:ret, :fund_flow])
-
-    df_data[!, :fund_assets] = df_data.fund_assets ./ 1e6
-    df_data[!, :fund_flow_dollars] = df_data.fund_flow .* lag(df_data.fund_assets)
-
-    rename!(df_data, :fund_flow => :fund_flow_percent)
+    rename!(df_data, :fund_flow => :percentage_fund_flow)
+    df_data[!, :fund_size] = exp.(df_data.log_size) ./ 1e6
+    df_data[!, :fund_age] = exp.(df_data.log_age)
+    rename!(df_data, :mean_costs => :expense_ratio)
+    df_data[!, :load_fund_dummy] = .!(df_data.no_load)
+    rename!(df_data, :std_return_12m => :volatility_lag12_to_lag1)
     
-    summary_table(df_data)
-    summary_distributions(df_data)
+    dropmissing!(df_data, SUMMARY_COLS)
+
+    df_summarydata = select!(df_data, SUMMARY_COLS)
+
+    summary_table(df_summarydata)
+    summary_distributions(df_summarydata)
 end
 
 function summary_table(df)
     df_summary = DataFrame(
         :series => Symbol[],
         :units => String[],
+        :n_obs => Int[],
         :mean => Float64[],
-        :median => Float64[],
         :std => Float64[],
-        :skew => Float64[],
-        :min => Float64[],
-        :max => Float64[],
-        :n_obs => Int[]
+        :p25 => Float64[],
+        :median => Float64[],
+        :p75 => Float64[]
     )
 
     for series in names(df)
@@ -64,13 +72,12 @@ function summary_table(df)
         push!(df_summary, [
             series_name,
             UNITS[series_name],
+            length(series_data),
             mean(series_data),
-            median(series_data),
             std(series_data),
-            skewness(series_data),
-            minimum(series_data),
-            maximum(series_data),
-            length(series_data)
+            percentile(series_data, 0.25),
+            median(series_data),
+            percentile(series_data, 0.75)
         ])
     end
 
@@ -79,7 +86,6 @@ end
 
 function summary_distributions(df)
     for series in names(df)
-        series == "fund_flow_dollars" && continue
         series_units = UNITS[Symbol(series)]
         if series in LOG_SERIES
             series_data = skipmissing(df[!, series]) |> collect .|> log
@@ -103,5 +109,3 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end
-
-main("usd-rets_na-int_eq-strict_targets_age-filtered")
