@@ -717,6 +717,9 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     # Clear unused memory.
     del df_mf_pol
+    
+    # TODO: Using the morningstar broad category is a better way of checking
+    # strict equity than this. I will replace it.
 
     # Define a single effective equity classification category based on the
     # values of strict_eq and exc_finre.
