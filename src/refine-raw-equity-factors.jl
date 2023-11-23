@@ -31,14 +31,9 @@ function main()
     usa_filename = joinpath(INPUT_DIR, "usa_factors.csv")
     usa_factors = CSV.read(usa_filename, DataFrame, dateformat=USA_DATEFORMAT)
 
-    riskfree_filename = joinpath(INPUT_DIR_RISKFREE, "usd_riskfree.csv")
-    riskfree_data = CSV.read(riskfree_filename, DataFrame, dateformat=USA_DATEFORMAT)
-
     println("Combining data...")
-    complete_global_list = [global_factors_list..., global_mkt, riskfree_data]
-    global_factors = reduce((x,y)->outerjoin(x, y, on=:date), complete_global_list)
-
-    usa_factors = innerjoin(usa_factors, riskfree_data, on=:date)
+    complete_global_list = [global_factors_list..., global_mkt]
+    global_factors = reduce((x,y)->innerjoin(x, y, on=:date), complete_global_list)
     
     output_filestring_global = makepath(OUTPUT_DIR, "global_equity_factors.arrow")
     output_filestring_usa = makepath(OUTPUT_DIR, "usa_equity_factors.arrow")
