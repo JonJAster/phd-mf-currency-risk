@@ -14,10 +14,12 @@ const INPUT_DIR = joinpath(DIRS.fund, "post-processing")
 const OUTPUT_DIR = INPUT_DIR
 
 const READ_COLUMNS = [
-    :fundid, :date, :ret_gross_m, :mean_costs, :fund_assets, :fund_flow, :domicile
+    :fundid, :date, :ret_gross_m, :mean_costs, :domicile, :fund_age,
+    :inv_international, :fin_or_re, :fund_assets, :fund_flow
 ]
 const OUTPUT_COLUMNS = [
-    :fundid, :date, :currency, :ret, :fund_flow, :domicile, :fund_assets, :mean_costs
+    :fundid, :date, :ret, :fund_flow, :fund_assets, :mean_costs, :fund_age,
+    :inv_international, :fin_or_re
 ]
 
 function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
