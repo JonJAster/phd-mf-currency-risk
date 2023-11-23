@@ -15,7 +15,7 @@ function test()
 
     options_folder=option_foldername(; DEFAULT_OPTIONS...)
     path = joinpath(DIRS.fund, "post-processing", options_folder, "main/fund_data.arrow")
-    path_factors = joinpath(DIRS.equity, "factor-series/global_equity_factors.arrow")
+    path_factors = joinpath(DIRS.equity, "factor-series/usa_equity_factors.arrow")
     path_curr = joinpath(DIRS.currency, "factor-series/currency_factors.arrow")
 
     df = Arrow.Table(path) |> DataFrame
