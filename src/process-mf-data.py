@@ -8,8 +8,10 @@ import multiprocessing
 from pandas.tseries.offsets import MonthEnd
 from datetime import datetime
 
-COUNTRY_GROUPS = {0: "lux", 1: "kor", 2: "usa", 3: "can-chn-jpn", 4: "irl-bra",
-                  5: "gbr-fra-ind", 6: "esp-tha-aus-zaf-mex-aut-che", 7: "other"}
+# This code was originally designed to group data into many domicile countries,
+# but it currently looks only for US-domiciled groups.
+# TODO: Rewrite code to remove redundancies now that only US is looked at.
+COUNTRY_GROUPS = {0: "usa"}
 
 # Define Assisting Functions
 def load_data(filename_base, country_group_code, series_type, value_name=None,\
@@ -525,7 +527,7 @@ def polate_assets(df_in, how="interpolate", keep=False, retain_testdata=False):
     return df_return
 
 def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_method,
-                      strict_eq, exc_finre, inv_targets, inc_agefilter):
+                      exc_finre, age_filtered):
     """
     Parameters
     ----------
@@ -542,18 +544,11 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         assets values will be extrapolated. If "both", net asset values will be both
         extrapolated and interpolated. If False, neither extrapolation or interpolation
         will occur.
-    strict_eq : bool
-        If True, only Morningstar categories classified as being "strict" equity categories
-        will be included in the final dataset.
     exc_finre : bool
         If True, funds classified as investing primarily in financial, infrastructure and
         real estate securities will be excluded.
-    inv_targets : bool
-        If True, the resultant DataFrame will include information about the investment
-        target of each fund, at levels of MSCI class, region, group and country.
-    inc_agefilter : bool
-        If True, additional DataFrames will be saved that include only age-filtered mutual
-        fund data, as well as the non-filtered DataFrames.
+    age_filtered : bool
+        If True, mutual funds under 3 years old will be filtered out.
     """    
     # Grab the process ID and start time
     process_id = os.getpid()
@@ -645,14 +640,14 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     print(f"Process {process_id} ({country_group_code}): Finished merging data ({elapsed_time} passed since process start)")
 
     # For the age-filtered funds dataset, we want eventually to only include
-    # observations after the first 24 months, but many other filters need to
+    # observations after the first 36 months, but many other filters need to
     # be applied first. Start tracking secid age now, so you can later take
     # the largest value in a given month for a fundid to be that fundid's
-    # age. Return observations under 2 years old will be removed as one of
+    # age. Return observations under 3 years old will be removed as one of
     # the final steps.
-    if inc_agefilter:
-        df_mf["age"] = df_mf.groupby("secid").cumcount()
+    df_mf["age"] = df_mf.groupby("secid").cumcount()
 
+    # TODO: This dictionary is unnecessary if USA is the only country.
     # Relabel countries as ISO codes
     ISO = {
         "Andorra": "AND", "Australia": "AUS", "Austria": "AUT", "Argentina": "ARG",
@@ -695,41 +690,20 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # Clear unused memory
     del df_mf
 
+    # TODO: Reconsider equity classification after hearing from Morningstar
+    # representative.
+
     # Eliminate non-equity fund classes
     # Read a list of accepted morningstar categories
     df_equity_categories = (
         pd.read_csv("./data/mappings/morningstar_categories.csv")
     )
 
-    # If desired, merge Morningstar category fields into the main DataFrame.
-    # Otherwise, just merge the equity definition categories.
-    if inv_targets:
-        df_mf_cat = df_mf_pol.merge(df_equity_categories,
-                                    on="morningstar_category", how="left")
-    else:
-        df_mf_cat = (
-            df_mf_pol.merge(df_equity_categories.loc[:,["morningstar_category",
-                                                        "equity",
-                                                        "strict_equity",
-                                                        "fin_or_re"]],
-                            on="morningstar_category", how="left")
-        )
+    df_mf_cat = df_mf_pol.merge(df_equity_categories,
+                                on="morningstar_category", how="left")
 
     # Clear unused memory.
     del df_mf_pol
-    
-    # TODO: Using the morningstar broad category is a better way of checking
-    # strict equity than this. I will replace it.
-
-    # Define a single effective equity classification category based on the
-    # values of strict_eq and exc_finre.
-    if strict_eq:
-        df_mf_cat["equity_flag"] = df_mf_cat.strict_equity
-    else:
-        df_mf_cat["equity_flag"] = df_mf_cat.equity
-        
-    if exc_finre:
-        df_mf_cat.equity_flag = df_mf_cat.equity_flag * (1-df_mf_cat.fin_or_re)
 
     # If any secid for a fundid-date pair has an equity classification,
     # then all secids with an ambiguous category (neither clearly equity
@@ -742,36 +716,41 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # unambiguously nonequity secids and unambiguously equity secids that
     # share a fundid and date. This can be taken as evidence of
     # uncertainty over that fund's status as an equity fund on that date,
-    # and so all secids for that date-date are set to nonequity.
+    # and so all secids for that date are set to nonequity.
+
+    # First, exclude unambiguous equities at the secid level if they are
+    # financial or real estate funds if necessary.
+    if exc_finre:
+        df_mf_cat.equity = np.where(df_mf_cat.fin_or_re == 1, 0, df_mf_cat.equity)
 
     # Define a value for each fundid-date pair equal to 1 if that pair
     # includes any equity-classified secids and no non-equity-classified
     # secids, 0 if it includes any non-equity-classified secids, and nan if
     # there are no nonmissing category observations across all secids. This
-    # is achieved simply by calling min on the equity_flag column for each
+    # is achieved simply by calling min on the equity column for each
     # pair.
     df_mf_eqfunds = (
-        df_mf_cat.groupby(["fundid", "date"]).equity_flag.min().to_frame()
-                .reset_index().rename(columns={"equity_flag":
-                                                "override_eq_flag"})
+        df_mf_cat.groupby(["fundid", "date"]).equity.min().to_frame()
+                .reset_index().rename(columns={"equity":
+                                                "override_eq"})
     )
 
     # Merge this new column back into the main DataFrame. For each
     # fundid-date pair where this value is 1, all missing classifications
     # should be set to 1, and where this value is 0, all classifications
     # should be set to 0, but the value will not be 1 unless there are no
-    # secids for that fundid-date pair that have a 0 for equity_flag, so
+    # secids for that fundid-date pair that have a 0 for equity, so
     # this can be achieved simply by overwriting all secid classifications
-    # for all fundid-date pairs with that pair's value of override_eq_flag.
+    # for all fundid-date pairs with that pair's value of override_eq.
     df_mf_anyeq = df_mf_cat.merge(df_mf_eqfunds, on=["fundid", "date"], how="left")
 
-    df_mf_anyeq.equity_flag = df_mf_anyeq.override_eq_flag
+    df_mf_anyeq.equity = df_mf_anyeq.override_eq
 
     # Eliminate return observations if the secid didn't belong to an
     # appropriate equity category in that month. This can't remove partial
     # fundid returns data as long as the verification above completed
     # successfully.
-    df_mf_anyeq.ret_gross_m = np.where(df_mf_anyeq.equity_flag,
+    df_mf_anyeq.ret_gross_m = np.where(df_mf_anyeq.equity,
                                     df_mf_anyeq.ret_gross_m, np.nan)
 
     # After this filter, remove unnecessary rows once again (those that
@@ -787,13 +766,8 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # Check to see if it's safe to aggregate secids under the same fundid by
     # ensuring that no two secids that share a fundid and date have
     # differing values of any of their categorical columns.
-
-    if inv_targets:
-        agg_check = agg_verify(df_mf_anyeq, ["inv_msci_class", "inv_region",
-                                             "inv_group", "inv_country",
-                                             "domicile"])
-    else:
-        agg_check = agg_verify(df_mf_anyeq, "domicile")
+    
+    agg_check = agg_verify(df_mf_anyeq, ["equity", "inv_international", "fin_or_re"])
         
     if agg_check != []:
         for i in agg_check:
@@ -817,7 +791,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         df_mf_anyeq.groupby(["fundid", "date"])
                         .agg(fund_assets_m1=("net_assets_m1",
                                             lambda x: np.sum(x.values)),
-                            num_classes=("secid", "count"))
+                             num_classes=("secid", "count"))
     )
 
     df_weightedfunds = df_mf_anyeq.merge(df_fundassets,
@@ -829,7 +803,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # had a missing value of net assets.
     df_weightedfunds["return_weight"] = (
         np.where(df_weightedfunds.num_classes == 1, 1,
-                df_weightedfunds.net_assets_m1/df_weightedfunds.fund_assets_m1)
+                 df_weightedfunds.net_assets_m1/df_weightedfunds.fund_assets_m1)
     )
 
     # Weight all required columns
@@ -843,27 +817,25 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # Define the GroupBy.agg(...) keyword arguments as a dictionary based on
     # the run options chosen at the start of the notebook. Begin with the
     # columns that will always be aggregated. These are the return columns,
-    # the representative cost column, the domicile columns, and an
-    # "approximate" Morningstar category column that holds the modal secid
-    # category for that fundid-date pair, or simply whichever category is
-    # sorted first amongst all the modal categories if there are more than
-    # one. This column is useful to determine a probable investment
-    # category for that fund on that date at a glance.
+    # the representative cost column, the domicile column, the classification
+    # columns and the age column. The fund's age is the maximum of the ages
+    # of the secids.
     agg_dict = {
         "ret_gross_m": ("ret_gross_m", lambda x: np.sum(x.values)),
         "ret_net_m": ("ret_net_m", lambda x: np.sum(x.values)),
         "mean_costs": ("rep_costs", lambda x: np.sum(x.values)),
-        "approx_morningstar_category": ("morningstar_category",
-                                        lambda x: stats.mode(x)[0][0]),
-        "domicile": ("domicile", "first")
+        "domicile": ("domicile", "first"),
+        "fund_age": ("age", "max"),
+        "inv_international": ("inv_international", "first")
     }
 
-    # Add aggregate fund_age as the maximum age of all secids in a 
-    # fundid-date pair only if age filtered returns data is desired.
-    if inc_agefilter:
-        agg_dict["fund_age"] = ("age", "max")
+    # The fin_or_re column is only relevant at this stage if filtering *hasn't*
+    # occured, since otherwise it adds no useful information. Leaving this field in
+    # allows for future filtering if desired.
+    if not exc_finre:
+        agg_dict["fin_or_re"] = ("fin_or_re", "first")
         
-    # Always add a measure for fund assets, but the name of this measure
+    # Then, add a measure for fund assets, but the name of this measure
     # depends on the value set for polation_method.
     if polation_method in ["interpolate", "extrapolate", "both"]:
         assets_name = "net_assets_original"
@@ -872,15 +844,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     agg_dict["fund_assets"] = (assets_name, lambda x: np.sum(x.values)) 
 
-    # If investment targets are desired, all them all in.
-    if inv_targets:
-        agg_dict = {**agg_dict,
-                    "inv_msci_class": ("inv_msci_class", "first"),
-                    "inv_region": ("inv_region", "first"),
-                    "inv_group": ("inv_group", "first"),
-                    "inv_country": ("inv_country", "first")}
-
-    # Aggregate all secids for the same fundid. Ensure that entires are
+    # Aggregate all secids for the same fundid. Ensure that entries are
     # date sorted so that fund flows can be accurately calculated.
     df_mf_agg = (
         df_weightedfunds.groupby(["fundid", "date"]).agg(**agg_dict)
@@ -899,14 +863,16 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     )
 
     # Define fund flows in month t as the ratio of fund_asset in t to
-    # fund_assets in t-1 less the net returns to the fund at time t. If
-    # month t is not one month after month t-1, set the fund flows to nan.
+    # fund_assets in t-1 less the net returns to the fund at time t, in
+    # percentage points. If month t is not one month after month t-1, or
+    # if fund_assets in t-1 is less than 10 million, set the fund flows to
+    # nan.
     df_mf_agg["fund_flow"] = (
         np.where(
             (df_mf_agg.date == df_mf_agg.date_m1+MonthEnd(1))
             & (df_mf_agg.fund_assets_m1 >= 10_000_000),
-            df_mf_agg.fund_assets/df_mf_agg.fund_assets_m1
-            - (1+df_mf_agg.ret_net_m/100),
+            df_mf_agg.fund_assets/df_mf_agg.fund_assets_m1 * 100
+            - (1+df_mf_agg.ret_net_m),
             np.nan
         )
     )
@@ -927,18 +893,13 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # Correct for incubation bias with an age filter
     # If desired, filter out the first 3 years of observations using the
     # existing age field.
-    if inc_agefilter:
-        df_mf_filt = (
+    if age_filtered:
+        df_mf_agg = (
             df_mf_agg[df_mf_agg.fund_age >= 36].copy() #  Age is zero-indexed.
         )
 
-        df_mf_agg.drop("fund_age", axis=1, inplace=True)
-        df_mf_filt.drop("fund_age", axis=1, inplace=True)
-
     # Trim leading and trailing nans for the final time
     df_mf_agg = trim_nans(df_mf_agg.copy(), id_level="fundid")
-    if inc_agefilter:
-        df_mf_filt = trim_nans(df_mf_filt.copy(), id_level="fundid")
 
     # Filter out funds with fewer than 24 nonmissing monthly returns
     # Count the number of nonmissing returns for each fundid (for filtered
@@ -960,24 +921,12 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
                 .drop(["date_m1", "fund_assets_m1"], axis=1)
     )
 
-    # Repeat for filtered DataFrame if necessary.
-    if inc_agefilter:
-
-        df_mf_retcounts_filt = (
-            df_mf_filt.groupby("fundid").ret_gross_m.count().to_frame()
-                    .reset_index().rename(columns={"ret_gross_m": "retcount"})
-        )
-        
-        mature_fundids = (
-            df_mf_retcounts_filt.loc[df_mf_retcounts_agg.retcount >= 24,
-                                    "fundid"]
-                                .values
-        )
-
-        df_mf_filt = (
-            df_mf_filt.loc[df_mf_filt.fundid.isin(mature_fundids)]
-                    .drop(["date_m1", "fund_assets_m1"], axis=1)
-        )
+    # It's not necessary to retain the information in the fin_or_re column if
+    # the data has already been filtered by this column, while age is kept
+    # regardless of whether filtering has occured because it's needed as a
+    # regression control.
+    if exc_finre:
+        df_mf.drop("fin_or_re", axis=1, inplace=True)
 
     # Save refined data
     # Declare a filename suffix based on the particular run options that
@@ -996,17 +945,12 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         folder_name += "_na-int"
     elif polation_method == "extrapolate":
         folder_name += "_na-exp"
-        
-    if strict_eq:
-        if exc_finre:
-            folder_name += "_eq-strict-exfinre"
-        else:
-            folder_name += "_eq-strict"
-    elif exc_finre:
-            folder_name += "_eq-exfinre"
 
-    if inv_targets:
-        folder_name += "_targets"
+    if exc_finre:
+        folder_name += "_eq-exfinre"
+
+    if age_filtered:
+        folder_name += "_age-filtered"
 
     folder_dir = (
         "./data/mutual-funds/post-processing/{}/initialised".format(folder_name)
@@ -1019,20 +963,6 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
                 .format(fld=folder_dir,
                         ctry=country_group_code),
                 index=False)
-
-    if inc_agefilter:
-        folder_dir = (
-            "./data/mutual-funds/post-processing/{}_age-filtered/initialised"
-            .format(folder_name)
-        ) 
-        
-        if not os.path.exists(folder_dir):
-            os.makedirs(folder_dir)
-
-        df_mf_filt.to_csv("{fld}\\mf_{ctry}.csv"
-                    .format(fld=folder_dir,
-                            ctry=country_group_code),
-                    index=False)
     
     elapsed_time = datetime.now() - start_time
     print(f"Process {process_id} ({country_group_code}): Data saved and processed ended ({elapsed_time} passed since process start)")
@@ -1040,8 +970,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 def process_fund_data_wrapped(process_id):
     process_fund_data(
         COUNTRY_GROUPS[process_id], currency_type="usd", raw_ret_only=True,
-        polation_method="interpolate", strict_eq=True, exc_finre=False,
-        inv_targets=True, inc_agefilter=True
+        polation_method="interpolate", exc_finre=False, age_filtered=False
     )
 
 if __name__ == "__main__":
