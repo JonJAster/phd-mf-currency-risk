@@ -1,6 +1,7 @@
 using DataFrames
 using CSV
 using Arrow
+using Dates
 
 include("shared/CommonConstants.jl")
 include("shared/CommonFunctions.jl")
@@ -15,6 +16,9 @@ const GLOBAL_FACTOR_LIST = ["smb", "hml", "cma", "rmw", "wml"]
 const GLOBAL_READ_COLUMNS = [:date, :ret]
 const USA_FACTOR_LIST = ["mkt", "smb", "hml", "wml"]
 
+const GLOBAL_DATEFORMAT = DateFormat("yyyy-mm-dd")
+const USA_DATEFORMAT = DateFormat("dd/mm/yyyy")
+
 function main()
     time_start = time()
 
@@ -22,17 +26,17 @@ function main()
     global_factors_list = read_global_factors_data()
 
     global_mkt_filename = joinpath(INPUT_DIR, "global_mkt.csv")
-    global_mkt = CSV.read(global_mkt_filename, DataFrame)
+    global_mkt = CSV.read(global_mkt_filename, DataFrame, dateformat=USA_DATEFORMAT)
 
     usa_filename = joinpath(INPUT_DIR, "usa_factors.csv")
-    usa_factors = CSV.read(usa_filename, DataFrame)
+    usa_factors = CSV.read(usa_filename, DataFrame, dateformat=USA_DATEFORMAT)
 
     riskfree_filename = joinpath(INPUT_DIR_RISKFREE, "usd_riskfree.csv")
-    riskfree_data = CSV.read(riskfree_filename, DataFrame)
+    riskfree_data = CSV.read(riskfree_filename, DataFrame, dateformat=USA_DATEFORMAT)
 
     println("Combining data...")
     complete_global_list = [global_factors_list..., global_mkt, riskfree_data]
-    global_factors = reduce((x,y)->innerjoin(x, y, on=:date), complete_global_list)
+    global_factors = reduce((x,y)->outerjoin(x, y, on=:date), complete_global_list)
 
     usa_factors = innerjoin(usa_factors, riskfree_data, on=:date)
     
@@ -52,7 +56,10 @@ function read_global_factors_data()
 
     for factor_code in GLOBAL_FACTOR_LIST
         filestring = joinpath(INPUT_DIR, "global_$factor_code.csv")
-        factor_data = CSV.read(filestring, DataFrame, select=GLOBAL_READ_COLUMNS)
+        factor_data = CSV.read(
+            filestring, DataFrame, select=GLOBAL_READ_COLUMNS, dateformat=GLOBAL_DATEFORMAT
+        )
+        factor_data.ret .*= 100
         rename!(factor_data, :ret => Symbol(factor_code))
         push!(factors_list, factor_data)
     end
