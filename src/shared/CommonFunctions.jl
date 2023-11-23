@@ -94,19 +94,8 @@ function option_foldername(; currency_type, kwargs...)
         end
     end
     
-    if haskey(options_in, :strict_eq) && options_in[:strict_eq] == true
-        if haskey(options_in, :exc_finre) && options_in[:exc_finre] == true
-            folder_name *= "_eq-strict-exfinre"
-        else
-            folder_name *= "_eq-strict"
-        end
-    elseif haskey(options_in, :exc_finre) && options_in[:exc_finre] == true
-        folder_name *= "_eq-exfinre"
-    end
-
-    if haskey(options_in, :inv_targets) && options_in[:inv_targets] == true
-        folder_name *= "_targets"
-    end
+    if haskey(options_in, :exc_finre) && options_in[:exc_finre] == true
+        folder_name *= "_exc-finre"
 
     if haskey(options_in, :age_filter) && options_in[:age_filter] == true
         folder_name *= "_age-filtered"

@@ -947,7 +947,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         folder_name += "_na-exp"
 
     if exc_finre:
-        folder_name += "_eq-exfinre"
+        folder_name += "_exc-finre"
 
     if age_filtered:
         folder_name += "_age-filtered"

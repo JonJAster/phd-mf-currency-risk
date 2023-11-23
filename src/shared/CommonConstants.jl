@@ -68,9 +68,6 @@ const DEFAULT_DECAY = 0.186
 const DEFAULT_TIMEWEIGHT_LAGS = 18
 const DEFAULT_OPTIONS = Dict(
     :currency_type => :usd,
-    :strict_eq => true,
-    :polation_method => :interpolate,
-    :inv_targets => true
+    :polation_method => :interpolate
 )
-
 end
