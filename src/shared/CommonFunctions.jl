@@ -96,6 +96,7 @@ function option_foldername(; currency_type, kwargs...)
     
     if haskey(options_in, :exc_finre) && options_in[:exc_finre] == true
         folder_name *= "_exc-finre"
+    end
 
     if haskey(options_in, :age_filter) && options_in[:age_filter] == true
         folder_name *= "_age-filtered"
