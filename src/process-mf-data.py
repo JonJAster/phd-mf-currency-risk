@@ -879,16 +879,9 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
 
     # There are extreme outliers of fund_flows on both the high and the
     # low end, which must be due to errors in either returns or net assets
-    # data around those observations. Winsorise the fund_flows variable
-    # at the 1st and 99th percentiles.
-    df_mf_agg.fund_flow = (
-        df_mf_agg.fund_flow.copy().clip(lower=df_mf_agg.fund_flow
-                                                       .quantile(0.01,
-                                                                 interpolation="lower"),
-                                        upper=df_mf_agg.fund_flow
-                                                       .quantile(0.99,
-                                                                 interpolation="higher"))
-    )
+    # data around those observations. Following BHO (2016), these are clipped
+    # at -90% and +1000%
+    df_mf_agg.fund_flow = df_mf_agg.fund_flow.copy().clip(lower=-90, upper=1000)
 
     # Correct for incubation bias with an age filter
     # If desired, filter out the first 3 years of observations using the
