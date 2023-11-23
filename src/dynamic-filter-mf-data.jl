@@ -31,7 +31,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
     df_funds = df_funds[date_filter .& international_fund_filter, :]
 
     output_filestring = makepath(
-        OUTPUT_DIR, options_folder, "main/filtered_fund_data.arrow"
+        OUTPUT_DIR, options_folder, "filtered/fund_data.arrow"
     )
     Arrow.write(output_filestring, df_funds)
 
