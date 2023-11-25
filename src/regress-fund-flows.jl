@@ -45,12 +45,6 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
         dropmissing!(regression_data)
         drop_zero_cols!(regression_data)
 
-        # TODO: This makes much more sense to be done in the step of initialising flow
-        # data, but when doing it that way the coefficients on alpha are not scaled as
-        # they should be. I'll check back later as to why and refactor this into a more
-        # appropriate place.
-        regression_data.fund_flow .*= 100
-
         flow_betas = flow_regression(regression_data, return_component_cols)
 
         lock(savelock) do

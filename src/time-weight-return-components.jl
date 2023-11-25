@@ -29,7 +29,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
         )
 
         model_returns = Arrow.Table(model_filename) |> DataFrame
-        select!(model_returns, Not(:ret))
+        select!(model_returns, Not(:ex_ret))
 
         weighted_returns = (
             timeweight_returns(model_returns, DEFAULT_DECAY, DEFAULT_TIMEWEIGHT_LAGS)

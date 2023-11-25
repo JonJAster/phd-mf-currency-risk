@@ -20,23 +20,36 @@ const PERFECT_MULTIPLE = 0
 currency_coefs(coef_vector) = coef_vector[end-2:end]
 combine_reg_results(date, rr...) = zip(repeat(date, inner=size(first(rr),1)), vec.(rr)...)
 
-function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
+function main(
+        options_folder=option_foldername(; DEFAULT_OPTIONS...);
+        filtered=false, region=:world
+    )
     time_start = time()
 
-    full_data = initialise_base_data(options_folder)
+    full_data = initialise_base_data(options_folder, filtered=filtered, region=region)
     
     println("Running regressions...")
     model_results = Dict(model=>full_data[:, [:fundid, :date]] for model in COMPLETE_MODELS)
 
-    @threads for model in COMPLETE_MODELS
+    if region == :usa
+        region_benchmarks = USA_BENCHMARK_MODELS
+        region_models = USA_COMPLETE_MODELS
+    elseif region == :world
+        region_benchmarks = BENCHMARK_MODELS
+        region_models = COMPLETE_MODELS
+    else
+        error("region must be :usa or :world")
+    end
+
+    @threads for model in region_models
         process_start = time()
         benchmark_model_name, currency_risk_model_name = model
-        benchmark_factors = BENCHMARK_MODELS[benchmark_model_name]
+        benchmark_factors = region_benchmarks[benchmark_model_name]
         currency_risk_factors = CURRENCYRISK_MODELS[currency_risk_model_name]
         complete_factors = vcat(benchmark_factors, currency_risk_factors)
         
         model_result = compute_timevarying_betas(
-            full_data; id_col=:fundid, date_col=:date, y=:ret, X=complete_factors
+            full_data; id_col=:fundid, date_col=:date, y=:ex_ret, X=complete_factors
         )
 
         dropmissing!(model_result)
@@ -52,6 +65,7 @@ function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
         )
     end
 
+    # TODO: Save filtered and usa region results to different folders
     println("Saving results...")
     output_folderstring = joinpath(OUTPUT_DIR, options_folder, "factor-betas")
 
@@ -125,4 +139,6 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
+    main(; filtered=true)
+    main(; filtered=true, region=:usa)
 end
