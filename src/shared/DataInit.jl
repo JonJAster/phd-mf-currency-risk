@@ -25,26 +25,32 @@ const INPUT_DIR_EQ = joinpath(DIRS.equity, "factor-series")
 
 const READ_COLUMNS_MF = [:fundid, :date, :ret_gross_m, :domicile]
 
-function initialise_base_data(options_folder)
-    filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
+function initialise_base_data(options_folder; filtered=false, region=:world)
+    filtered ? parent_dir = "filtered" : parent_dir = "main"
+    filename_mf = joinpath(
+        INPUT_DIR_MF, options_folder, parent_dir, "excess_fund_data.arrow"
+    )
+
     filename_fx = joinpath(INPUT_DIR_FX, "currency_factors.arrow")
-    filename_longshort = joinpath(INPUT_DIR_EQ, "equity_factors.arrow")
-    filename_market = joinpath(INPUT_DIR_EQ, "unhedged_global_mkt.arrow")
+    
+    if region == :world
+        filename_eq = joinpath(INPUT_DIR_EQ, "global_equity_factors.arrow")
+    elseif region == :usa
+        filename_eq = joinpath(INPUT_DIR_EQ, "usa_equity_factors.arrow")
+    else
+        error("region must be :usa or :world")
+    end
 
     fund_data = Arrow.Table(filename_mf) |> DataFrame
     currency_factors = Arrow.Table(filename_fx) |> DataFrame
-    longshort_factors = Arrow.Table(filename_longshort) |> DataFrame
-    market_data = Arrow.Table(filename_market) |> DataFrame
+    equity_factors = Arrow.Table(filename_eq) |> DataFrame
     
-    partialjoin = innerjoin(fund_data, longshort_factors, currency_factors, on=:date)
-    main_data = innerjoin(
-        partialjoin, market_data, on=[:currency, :date], matchmissing=:notequal
-    )
+    main_data = innerjoin(fund_data, equity_factors, currency_factors, on=:date)
 
     return main_data
 end
 
-function initialise_flow_data(options_folder, model; ret, us_only=true)
+function initialise_flow_data(options_folder, model; ret)
     model_name = name_model(model)
     
     if ret == :raw
@@ -59,18 +65,14 @@ function initialise_flow_data(options_folder, model; ret, us_only=true)
         error("ret must be :raw or :weighted")
     end
     
-    filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/fund_data.arrow")
+    filename_mf = joinpath(INPUT_DIR_MF, options_folder, "main/excess_fund_data.arrow")
     filename_info = joinpath(INPUT_DIR_MFINFO, "mf_info.arrow")
 
     fund_base_data = Arrow.Table(filename_mf) |> DataFrame
     fund_info = Arrow.Table(filename_info) |> DataFrame
     decomposed_returns = Arrow.Table(filename_decomposition) |> DataFrame
 
-    if us_only
-        fund_base_data = fund_base_data[fund_base_data.domicile .== "USA", :]
-    end
-
-    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ret, 12; lagged=true)
+    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ex_ret, 12; lagged=true)
 
     select!(
         fund_base_data,

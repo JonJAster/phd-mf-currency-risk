@@ -23,6 +23,7 @@ export
     infofilter,
     infolookup,
     load_data_in_parts,
+    load_raw,
     ismissing_or_blank,
     name_model,
     offset_monthend,
@@ -323,6 +324,42 @@ function load_data_in_parts(dirstring; select=nothing)
 
     return vcat(output_data...)
 end
+
+function load_raw(parent_folder, country_code; return_type=:both)
+    if return_type ∉ [:both, :usd, :local]
+        # Only :usd and :local are functional, :both is descriptive but 
+        # functions as any other symbol.
+        println("Invalid return type $return_type. Using :both.")
+    end
+    raw_path = joinpath(DIRS.fund, parent_folder)
+    folders = readdir(raw_path)
+    dfs = []
+    for folder in folders
+        println("Reading $folder")
+        folder == "info" && continue
+        !(match("local", folder) |> isnothing) && return_type == :usd && continue
+        !(match("usd", folder) |> isnothing) && return_type == :local && continue
+        
+        file_path = joinpath(raw_path, folder, "mf_$(folder)_$(country_code).csv")
+        df = CSV.read(file_path, DataFrame)
+
+        melted_df = stack(
+            df, Not([:fundid, :secid, :name]), [:fundid, :secid];
+            variable_name=:date, value_name=folder
+        )
+
+        push!(dfs, melted_df)
+    end
+    df_merged = reduce((left, right) -> outerjoin(left, right, on = [:fundid, :secid, :date]), dfs)
+    
+    drop_allmissing!(df_merged, Not(:fundid, :secid, :date))
+    sort!(df_merged, [:fundid, :secid, :date])
+
+    return df_merged
+end
+
+function drop_allmissing!(df, cols)
+    mask = Matrix(df[!, cols]) .|> ismissing
 
 name_model(model) = "$(model[1])_$(model[2])"
 offset_monthend(date, offset=1) = date + Dates.Month(offset) |> Dates.lastdayofmonth
