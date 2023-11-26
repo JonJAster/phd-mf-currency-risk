@@ -51,7 +51,7 @@ function load_file_by_parts(folder)
         else
             read_data = CSV.read(
                 filestring, DataFrame;
-                types=EXPLICIT_TYPES, stringtype=String, groupmark=","
+                types=EXPLICIT_TYPES, stringtype=String, groupmark=','
             )
 
             normalise_headings!(read_data)
