@@ -1,9 +1,15 @@
-using CSV
 using DataFrames
+using Arrow
 using ShiftedArrays: lead, lag
+using Dates
 
-const INPUT_FILESTRING_BASE = "./data/cleaned/mutual-funds/regrouped"
-const OUTPUT_FILESTRING_BASE = "./data/prepared/mutual-funds"
+include("shared/CommonConstants.jl")
+include("shared/CommonFunctions.jl")
+using .CommonFunctions
+using .CommonConstants
+
+const INPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
+const OUTPUT_DIR = joinpath(DIRS.fund, "post-processing", "@option", "main")
 
 const ID_COLUMNS = [:name, :fundid, :secid]
 
@@ -26,8 +32,6 @@ function load_dataset(country_group)
     for folder in FIELD_FOLDERS
         push_data_part!(data_field_set, folder, country_group)
     end
-
-    global testdfs = data_field_set
 
     mf_data = reduce((x,y) -> outerjoin(x,y,on=[ID_COLUMNS..., :date]), data_field_set)
 

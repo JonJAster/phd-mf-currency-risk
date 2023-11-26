@@ -1,13 +1,12 @@
-using
-    DataFrames,
-    CSV,
-    Dates
+using DataFrames
+using CSV
+using Arrow
+using Dates
 
 include("shared/CommonConstants.jl")
 include("shared/CommonFunctions.jl")
-using
-    .CommonFunctions,
-    .CommonConstants
+using .CommonFunctions
+using .CommonConstants
 
 const INPUT_DIR = joinpath(DIRS.fund, "raw")
 const OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
