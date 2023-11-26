@@ -3,6 +3,7 @@ using CSV
 using DataFrames
 using Dates
 using StatsBase
+using BenchmarkTools
 
 include("shared/CommonConstants.jl")
 include("shared/CommonFunctions.jl")
@@ -11,6 +12,8 @@ using .CommonFunctions
 using .CommonConstants
 using .DataInit
 
+OUTPUT_DIR = "data/test-data"
+
 function test()
 
     options_folder=option_foldername(; DEFAULT_OPTIONS...)
@@ -18,10 +21,79 @@ function test()
     path_factors = joinpath(DIRS.equity, "factor-series/global_equity_factors.arrow")
     path_curr = joinpath(DIRS.currency, "factor-series/currency_factors.arrow")
 
+    ###
+
+    path_info = joinpath(DIRS.fund, "domicile-grouped/info/mf_info_usa.csv")
+    df_info = CSV.read(path_info, DataFrame)
     df_raw = load_raw("domicile-grouped", "usa")
 
-    describe(df_raw)
-    dropmissing!(df_raw, :ret_gross_m)
+    dropmissing!(df_raw, "local-monthly-gross-returns")
+
+    gb_funds = groupby(df_raw, "fundid")
+    tenures = combine(
+        gb_funds,
+        "date" => (x->length(unique(x))) => :tenure
+    )
+
+    tenures[tenures.tenure .== 120, :]
+
+    infolookup("FSUSA0B4D9")
+    list_categories(df_raw, "FSUSA00101").categories[1]
+    
+    tenures[tenures.fundid .== "FSUSA00101", :]
+
+    CSV.write(joinpath(OUTPUT_DIR, "immature-fund.csv"), df_raw[df_raw.fundid .== "FS0000A8MW", :])
+
+    function list_categories(df, fundid)
+        fund_data = df[df.fundid .== fundid, ["secid", "monthly-morningstar-category"]]
+        gb = groupby(fund_data, :secid)
+        
+        println(1)
+        categories = combine(
+            gb,
+            "monthly-morningstar-category" => string_categories => :categories
+        )
+        println(2)
+
+        return categories
+    end
+
+    function list_categories(df; secid)
+        fundid = df[df.secid .== secid, "fundid"] |> first
+        sec_data = df[df.secid .== secid, "monthly-morningstar-category"]
+        output = DataFrame(
+            :fundid => fundid,
+            :secid => secid,
+            :categories => string_categories(sec_data)
+        )
+        println(first(output.categories))
+        return output
+    end
+    
+    function string_categories(categories)
+        map(x->ismissing(x) ? "missing" : x, categories)
+        categories = unique(skipmissing(categories))
+        category_string = first(categories)
+        i = 2
+        while i <= length(categories)
+            category_string *= ", " * categories[i]
+            i += 1
+        end
+        return category_string
+    end
+
+    gb_catcount = groupby(df_raw, :secid)
+    catcount = combine(
+        gb_catcount,
+        "monthly-morningstar-category" => (x->length(unique(x))) => :catcount
+    )
+    sort(countmap(catcount.catcount))
+    sort(Dict(n=>countmap(catcount.catcount)[n]/length(catcount.catcount) for n in 1:7))
+    catcount[catcount.catcount .== 7, :]
+    
+    list_categories(df_raw, secid="FOUSA00CRI")
+    
+    ###
 
     df = Arrow.Table(path) |> DataFrame
     df_factors = Arrow.Table(path_factors) |> DataFrame
@@ -30,7 +102,7 @@ function test()
     minimum(df.date)
 
     test_df = DataFrame(
-        a = [1, missing, missing, missing, missing, missing, missing],
+        a = [missing, missing, missing, missing, missing, missing, missing],
         b = [1, missing, missing, missing, missing, missing, 7],
         c = [1, missing, missing, missing, missing, 6, missing],
         d = [1, missing, missing, missing, 5, 6, 7],
@@ -42,7 +114,21 @@ function test()
         k = [1, missing, 3, missing, 5, 6, 7]
     )
 
+    drop_allmissing!(test_df, dims=:rows)
+    cols = [:a, :f, :g]
+    cols[[1,3]]
+    select(test_df, Not([1,2]))
+
+    supertest_df = reduce(vcat, fill(test_df, 100_000))
+
     dropmissing(test_df, :k)
 
-    Matrix(test_df) .|> ismissing .|> m->any(m,1)
+    delete!(test_df, findall(all_missing))
+
+    # Benchmark this call
+    all_missing = .!(Matrix(test_df) .|> ismissing) * ones(size(test_df, 2)) .== zeros(size(test_df, 1))
+    @benchmark all(Matrix(test_df) .|> ismissing, dims=2)
+
+    @benchmark (Matrix(supertest_df) .|> ismissing) * ones(size(supertest_df, 2)) .== zeros(size(supertest_df, 1))
+    @benchmark .!any(Matrix(supertest_df) .|> ismissing, dims=2)
 end
