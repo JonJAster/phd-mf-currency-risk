@@ -24,7 +24,7 @@ function test()
     ###
 
     path_info = joinpath(DIRS.fund, "domicile-grouped/info/mf_info_usa.csv")
-    df_info = CSV.read(path_info, DataFrame)
+    df_info = CSV.read(path_info, DatcaFrame)
     df_raw = load_raw("domicile-grouped", "usa")
 
     dropmissing!(df_raw, "local-monthly-gross-returns")
@@ -35,30 +35,42 @@ function test()
         "date" => (x->length(unique(x))) => :tenure
     )
 
-    tenures[tenures.tenure .== 120, :]
+    tenlist = tenures[tenures.tenure .== 60, :]
 
-    infolookup("FSUSA0B4D9")
-    list_categories(df_raw, "FSUSA00101").categories[1]
+    print(first(tenlist.fundid, 10))
+
+    infolookup("FS0000A1MC")
+    list_categories(df_raw, "FS0000A1MC"; markup=true)
+
+    # CSV.write(joinpath(OUTPUT_DIR, "usa-fund-tenures.csv"), tenures)
     
-    tenures[tenures.fundid .== "FSUSA00101", :]
+    tenures[tenures.fundid .== "FS00009UF0", :]
+    df_raw[df_raw.fundid .== "FS00009UF0", :]
 
-    CSV.write(joinpath(OUTPUT_DIR, "immature-fund.csv"), df_raw[df_raw.fundid .== "FS0000A8MW", :])
+    CSV.write(joinpath(OUTPUT_DIR, "borderline-mature-fund.csv"), df_raw[df_raw.fundid .== "FS0000A1MC", :])
 
-    function list_categories(df, fundid)
+    function list_categories(df, fundid; markup=false)
         fund_data = df[df.fundid .== fundid, ["secid", "monthly-morningstar-category"]]
         gb = groupby(fund_data, :secid)
         
-        println(1)
         categories = combine(
             gb,
             "monthly-morningstar-category" => string_categories => :categories
         )
-        println(2)
+
+        if markup
+            println("| "*join(names(categories), " | ")*" |")
+            println("| "*join(fill("---", length(names(categories))), " | ")*" |")
+            for row in eachrow(categories)
+                println("| "*join(row, " | ")*" |")
+            end
+            return
+        end
 
         return categories
     end
 
-    function list_categories(df; secid)
+    function list_categories(df; secid, markup=false)
         fundid = df[df.secid .== secid, "fundid"] |> first
         sec_data = df[df.secid .== secid, "monthly-morningstar-category"]
         output = DataFrame(
@@ -66,7 +78,16 @@ function test()
             :secid => secid,
             :categories => string_categories(sec_data)
         )
-        println(first(output.categories))
+
+        if markup
+            println("| "*join(names(categories), " | ")*" |")
+            println("| "*join(fill("---", length(names(categories))), " | ")*" |")
+            for row in eachrow(categories)
+                println("| "*join(row, " | ")*" |")
+            end
+            return
+        end
+
         return output
     end
     

@@ -289,7 +289,7 @@ def polate_assets(df_in, how="interpolate", keep=False, retain_testdata=False):
     df_main = pd.merge(df_in, df_assetobs, on=["secid", "date"], how="left")
 
     # Back fill the polation ID within each secid. The purpose of this
-    # backfilling is so to group together consecutive missing
+    # backfilling is to group together consecutive missing
     # observations with the next available nonmissing observation.
     df_main["polation_id"] = df_main.groupby("secid").polation_id.bfill()
     
@@ -511,13 +511,13 @@ def polate_assets(df_in, how="interpolate", keep=False, retain_testdata=False):
     if retain_testdata:
         df_return = (
             pd.concat([df_return, df_main.loc[:, ["multret_net",
-                                                "cumret_net",
-                                                "net_assets_recalculated",
-                                                "net_assets_recalculated_exflows",
-                                                "asset_discrepancy",
-                                                "polation_id",
-                                                "polation_duration",
-                                                "polation_progress"]]],
+                                                  "cumret_net",
+                                                  "net_assets_recalculated",
+                                                  "net_assets_recalculated_exflows",
+                                                  "asset_discrepancy",
+                                                  "polation_id",
+                                                  "polation_duration",
+                                                  "polation_progress"]]],
                     axis=1)
         )
             
@@ -594,7 +594,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # Merge all returns data together. The resultant dataframe needs to be
     # sorted by date to enable removal of unnecessary rows.
     df_mfrets = (
-        panelmerge([df_mfret_g, df_mfret_n, df_mfcosts]).sort_values(by="date")
+        panelmerge([df_mfret_g, df_mfret_n, df_mfcosts], how="left").sort_values(by="date")
     )
 
     # Clear unused memory
@@ -888,7 +888,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # existing age field.
     if age_filtered:
         df_mf_agg = (
-            df_mf_agg[df_mf_agg.fund_age >= 36].copy() #  Age is zero-indexed.
+            df_mf_agg[df_mf_agg.fund_age >= 35].copy() #  Age is zero-indexed.
         )
 
     # Trim leading and trailing nans for the final time
