@@ -57,8 +57,8 @@ function load_file_by_parts(folder)
             normalise_headings!(read_data)
 
             dropmissing!(read_data, [:fundid, :secid])
-            _drop_incompleteids!(data_part)
-            _drop_emptyrows!(data_part)
+            _drop_incompleteids!(read_data)
+            _drop_emptyrows!(read_data)
         end
 
         push!(data_parts, read_data)
