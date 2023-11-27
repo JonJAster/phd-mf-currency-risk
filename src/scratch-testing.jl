@@ -15,7 +15,7 @@ using .DataInit
 OUTPUT_DIR = "data/test-data"
 
 function test()
-
+    
     options_folder=option_foldername(; DEFAULT_OPTIONS...)
     path = joinpath(DIRS.fund, "post-processing", options_folder, "main/fund_data.arrow")
     path_factors = joinpath(DIRS.equity, "factor-series/global_equity_factors.arrow")
