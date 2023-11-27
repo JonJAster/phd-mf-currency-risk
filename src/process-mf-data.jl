@@ -24,8 +24,12 @@ const FIELD_FOLDERS = [
     "usd-monthly-net-returns"
 ]
 
+function main()
+    x = load_dataset("other")
+end
+
 function load_dataset(country_group)
-    info_filestring = joinpath(INPUT_FILESTRING_BASE, "info", "mf_info_$country_group.csv")
+    info_filestring = joinpath(INPUT_DIR, "info", "mf_info_$country_group.csv")
     mf_info = CSV.read(info_filestring, DataFrame)
 
     data_field_set = DataFrame[]
@@ -50,10 +54,6 @@ function push_data_part!(data_field_set, folder, country_group)
         )
         push!(data_field_set, stacked_data)
     end
-end
-
-function main()
-    x = load_dataset("other")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

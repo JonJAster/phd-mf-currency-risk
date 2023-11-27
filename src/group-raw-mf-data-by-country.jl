@@ -33,7 +33,7 @@ function main()
             "($main_duration_m minutes)")
 end
     
-function load_file_by_parts(folder)
+function load_file_by_parts2(folder)
     folderstring = joinpath(INPUT_DIR, folder)
     files = readdir(folderstring)
     data_parts = DataFrame[]
@@ -50,8 +50,8 @@ function load_file_by_parts(folder)
             normalise_headings!(read_data, infodata=true)
         else
             read_data = CSV.read(
-                filestring, DataFrame;
-                types=EXPLICIT_TYPES, stringtype=String, groupmark=','
+                filestring, DataFrame; ntasks=1, #TODO REMOVE TEST CODE
+                types=EXPLICIT_TYPES, stringtype=String#, groupmark=','
             )
 
             normalise_headings!(read_data)
