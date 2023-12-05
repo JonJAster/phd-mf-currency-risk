@@ -1,76 +1,98 @@
+using FromFile
 using DataFrames
 using CSV
 using Arrow
 using Dates
 
-include("shared/CommonConstants.jl")
-include("shared/CommonFunctions.jl")
-using .CommonFunctions
-using .CommonConstants
-
-const INPUT_DIR = joinpath(DIRS.fund, "raw")
-const OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
+@from "../../utils.jl" using ProjectUtilities
 
 const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
 const ID_COLS = [:name, :fundid, :secid]
 
 function main()
-    main_time_start = time()
-    # Load info data first to build a map from fundid to domicile country group
-    info = load_file_by_parts("info")
+    startedat = time()
 
-    info[!, :country_group] .= map_country_to_group.(info[!, :domicile])
-    secid_to_group = Dict(zip(info[!, :secid], info[!, :country_group]))
+    info = _loadinfo()
+    country_group_map = _map_countrygroups()
+
+    info.country_group .= get.(Ref(country_group_map), info.domicile, "other")
+    secid_group_map = Dict(info.secid .=> info.country_group)
+    
     println("Regrouping files...")
+    for folder in values(FUND_FIELDS)
+        folder_startedat = time()
 
-    for folder in FIELD_FOLDERS
-        regroup_data(folder, secid_to_group, info)
+        data = _loaddata(folder)
+        
+        _savegroups(folder, data; mapping=secid_group_map)
+
+        printtime(
+            "saving raw mutual fund data by country group", startedat;
+            process_subtask=folder, process_start_time=folder_startedat
+        )
     end
 
-    main_duration_s = round(time() - main_time_start, digits=2)
-    main_duration_m = round(main_duration_s / 60, digits=2)
-    println("Finished refining mutual fund data in $main_duration_s seconds " *
-            "($main_duration_m minutes)")
+    _savegroups("info", info; mapping=secid_group_map)
+
+    printtime("regrouping all raw mutual fund data", startedat, minutes=true)
+    return nothing
 end
-    
-function load_file_by_parts2(folder)
-    folderstring = joinpath(INPUT_DIR, folder)
-    files = readdir(folderstring)
+
+function _loadinfo()
+    info = qload(
+        PATHS.rawfunds, "info";
+        types=EXPLICIT_TYPES, stringtype=String, truestring=["Yes"], falsestrings=["No"]
+    )
+    _normalise_headings!(info; infodata=true)
+    return info
+end
+
+function _map_countrygroups()
+    group_names = keys(COUNTRY_GROUPS)
+    countries_in_group = values(COUNTRY_GROUPS)
+    country_group_pairs = Iterators.flatten(
+        [list .=> name for (name, list) in zip(group_names, countries_in_group)]
+    )
+
+    groupmap = Dict(country_group_pairs)
+    return groupmap
+end
+
+function _loaddata(folder)
+    folderpath = qpath(PATHS.rawfunds, "$folder/")
+
     data_parts = DataFrame[]
-
-    for file in files
-        filestring = joinpath(folderstring, file)
+    for filepath in readdir(folderpath; join=true)
         
-        if folder == "info"
-            read_data = CSV.read(
-                filestring, DataFrame, types=EXPLICIT_TYPES, stringtype=String,
-                truestrings=["Yes"], falsestrings=["No"]
-            )
+        data_part = CSV.read(
+            filepath, DataFrame;
+            types=EXPLICIT_TYPES, stringtype=String, groupmark=',', rows_to_check=200
+        )
 
-            normalise_headings!(read_data, infodata=true)
-        else
-            read_data = CSV.read(
-                filestring, DataFrame; ntasks=1, #TODO REMOVE TEST CODE
-                types=EXPLICIT_TYPES, stringtype=String#, groupmark=','
-            )
+        _normalise_headings!(data_part)
 
-            normalise_headings!(read_data)
+        _drop_incompleteids!(data_part)
+        _drop_emptyrows!(data_part)
 
-            dropmissing!(read_data, [:fundid, :secid])
-            _drop_incompleteids!(read_data)
-            _drop_emptyrows!(read_data)
-        end
-
-        push!(data_parts, read_data)
+        push!(data_parts, data_part)
     end
 
     data = vcat(data_parts...)
-    folder != "info" && _drop_emptycols!(data)
+    _drop_emptycols!(data)
 
     return data
 end
 
-function normalise_headings!(data_part; infodata=false)
+function _savegroups(folder, data; mapping)
+    data.group = get.(Ref(mapping), data.secid, "other")
+    gdf = groupby(data, :group)
+    for (group_key, group_data) in pairs(gdf)
+        group_name = group_key.group
+        qsave(PATHS.groupedfunds, folder, "$group_name.csv"; data=group_data)
+    end
+end
+
+function _normalise_headings!(data_part; infodata=false)
     if infodata
         raw_names = names(data_part)
         re_underscored_chars = r"[\s\(\)\-]+(?!$)"
@@ -120,43 +142,6 @@ function _lostdata(df, cols)
         islost[:, i] .= ismissing.(col) .| isequal.(col, "")
     end
     return islost
-end
-
-function map_country_to_group(country::AbstractString)
-    for (group, countries) in COUNTRY_GROUPS
-        if country in countries
-            return group
-        end
-    end
-
-    return "other"
-end
-map_country_to_group(::Missing) = return "other"
-
-function save_file_by_country_group(data, folder, group_map)
-    for group in [keys(COUNTRY_GROUPS)..., "other"]
-        # Split the dataframe into a subset of rows with the given country group
-        data_split = data[map(secid -> get(group_map, secid, ""),
-                          data[!, :secid]) .== group, :]
-        
-        output_filestring = makepath(OUTPUT_DIR, folder, "mf_$(folder)_$group.arrow")
-
-        Arrow.write(output_filestring, data_split)
-    end
-end
-
-function regroup_data(folder, secid_to_group, info)
-    folder_time_start = time()
-    if folder == "info"
-        data = info[:, Not(:country_group)]
-    else
-        data = load_file_by_parts(folder)
-    end
-
-    save_file_by_country_group(data, folder, secid_to_group)
-        
-    folder_duration = round(time() - folder_time_start, digits=2)
-    println("Processed folder $folder in $folder_duration seconds")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
