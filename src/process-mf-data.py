@@ -136,6 +136,8 @@ def trim_nans(df_in, id_level="secid"):
     For a DataFrame of mutual fund data, drop any observations for a
     fund class before the first nonmissing observation of gross return
     and after the last nonmissing observation.
+
+    THIS FUNCTION RE-SORTS THE DATAFRAME IF CALLED WITH id_level="secid".
     
     Parameters
     ----------
@@ -147,34 +149,27 @@ def trim_nans(df_in, id_level="secid"):
 
     # If running on the secid level, we only want to remove observations outside of
     # the first and last nonempty return observations on ANY secid within that fundid.
+    # An efficient way to do this is to sort by fundid, date and return, then use
+    # ffills and bfills to identify the first and last nonempty return observations.
+    # The sort over returns is used only to ensure that a secid with a nonmissing
+    # return is sorted to the front of a given fundid-month if there's at least one
+    # nonmissing return observations for that fundid-month.
     if id_level == "secid":
-        df_in["all_missing_flag"] = (
-            df_in.groupby(["fundid", "date"]).ret_gross_m.transform(
-                lambda x: np.nan if np.isnan(x).all() else 1
-            )
+        df_in.sort_values(by=["fundid", "date", "ret_gross_m"], inplace=True)
+        df_in["first_ret_flag"] = df_in.groupby("fundid").ret_gross_m.ffill()
+
+        df_in.sort_values(
+            by=["fundid", "date", "ret_gross_m"], inplace=True, na_position="first"
         )
-
-        check_column = "all_missing_flag"
+        df_in["final_ret_flag"] = df_in.groupby("fundid").ret_gross_m.bfill()
     else:
-        check_column = "ret_gross_m"
-
-    # Forward and back fill values of the check column. Then, delete
-    # any observations for which either of the fills is null, because
-    # observations before the first return will have null forward fill
-    # values, and observations after the final return will have null
-    # back fill values.
-    df_in["before_first_ret_flag"] = (
-        df_in.groupby(id_level)[check_column].ffill()
-    )
-    df_in["after_final_ret_flag"] = (
-        df_in.groupby(id_level)[check_column].bfill()
-    )
+        df_in["first_ret_flag"] = df_in.groupby("fundid").ret_gross_m.ffill()
+        df_in["final_ret_flag"] = df_in.groupby("fundid").ret_gross_m.bfill()
     
     df_return = (
         df_in.copy()
-             .dropna(subset=["before_first_ret_flag","after_final_ret_flag"],
-                     how="any")
-             .drop(["before_first_ret_flag", "after_final_ret_flag"], axis=1)
+             .dropna(subset=["first_ret_flag","final_ret_flag"], how="any")
+             .drop(["first_ret_flag", "final_ret_flag"], axis=1)
     )
 
     return df_return
@@ -600,14 +595,18 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     print(f"Process {process_id} ({country_group_code}): Finished loading data ({elapsed_time} passed since process start)")
     
     # Combine panel data
+    # If only raw returns are used, then unneccessary return rows can be trimmed now on
+    # "gross returns" alone.
+    if raw_ret_only:
+        df_mfret_g = trim_nans(df_mfret_g)
+    
     # Combine only the data that is required to remove unneccessary return rows, that being
     # "gross returns", "net returns" and "representative costs". Other data can be combined
     # later after unneccessary rows have been removed to save time in the merge.
 
-    # Merge all returns data together. The resultant dataframe needs to be
-    # sorted by date to enable removal of unnecessary rows.
+    # Merge all returns data together.
     df_mfrets = (
-        panelmerge([df_mfret_g, df_mfret_n, df_mfcosts], how="left").sort_values(by="date")
+        panelmerge([df_mfret_g, df_mfret_n, df_mfcosts], how="left")
     )
 
     # Clear unused memory
@@ -635,16 +634,18 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         # costs, so set gross returns also to zero for those observations.
         df_mfrets.loc[df_mfrets.ret_net_m == 0, "ret_gross_m"] = 0
 
-    # Remove unnecessary rows
-    df_mfrets = trim_nans(df_mfrets)
+    # Remove unnecessary rows if not done earlier
+    if not raw_ret_only:
+        df_mfrets = trim_nans(df_mfrets)
 
     # Merge the rest of the fund time-series data together
     df_mf = panelmerge([df_mfrets, df_mfna, df_mfcat], how="left")
 
     # Merge in country of domicile.
-    df_mf = (
-        df_mf.merge(df_mfinfo.loc[:,["secid", "domicile"]])
-    )
+    df_mf["domicile"] = "United States" # Skip this step while only looking at USA.
+    # df_mf = (
+    #     df_mf.merge(df_mfinfo.loc[:,["secid", "domicile"]])
+    # )
 
     # Clear unused memory
     del df_mfrets, df_mfna, df_mfcat
