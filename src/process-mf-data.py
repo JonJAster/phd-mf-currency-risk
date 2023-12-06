@@ -144,10 +144,6 @@ def trim_nans(df_in, id_level="secid"):
     id_level : {"secid", "fundid"}, default "secid"
         Inner-most level of ID still in the DataFrame
     """
-    # TODO: Fix this function to remove any reference to id_level, since running on
-    # secids is invalid and will cause errors in aggregation.
-    if id_level == "secid":
-        raise ValueError("id_level must be 'fundid' for this function.")
     
     # First, forward and back fill values of gross return. Then, delete
     # any observations for which either of the fills is null, because
@@ -160,7 +156,21 @@ def trim_nans(df_in, id_level="secid"):
     df_in["after_final_ret_flag"] = (
         df_in.groupby(id_level).ret_gross_m.bfill()
     )
-    #df_in[""]
+
+    # If running on the secid level, only remove observations occuring before the 
+    # first nonempty return observation on ANY secid within that fundid, and after
+    # the final nonempty return observation on ANY secid within that fundid.
+    if id_level == "secid":
+        df_in.before_first_ret_flag = (
+            df_in.groupby(["fundid", "date"]).before_first_ret_flag.transform(
+                lambda x: np.nan if np.isnan(x).all() else 1
+            )
+        )
+        df_in.after_final_ret_flag = (
+            df_in.groupby(["fundid", "date"]).after_final_ret_flag.transform(
+                lambda x: np.nan if np.isnan(x).all() else 1
+            )
+        )
     
     df_return = (
         df_in.copy()
@@ -627,6 +637,9 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         # costs, so set gross returns also to zero for those observations.
         df_mfrets.loc[df_mfrets.ret_net_m == 0, "ret_gross_m"] = 0
 
+    # Remove unnecessary rows
+    df_mfrets = trim_nans(df_mfrets)
+
     # Merge the rest of the fund time-series data together
     df_mf = panelmerge([df_mfrets, df_mfna, df_mfcat], how="left")
 
@@ -754,6 +767,15 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # successfully.
     df_mf_anyeq.ret_gross_m = np.where(df_mf_anyeq.equity,
                                     df_mf_anyeq.ret_gross_m, np.nan)
+
+    # After this filter, remove unnecessary rows once again (those that
+    # exist for a secid before the first nonmissing observation of gross
+    # returns, and after the last nonmissing observation - this will
+    # eliminate entirely any secids that have had their full series deleted).
+    # The method of trimming out non-equity returns has the benefit
+    # of allowing returns to a fund that was at one point in time defined as
+    # an equity category for the duration of definition as that category.
+    df_mf_anyeq = trim_nans(df_mf_anyeq)
 
     # Aggregate into fund groups
     # Check to see if it's safe to aggregate secids under the same fundid by
@@ -884,7 +906,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
             df_mf_agg[df_mf_agg.fund_age >= 35].copy() #  Age is zero-indexed.
         )
 
-    # Trim leading and trailing nans
+    # Trim leading and trailing nans for the final time
     df_mf_agg = trim_nans(df_mf_agg.copy(), id_level="fundid")
 
     # Filter out funds with fewer than 24 nonmissing monthly returns
