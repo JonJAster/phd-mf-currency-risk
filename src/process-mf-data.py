@@ -144,33 +144,31 @@ def trim_nans(df_in, id_level="secid"):
     id_level : {"secid", "fundid"}, default "secid"
         Inner-most level of ID still in the DataFrame
     """
-    
-    # First, forward and back fill values of gross return. Then, delete
+
+    # If running on the secid level, we only want to remove observations outside of
+    # the first and last nonempty return observations on ANY secid within that fundid.
+    if id_level == "secid":
+        df_in["all_missing_flag"] = (
+            df_in.groupby(["fundid", "date"]).ret_gross_m.transform(
+                lambda x: np.nan if np.isnan(x).all() else 1
+            )
+        )
+
+        check_column = "all_missing_flag"
+    else:
+        check_column = "ret_gross_m"
+
+    # Forward and back fill values of the check column. Then, delete
     # any observations for which either of the fills is null, because
     # observations before the first return will have null forward fill
     # values, and observations after the final return will have null
     # back fill values.
     df_in["before_first_ret_flag"] = (
-        df_in.groupby(id_level).ret_gross_m.ffill()
+        df_in.groupby(id_level)[check_column].ffill()
     )
     df_in["after_final_ret_flag"] = (
-        df_in.groupby(id_level).ret_gross_m.bfill()
+        df_in.groupby(id_level)[check_column].bfill()
     )
-
-    # If running on the secid level, only remove observations occuring before the 
-    # first nonempty return observation on ANY secid within that fundid, and after
-    # the final nonempty return observation on ANY secid within that fundid.
-    if id_level == "secid":
-        df_in.before_first_ret_flag = (
-            df_in.groupby(["fundid", "date"]).before_first_ret_flag.transform(
-                lambda x: np.nan if np.isnan(x).all() else 1
-            )
-        )
-        df_in.after_final_ret_flag = (
-            df_in.groupby(["fundid", "date"]).after_final_ret_flag.transform(
-                lambda x: np.nan if np.isnan(x).all() else 1
-            )
-        )
     
     df_return = (
         df_in.copy()
@@ -637,10 +635,8 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         # costs, so set gross returns also to zero for those observations.
         df_mfrets.loc[df_mfrets.ret_net_m == 0, "ret_gross_m"] = 0
 
-    # TODO reconsider if trimming rows is necessary
-
     # Remove unnecessary rows
-    # df_mfrets = trim_nans(df_mfrets)
+    df_mfrets = trim_nans(df_mfrets)
 
     # Merge the rest of the fund time-series data together
     df_mf = panelmerge([df_mfrets, df_mfna, df_mfcat], how="left")
