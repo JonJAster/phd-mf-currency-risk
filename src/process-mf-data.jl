@@ -9,7 +9,7 @@ using .CommonFunctions
 using .CommonConstants
 
 const INPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
-const OUTPUT_DIR = joinpath(DIRS.fund, "post-processing", "@option", "main")
+const OUTPUT_DIR = joinpath(DIRS.fund, "post-processing")
 
 const ID_COLUMNS = [:name, :fundid, :secid]
 
@@ -23,6 +23,11 @@ const FIELD_FOLDERS = [
     "monthly-morningstar-category", "monthly-net-assets", "usd-monthly-gross-returns",
     "usd-monthly-net-returns"
 ]
+
+function main(options_folder=option_foldername(; DEFAULT_OPTIONS...))
+
+    x = load_dataset("other")
+end
 
 function load_dataset(country_group)
     info_filestring = joinpath(INPUT_FILESTRING_BASE, "info", "mf_info_$country_group.csv")
@@ -50,10 +55,6 @@ function push_data_part!(data_field_set, folder, country_group)
         )
         push!(data_field_set, stacked_data)
     end
-end
-
-function main()
-    x = load_dataset("other")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
