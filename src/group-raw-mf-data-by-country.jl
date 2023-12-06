@@ -11,9 +11,8 @@ using .CommonConstants
 const INPUT_DIR = joinpath(DIRS.fund, "raw")
 const OUTPUT_DIR = joinpath(DIRS.fund, "domicile-grouped")
 
-const DATESTRING = r"\d{4}-\d{2}"
 const EXPLICIT_TYPES = Dict(:FundId => String15, :SecId => String15)
-const DATA_COLS = Not([:name, :fundid, :secid])
+const ID_COLS = [:name, :fundid, :secid]
 const NONDATA_COL_OFFSET = 3
 
 function main()
@@ -75,29 +74,30 @@ end
 function normalise_headings!(data_part; infodata=false)
     if infodata
         raw_names = names(data_part)
-        re_whitespace_plus_bracket = r"\s+\("
-        re_close_bracket = r"\)"
-        re_remaining_whitespace = r"\s+"
+        re_underscored_chars = r"[\s\(\)\-]+(?!$)"
+        re_erased_chars = r"[\s\(\)\-]+$"
 
-        underscored_names = replace.(raw_names, re_whitespace_plus_bracket => "_")
-        bracket_stripped_names = replace.(underscored_names, re_close_bracket => "")
-        dashed_names = replace.(bracket_stripped_names, re_remaining_whitespace => "-")
+        underscored_names = replace.(raw_names, re_underscored_chars => "_")
+        tailclipped_names = replace.(underscored_names, re_erased_chars => "")
+        normalised_names = replace.(tailclipped_names, r"&" => "and")
 
-        rename!(data_part, lowercase.(dashed_names))
+        rename!(data_part, lowercase.(normalised_names))
     else
-        start_date = match(DATESTRING, names(data_part)[4]).match
-        number_of_other_dates = size(data_part, 2) - 4
-        data_dates = [Date(start_date) + Month(i) for i in 0:number_of_other_dates]
+        datestring = r"\d{4}-\d{2}"
+        n_idcols = length(ID_COLS)
+        n_datacols = ncol(data_part) - n_idcols
+        first_datacol = n_idcols + 1
         
-        column_names = Symbol.(
-            [lowercase.(names(data_part)[1:3]); Dates.format.(data_dates, "yyyy-mm")]
-        )
+        start_date = match(datestring, names(data_part)[first_datacol]).match
+        data_dates = [Date(start_date) + Month(i) for i in 0:(n_datacols-1)]
+        date_names = Dates.format.(data_dates, "yyyy-mm") .|> Symbol
+        column_names = [ID_COLS; date_names]
         rename!(data_part, column_names)
     end
 end
 
 function fix_thousands_commas(df)
-    col_types = map(col -> eltype(col), eachcol(df[!, DATA_COLS]))
+    col_types = map(col -> eltype(col), eachcol(df[!, Not(ID_COLS)]))
     isstring(T) = T <: Union{Missing, AbstractString} && T != Missing
     isnumber(T) = T <: Union{Missing, Number} && T != Missing
     data_contains_strings = any(isstring, col_types)
@@ -128,7 +128,7 @@ function strip_thousands_commas(df, mistyped_cols)
 end
 
 function drop_empty_rows(df)
-    where_data_exists = .!ismissing_or_blank.(df[!, DATA_COLS])
+    where_data_exists = .!ismissing_or_blank.(df[!, Not(ID_COLS)])
     any_data = reduce(.|, eachcol(where_data_exists))
     return df[any_data, :]
 end
