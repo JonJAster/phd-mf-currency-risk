@@ -594,6 +594,15 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     elapsed_time = datetime.now() - start_time
     print(f"Process {process_id} ({country_group_code}): Finished loading data ({elapsed_time} passed since process start)")
     
+    # For the age-filtered funds dataset, we want eventually to only include
+    # observations after the first 36 months, but many other filters need to
+    # be applied first. Start tracking secid age now, so you can later take
+    # the largest value in a given month for a fundid to be that fundid's
+    # age. Return observations under 3 years old will be removed as one of
+    # the final steps. This is stored with the gross returns data because
+    # it has to be calculated before trimming anything out.
+    df_mfret_g["age"] = df_mfret_g.groupby("secid").cumcount()+1
+
     # Combine panel data
     # If only raw returns are used, then unneccessary return rows can be trimmed now on
     # "gross returns" alone.
@@ -652,14 +661,6 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     
     elapsed_time = datetime.now() - start_time
     print(f"Process {process_id} ({country_group_code}): Finished merging data ({elapsed_time} passed since process start)")
-
-    # For the age-filtered funds dataset, we want eventually to only include
-    # observations after the first 36 months, but many other filters need to
-    # be applied first. Start tracking secid age now, so you can later take
-    # the largest value in a given month for a fundid to be that fundid's
-    # age. Return observations under 3 years old will be removed as one of
-    # the final steps.
-    df_mf["age"] = df_mf.groupby("secid").cumcount()
 
     # TODO: This dictionary is unnecessary if USA is the only country.
     # Relabel countries as ISO codes
@@ -886,7 +887,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
             (df_mf_agg.date == df_mf_agg.date_m1+MonthEnd(1))
             & (df_mf_agg.fund_assets_m1 >= 10_000_000),
             df_mf_agg.fund_assets/df_mf_agg.fund_assets_m1 * 100
-            - (1+df_mf_agg.ret_net_m),
+            - (100+df_mf_agg.ret_net_m),
             np.nan
         )
     )
@@ -902,7 +903,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # existing age field.
     if age_filtered:
         df_mf_agg = (
-            df_mf_agg[df_mf_agg.fund_age >= 35].copy() #  Age is zero-indexed.
+            df_mf_agg[df_mf_agg.fund_age >= 36].copy()
         )
 
     # Trim leading and trailing nans for the final time
