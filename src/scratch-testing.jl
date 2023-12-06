@@ -24,8 +24,15 @@ function test()
     ###
 
     path_info = joinpath(DIRS.fund, "domicile-grouped/info/mf_info_usa.csv")
-    df_info = CSV.read(path_info, DatcaFrame)
+    df_info = CSV.read(path_info, DataFrame)
     df_raw = load_raw("domicile-grouped", "usa")
+
+    df_cats = DataFrame(
+        :morningstar_category => unique(df_raw[!,"monthly-morningstar-category"])
+        |> skipmissing |> collect
+    )
+    CSV.write(joinpath(OUTPUT_DIR, "morningstar_categories.csv"), df_cats)
+    CSV.write(df_raw[df_raw.fundid .== "FS0000A1MC", :], joinpath(OUTPUT_DIR))
 
     dropmissing!(df_raw, "local-monthly-gross-returns")
 
@@ -47,7 +54,7 @@ function test()
     tenures[tenures.fundid .== "FS00009UF0", :]
     df_raw[df_raw.fundid .== "FS00009UF0", :]
 
-    CSV.write(joinpath(OUTPUT_DIR, "borderline-mature-fund.csv"), df_raw[df_raw.fundid .== "FS0000A1MC", :])
+    CSV.write(joinpath(OUTPUT_DIR, "mid-tenure-fund.csv"), df_raw[df_raw.fundid .== "FSUSA0B4D9", :])
 
     function list_categories(df, fundid; markup=false)
         fund_data = df[df.fundid .== fundid, ["secid", "monthly-morningstar-category"]]
