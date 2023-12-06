@@ -637,8 +637,10 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         # costs, so set gross returns also to zero for those observations.
         df_mfrets.loc[df_mfrets.ret_net_m == 0, "ret_gross_m"] = 0
 
+    # TODO reconsider if trimming rows is necessary
+
     # Remove unnecessary rows
-    df_mfrets = trim_nans(df_mfrets)
+    # df_mfrets = trim_nans(df_mfrets)
 
     # Merge the rest of the fund time-series data together
     df_mf = panelmerge([df_mfrets, df_mfna, df_mfcat], how="left")
@@ -775,7 +777,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # The method of trimming out non-equity returns has the benefit
     # of allowing returns to a fund that was at one point in time defined as
     # an equity category for the duration of definition as that category.
-    df_mf_anyeq = trim_nans(df_mf_anyeq)
+    # df_mf_anyeq = trim_nans(df_mf_anyeq)
 
     # Aggregate into fund groups
     # Check to see if it's safe to aggregate secids under the same fundid by
@@ -985,7 +987,7 @@ if __name__ == "__main__":
     main_start_time = datetime.now()
     num_groups = len(COUNTRY_GROUPS)
     
-    with multiprocessing.Pool(processes=4) as pool:
+    with multiprocessing.Pool(processes=np.min(4, num_groups)) as pool:
         pool.map(process_fund_data_wrapped, range(num_groups))
 
     print(f"All processes complete in {datetime.now() - main_start_time}")
