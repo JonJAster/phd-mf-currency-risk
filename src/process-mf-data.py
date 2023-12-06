@@ -987,7 +987,7 @@ if __name__ == "__main__":
     main_start_time = datetime.now()
     num_groups = len(COUNTRY_GROUPS)
     
-    with multiprocessing.Pool(processes=np.min(4, num_groups)) as pool:
+    with multiprocessing.Pool(processes=np.min([4, num_groups])) as pool:
         pool.map(process_fund_data_wrapped, range(num_groups))
 
     print(f"All processes complete in {datetime.now() - main_start_time}")
