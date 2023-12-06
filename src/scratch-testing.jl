@@ -17,24 +17,26 @@ OUTPUT_DIR = "data/test-data"
 function test()
 
     options_folder=option_foldername(; DEFAULT_OPTIONS...)
-    path = joinpath(DIRS.fund, "post-processing", options_folder, "main/fund_data.arrow")
+    path = joinpath(DIRS.fund, "post-processing", options_folder, "main/excess_fund_data.arrow")
+    path_bho = joinpath(DIRS.fund, "post-processing", options_folder, "filtered/excess_fund_data.arrow")
     path_factors = joinpath(DIRS.equity, "factor-series/global_equity_factors.arrow")
     path_curr = joinpath(DIRS.currency, "factor-series/currency_factors.arrow")
-
+    path_info = joinpath(DIRS.fund, "domicile-grouped/info/mf_info_usa.csv")
     ###
 
-    path_info = joinpath(DIRS.fund, "domicile-grouped/info/mf_info_usa.csv")
     df_info = CSV.read(path_info, DataFrame)
     df_raw = load_raw("domicile-grouped", "usa")
+    df_mf = Arrow.Table(path) |> DataFrame
+    df_bho = Arrow.Table(path_bho) |> DataFrame
 
     df_cats = DataFrame(
         :morningstar_category => unique(df_raw[!,"monthly-morningstar-category"])
         |> skipmissing |> collect
     )
-    CSV.write(joinpath(OUTPUT_DIR, "morningstar_categories.csv"), df_cats)
-    CSV.write(df_raw[df_raw.fundid .== "FS0000A1MC", :], joinpath(OUTPUT_DIR))
 
-    dropmissing!(df_raw, "local-monthly-gross-returns")
+    mf(id) = df_mf[df_mf.fundid .== id, :]
+
+    x = mf("FSUSA00101")
 
     gb_funds = groupby(df_raw, "fundid")
     tenures = combine(
