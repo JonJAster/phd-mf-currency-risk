@@ -35,20 +35,41 @@ function test()
     )
 
     mf(id) = df_mf[df_mf.fundid .== id, :]
+    raw(id) = df_raw[df_raw.fundid .== id, :]
 
-    x = mf("FSUSA00101")
+    x = mf("FS00008MWZ")
+    y = raw("FS00008XZM")
 
-    gb_funds = groupby(df_raw, "fundid")
-    tenures = combine(
+    println(first(x,10))
+
+    CSV.write(joinpath(OUTPUT_DIR, "multiple-category-fund.csv"), y)
+
+    gb_funds = groupby(df_mf, "fundid")
+    processed_tenures = combine(
         gb_funds,
         "date" => (x->length(unique(x))) => :tenure
     )
 
-    tenlist = tenures[tenures.tenure .== 60, :]
+    gb_secids = groupby(df_raw, "fundid")
+    raw_secid_count = combine(
+        gb_secids,
+        "secid" => (x->length(unique(x))) => :secid_count
+    )
+
+    df_raw = nothing
+    GC.gc()
+
+    target_funds = Set(raw_secid_count[raw_secid_count.secid_count .== 3, :fundid])
+
+    candidates = processed_tenures[processed_tenures.fundid .∈ Ref(target_funds), :]
+
+    tenlist = candidates[candidates.tenure .>= 60, :]
+
+    unique(raw("FS00008XZM").secid)
 
     print(first(tenlist.fundid, 10))
 
-    infolookup("FS0000A1MC")
+    infolookup("FS00008MWZ")
     list_categories(df_raw, "FS0000A1MC"; markup=true)
 
     # CSV.write(joinpath(OUTPUT_DIR, "usa-fund-tenures.csv"), tenures)
