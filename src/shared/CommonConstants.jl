@@ -79,7 +79,7 @@ const DEFAULT_BETA_LAGS = 60
 const DEFAULT_MIN_REGRESSION_OBS = 36
 const DEFAULT_DECAY = 0.186
 const DEFAULT_TIMEWEIGHT_LAGS = 18
-const DEFAULT_OPTIONS = Dict(
+const DEFAULT_OPTIONS = Dict{Symbol, Any}(
     :currency_type => :usd,
     :polation_method => :interpolate
 )

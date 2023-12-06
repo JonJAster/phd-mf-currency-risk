@@ -156,9 +156,9 @@ function save_file_by_country_group(data, folder, group_map)
         data_split = data[map(secid -> get(group_map, secid, ""),
                           data[!, :secid]) .== group, :]
         
-        output_filestring = makepath(OUTPUT_DIR, folder, "mf_$(folder)_$group.csv")
+        output_filestring = makepath(OUTPUT_DIR, folder, "mf_$(folder)_$group.arrow")
 
-        CSV.write(output_filestring, data_split)
+        Arrow.write(output_filestring, data_split)
     end
 end
 

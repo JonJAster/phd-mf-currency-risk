@@ -90,9 +90,9 @@ function option_foldername(; currency_type, kwargs...)
             folder_name *= "_na-int"
         elseif options_in[:polation_method] == :extrapolate
             folder_name *= "_na-exp"
-        elseif options_in != false
-            error("Invalid polation method: $(options_in[:polation_method]). Must be :both, "*
-                  ":interpolate, :extrapolate, or false.")
+        elseif options_in != :none
+            error("Invalid polation method: $(options_in[:polation_method]). Must be "*
+                  ":both, :interpolate, :extrapolate, or :none.")
         end
     end
     
