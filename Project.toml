@@ -1,0 +1,4 @@
+name = "CurrencyExposureMutualFunds"
+uuid = "0e7315e8-326a-4503-9dd6-f867b6560efc"
+authors = ["Jon Aster <jonaster.mail@gmail.com>"]
+version = "0.1.0"
