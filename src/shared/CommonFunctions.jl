@@ -23,8 +23,10 @@ export
     infofilter,
     infolookup,
     load_data_in_parts,
+    load_raw,
     ismissing_or_blank,
     name_model,
+    drop_allmissing!,
     offset_monthend,
     nonmissing
 
@@ -322,6 +324,65 @@ function load_data_in_parts(dirstring; select=nothing)
     end
 
     return vcat(output_data...)
+end
+
+function load_raw(parent_folder, country_code; return_type=:both)
+    if return_type ∉ [:both, :usd, :local]
+        # Only :usd and :local are functional, :both is descriptive but 
+        # functions as any other symbol.
+        println("Invalid return type $return_type. Using :both.")
+    end
+
+    raw_path = joinpath(DIRS.fund, parent_folder)
+    folders = readdir(raw_path)
+    dfs = []
+    for folder in folders
+        println("Reading $folder")
+        folder == "info" && continue
+        !(match(r"local", folder) |> isnothing) && return_type == :usd && continue
+        !(match(r"usd", folder) |> isnothing) && return_type == :local && continue
+        
+        file_path = joinpath(raw_path, folder, "mf_$(folder)_$(country_code).csv")
+        df = CSV.read(file_path, DataFrame)
+
+        melted_df = stack(
+            df, Not([:fundid, :secid, :name]), [:fundid, :secid];
+            variable_name=:date, value_name=folder
+        )
+
+        drop_allmissing!(melted_df, dims=:cols)
+
+        push!(dfs, melted_df)
+    end
+    df_merged = reduce((x, y) -> outerjoin(x, y, on = [:fundid, :secid, :date]), dfs)
+    
+    drop_allmissing!(df_merged, Not(:fundid, :secid, :date))
+    sort!(df_merged, [:fundid, :secid, :date])
+
+    return df_merged
+end
+
+drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
+function drop_allmissing!(df, cols; dims=1)
+    if dims ∉ [1, 2, :row, :rows, :col, :cols]
+        error("dims must be :rows or :cols")
+    end
+
+    dimsmap = Dict(:row => 1, :rows => 1, :col => 2, :cols => 2)
+    if dims ∉ [1, 2]
+        dims = dimsmap[dims]
+    end
+
+    mask_matrix = .!(Matrix(df[!, cols]) .|> ismissing)
+    if dims == 1
+        one_vector = ones(size(mask_matrix,2))
+        all_missing = mask_matrix * one_vector .== zero(size(mask_matrix,1))
+        delete!(df, findall(all_missing))
+    else
+        one_vector = ones(size(mask_matrix,1))
+        all_missing = mask_matrix' * one_vector .== zero(size(mask_matrix,2))
+        select!(df, Not(cols[all_missing]))
+    end
 end
 
 name_model(model) = "$(model[1])_$(model[2])"

@@ -7,8 +7,10 @@ export
     FIELD_FOLDERS,
     COUNTRY_GROUPS,
     BENCHMARK_MODELS,
+    USA_BENCHMARK_MODELS,
     CURRENCYRISK_MODELS,
     COMPLETE_MODELS,
+    USA_COMPLETE_MODELS,
     RESULT_COLUMNS,
     DEFAULT_BETA_LAGS,
     DEFAULT_MIN_REGRESSION_OBS,
@@ -49,6 +51,12 @@ const BENCHMARK_MODELS = OrderedDict(
     :world_ff6 => [:mkt, :smb, :hml, :rmw, :cma, :wml]
 )
 
+const USA_BENCHMARK_MODELS = OrderedDict(
+    :capm => [:mkt],
+    :ff3 => [:mkt, :smb, :hml],
+    :ffcarhart => [:mkt, :smb, :hml, :wml],
+)
+
 const CURRENCYRISK_MODELS = OrderedDict(
     :lrv => [:hml_fx, :rx],
     # :lrv_net => [:hml_fx_net, :rx_net], # Excluded in main
@@ -57,6 +65,11 @@ const CURRENCYRISK_MODELS = OrderedDict(
 
 const COMPLETE_MODELS = (
     Iterators.product(keys(BENCHMARK_MODELS), keys(CURRENCYRISK_MODELS)) |>
+    collect |> permutedims |> vec
+)
+
+const USA_COMPLETE_MODELS = (
+    Iterators.product(keys(USA_BENCHMARK_MODELS), keys(CURRENCYRISK_MODELS)) |>
     collect |> permutedims |> vec
 )
 

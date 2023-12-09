@@ -139,6 +139,6 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
-    main(; filtered=true)
-    main(; filtered=true, region=:usa)
+    #main(; filtered=true)
+    #main(; filtered=true, region=:usa)
 end

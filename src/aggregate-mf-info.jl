@@ -12,14 +12,18 @@ const INPUT_DIR = joinpath(DIRS.fund, "domicile-grouped/info")
 const OUTPUT_DIR = joinpath(DIRS.fund, "info")
 
 const UNIQUE_AGG_COLS = [
-    "domicile", "base-currency", "global-broad-category-group",
+    "domicile", "base-currency", "fund-standard-name", "global-broad-category-group",
     "management-approach---active", "management-approach---passive", "true-no-load"
 ]
 
 const RENAME_MAP = Dict(
-    "base-currency" => "currency", "global-broad-category-group" => "broad_category",
-    "management-approach---active" => "active", "management-approach---passive" => "passive",
-    "true-no-load" => "no_load", "inception-date" => "inception_date"
+    "base-currency" => "currency",
+    "fund-standard-name" => "fund_name",
+    "global-broad-category-group" => "broad_category",
+    "management-approach---active" => "active",
+    "management-approach---passive" => "passive",
+    "true-no-load" => "no_load",
+    "inception-date" => "inception_date"
 )
 
 const ISO_MAP = Dict(
@@ -57,7 +61,7 @@ function main()
 
     println("Aggregating to fund level...")
     fund_info = groupby(fundsec_info, :fundid) |> gb->combine(
-        gb, UNIQUE_AGG_COLS .=> agg_if_unique, "inception_date" => minimum; renamecols=false
+        gb, UNIQUE_AGG_COLS .=> agg_if_unique, "inception-date" => minimum; renamecols=false
     )
 
     fund_info.domicile = map(country -> ISO_MAP[country], fund_info.domicile)

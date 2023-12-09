@@ -136,6 +136,8 @@ def trim_nans(df_in, id_level="secid"):
     For a DataFrame of mutual fund data, drop any observations for a
     fund class before the first nonmissing observation of gross return
     and after the last nonmissing observation.
+
+    THIS FUNCTION RE-SORTS THE DATAFRAME IF CALLED WITH id_level="secid".
     
     Parameters
     ----------
@@ -144,24 +146,30 @@ def trim_nans(df_in, id_level="secid"):
     id_level : {"secid", "fundid"}, default "secid"
         Inner-most level of ID still in the DataFrame
     """
-    
-    # First, forward and back fill values of gross return. Then, delete
-    # any observations for which either of the fills is null, because
-    # observations before the first return will have null forward fill
-    # values, and observations after the final return will have null
-    # back fill values.
-    df_in["before_first_ret_flag"] = (
-        df_in.groupby(id_level).ret_gross_m.ffill()
-    )
-    df_in["after_final_ret_flag"] = (
-        df_in.groupby(id_level).ret_gross_m.bfill()
-    )
+
+    # If running on the secid level, we only want to remove observations outside of
+    # the first and last nonempty return observations on ANY secid within that fundid.
+    # An efficient way to do this is to sort by fundid, date and return, then use
+    # ffills and bfills to identify the first and last nonempty return observations.
+    # The sort over returns is used only to ensure that a secid with a nonmissing
+    # return is sorted to the front of a given fundid-month if there's at least one
+    # nonmissing return observations for that fundid-month.
+    if id_level == "secid":
+        df_in.sort_values(by=["fundid", "date", "ret_gross_m"], inplace=True)
+        df_in["first_ret_flag"] = df_in.groupby("fundid").ret_gross_m.ffill()
+
+        df_in.sort_values(
+            by=["fundid", "date", "ret_gross_m"], inplace=True, na_position="first"
+        )
+        df_in["final_ret_flag"] = df_in.groupby("fundid").ret_gross_m.bfill()
+    else:
+        df_in["first_ret_flag"] = df_in.groupby("fundid").ret_gross_m.ffill()
+        df_in["final_ret_flag"] = df_in.groupby("fundid").ret_gross_m.bfill()
     
     df_return = (
         df_in.copy()
-             .dropna(subset=["before_first_ret_flag","after_final_ret_flag"],
-                     how="any")
-             .drop(["before_first_ret_flag", "after_final_ret_flag"], axis=1)
+             .dropna(subset=["first_ret_flag","final_ret_flag"], how="any")
+             .drop(["first_ret_flag", "final_ret_flag"], axis=1)
     )
 
     return df_return
@@ -289,7 +297,7 @@ def polate_assets(df_in, how="interpolate", keep=False, retain_testdata=False):
     df_main = pd.merge(df_in, df_assetobs, on=["secid", "date"], how="left")
 
     # Back fill the polation ID within each secid. The purpose of this
-    # backfilling is so to group together consecutive missing
+    # backfilling is to group together consecutive missing
     # observations with the next available nonmissing observation.
     df_main["polation_id"] = df_main.groupby("secid").polation_id.bfill()
     
@@ -511,13 +519,13 @@ def polate_assets(df_in, how="interpolate", keep=False, retain_testdata=False):
     if retain_testdata:
         df_return = (
             pd.concat([df_return, df_main.loc[:, ["multret_net",
-                                                "cumret_net",
-                                                "net_assets_recalculated",
-                                                "net_assets_recalculated_exflows",
-                                                "asset_discrepancy",
-                                                "polation_id",
-                                                "polation_duration",
-                                                "polation_progress"]]],
+                                                  "cumret_net",
+                                                  "net_assets_recalculated",
+                                                  "net_assets_recalculated_exflows",
+                                                  "asset_discrepancy",
+                                                  "polation_id",
+                                                  "polation_duration",
+                                                  "polation_progress"]]],
                     axis=1)
         )
             
@@ -586,15 +594,28 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     elapsed_time = datetime.now() - start_time
     print(f"Process {process_id} ({country_group_code}): Finished loading data ({elapsed_time} passed since process start)")
     
+    # For the age-filtered funds dataset, we want eventually to only include
+    # observations after the first 36 months, but many other filters need to
+    # be applied first. Start tracking secid age now, so you can later take
+    # the largest value in a given month for a fundid to be that fundid's
+    # age. Return observations under 3 years old will be removed as one of
+    # the final steps. This is stored with the gross returns data because
+    # it has to be calculated before trimming anything out.
+    df_mfret_g["age"] = df_mfret_g.groupby("secid").cumcount()+1
+
     # Combine panel data
+    # If only raw returns are used, then unneccessary return rows can be trimmed now on
+    # "gross returns" alone.
+    if raw_ret_only:
+        df_mfret_g = trim_nans(df_mfret_g)
+    
     # Combine only the data that is required to remove unneccessary return rows, that being
     # "gross returns", "net returns" and "representative costs". Other data can be combined
     # later after unneccessary rows have been removed to save time in the merge.
 
-    # Merge all returns data together. The resultant dataframe needs to be
-    # sorted by date to enable removal of unnecessary rows.
+    # Merge all returns data together.
     df_mfrets = (
-        panelmerge([df_mfret_g, df_mfret_n, df_mfcosts]).sort_values(by="date")
+        panelmerge([df_mfret_g, df_mfret_n, df_mfcosts], how="left")
     )
 
     # Clear unused memory
@@ -622,30 +643,24 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
         # costs, so set gross returns also to zero for those observations.
         df_mfrets.loc[df_mfrets.ret_net_m == 0, "ret_gross_m"] = 0
 
-    # Remove unnecessary rows
-    df_mfrets = trim_nans(df_mfrets)
+    # Remove unnecessary rows if not done earlier
+    if not raw_ret_only:
+        df_mfrets = trim_nans(df_mfrets)
 
     # Merge the rest of the fund time-series data together
     df_mf = panelmerge([df_mfrets, df_mfna, df_mfcat], how="left")
 
     # Merge in country of domicile.
-    df_mf = (
-        df_mf.merge(df_mfinfo.loc[:,["secid", "domicile"]])
-    )
+    df_mf["domicile"] = "United States" # Skip this step while only looking at USA.
+    # df_mf = (
+    #     df_mf.merge(df_mfinfo.loc[:,["secid", "domicile"]])
+    # )
 
     # Clear unused memory
     del df_mfrets, df_mfna, df_mfcat
     
     elapsed_time = datetime.now() - start_time
     print(f"Process {process_id} ({country_group_code}): Finished merging data ({elapsed_time} passed since process start)")
-
-    # For the age-filtered funds dataset, we want eventually to only include
-    # observations after the first 36 months, but many other filters need to
-    # be applied first. Start tracking secid age now, so you can later take
-    # the largest value in a given month for a fundid to be that fundid's
-    # age. Return observations under 3 years old will be removed as one of
-    # the final steps.
-    df_mf["age"] = df_mf.groupby("secid").cumcount()
 
     # TODO: This dictionary is unnecessary if USA is the only country.
     # Relabel countries as ISO codes
@@ -760,7 +775,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # The method of trimming out non-equity returns has the benefit
     # of allowing returns to a fund that was at one point in time defined as
     # an equity category for the duration of definition as that category.
-    df_mf_anyeq = trim_nans(df_mf_anyeq)
+    # df_mf_anyeq = trim_nans(df_mf_anyeq)
 
     # Aggregate into fund groups
     # Check to see if it's safe to aggregate secids under the same fundid by
@@ -872,7 +887,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
             (df_mf_agg.date == df_mf_agg.date_m1+MonthEnd(1))
             & (df_mf_agg.fund_assets_m1 >= 10_000_000),
             df_mf_agg.fund_assets/df_mf_agg.fund_assets_m1 * 100
-            - (1+df_mf_agg.ret_net_m),
+            - (100+df_mf_agg.ret_net_m),
             np.nan
         )
     )
@@ -888,7 +903,7 @@ def process_fund_data(country_group_code, currency_type, raw_ret_only, polation_
     # existing age field.
     if age_filtered:
         df_mf_agg = (
-            df_mf_agg[df_mf_agg.fund_age >= 36].copy() #  Age is zero-indexed.
+            df_mf_agg[df_mf_agg.fund_age >= 36].copy()
         )
 
     # Trim leading and trailing nans for the final time
@@ -970,7 +985,7 @@ if __name__ == "__main__":
     main_start_time = datetime.now()
     num_groups = len(COUNTRY_GROUPS)
     
-    with multiprocessing.Pool(processes=4) as pool:
+    with multiprocessing.Pool(processes=np.min([4, num_groups])) as pool:
         pool.map(process_fund_data_wrapped, range(num_groups))
 
     print(f"All processes complete in {datetime.now() - main_start_time}")
