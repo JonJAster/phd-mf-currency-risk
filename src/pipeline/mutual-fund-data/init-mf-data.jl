@@ -3,7 +3,11 @@ using DataFrames
 using CSV
 using Arrow
 
-# @from "../../utils.jl" include ProjectUtilities
+include("../../shared/CommonConstants.jl")
+include("../../shared/CommonFunctions.jl")
+
+using .CommonConstants
+using .CommonFunctions
 
 function init_mf_data()
     mf_data_collection = read_mf_data()
