@@ -1,5 +1,5 @@
 module CurrencyExposureMutualFunds
 
-greet() = print("Hello World!")
+nothing
 
 end # module CurrencyExposureMutualFunds
