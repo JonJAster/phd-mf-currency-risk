@@ -10,6 +10,7 @@ using .CommonConstants
 
 export dirslist
 export makepath
+export init_raw
 export drop_allmissing!
 
 function dirslist()
@@ -46,9 +47,11 @@ function makepath(paths...)
     return pathstring
 end
 
-function load_raw(filepath)
+function init_raw(filepath)
     data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
+    testname = names(data)[4]
     _normalise_names!(data)
+    drop_allmissing!(data, dims=:cols)
     drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
     return data
 end
@@ -64,6 +67,15 @@ function drop_allmissing!(df, cols; dims=1)
         dims = dimsmap[dims]
     end
 
+    testdf = DataFrame(
+        name = ["A", "B", "C", "D", "E"],
+        fundid = [1, 2, 3, 4, 5],
+        secid = [1, 2, 3, 4, 5],
+        date = ["2020-01", "2020-02", "2020-03", "2020-04", "2020-05"],
+        value = [missing, missing, missing, missing, missing]
+    )
+    df = copy(testdf)
+    cols = names(df)
     mask_matrix = .!(Matrix(df[!, cols]) .|> ismissing)
     if dims == 1
         one_vector = ones(size(mask_matrix,2))
@@ -92,14 +104,13 @@ function _normalise_names!(df)
     last_date = match(re_date, last(names(df))).match |> Dates.Date
     date_cols = [_offset_monthend(start_date, i) for i in 0:n_date_cols-1]
 
-    last(date_cols)+Dates.Month(1) != last_date && @warn(
+    last(date_cols) != last_date && @warn(
         "The calculated end date ($(last(date_cols))) is not the same as the last date " *
         "in the dataset for $fieldname ($last_date). This suggests that some date " *
         "columns may be missing or incorrectly sequenced."
     )
 
-    name_map = zip(names(df), vcat(id_cols, date_cols))
-    rename!(df, name_map)
+    rename!(df, Symbol.([id_cols; date_cols]))
     return
 end
 

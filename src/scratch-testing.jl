@@ -3,6 +3,7 @@ using DataFrames
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
+includet("pipeline/mutual-fund-data/init-mf-data.jl")
 
 using .CommonConstants
 using .CommonFunctions
@@ -15,14 +16,18 @@ function test()
         data[file] = CSV.read(joinpath(folder, file), DataFrame)
     end
 
+    k = collect(keys(data))
+
+    for i in k
+        testdf = data[i]
+        n_nonmissing = sum(.!ismissing.(testdf[:, 4]))
+        println(i, ": ", n_nonmissing)
+    end
+
     display(first(first(data)[2]))
     CommonFunctions._normalise_names!(first(data)[2])
 
-    df_test = data[collect(keys(data))[2]]
-    df_test2 = deepcopy(df_test)
-    CommonFunctions._normalise_names!(df_test2)
-    for i in [4, ncol(df_test)]
-        println(names(df_test)[i])
-    end
+    dftest = init_mf_data()
 
+    dftest
 end

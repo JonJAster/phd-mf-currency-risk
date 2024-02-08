@@ -5,6 +5,7 @@ export DIRS
 const DIRS = (
     mf = (
         raw = "data/mutual-funds/raw",
+        init = "data/mutual-funds/init"
     ),
     fx = (
         raw = "data/currencies/raw",
