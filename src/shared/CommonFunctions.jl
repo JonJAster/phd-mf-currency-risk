@@ -13,6 +13,8 @@ export makepath
 export init_raw
 export drop_allmissing!
 
+const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
+
 function dirslist()
     println("-- DIRS LIST --")
     println()
