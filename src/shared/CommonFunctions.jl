@@ -61,8 +61,14 @@ end
 
 function qview(filename)
     data = Arrow.Table(filename)
-    output = summarystats(data)
-    return output
+    println("------")
+    for col in propertynames(data)
+        println(col)
+        println()
+        describe(data[col])
+        println("------")
+    end
+    return
 end    
 
 function printtime(
