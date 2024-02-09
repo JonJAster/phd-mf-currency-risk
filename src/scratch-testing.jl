@@ -30,4 +30,6 @@ function test()
     dftest = init_mf_data()
 
     dftest
+
+    infodata = CSV.read(joinpath(DIRS.mf.raw, "info.csv"), DataFrame)
 end
