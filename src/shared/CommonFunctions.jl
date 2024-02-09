@@ -1,6 +1,5 @@
 module CommonFunctions
 
-using Revise
 using CSV
 using DataFrames
 using Dates
@@ -10,6 +9,7 @@ using .CommonConstants
 
 export dirslist
 export makepath
+export printtime
 export init_raw
 export drop_allmissing!
 
@@ -49,12 +49,44 @@ function makepath(paths...)
     return pathstring
 end
 
-function init_raw(filepath)
-    data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
-    testname = names(data)[4]
-    _normalise_names!(data)
-    drop_allmissing!(data, dims=:cols)
-    drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
+function printtime(
+        task, start_time;
+        process_subtask="", process_start_time=0, minutes=false
+        )
+    if isempty(process_subtask) ⊻ iszero(process_start_time)
+        error("If any process parameters are supplied, all must be supplied")
+    end
+    timed_process = !isempty(process_subtask)
+
+    duration_s = round(time() - start_time, digits=2)
+    duration_m = round(duration_s / 60, digits=2)
+    
+    if !timed_process
+        printout = "Finished $task in $duration_s seconds"
+        minutes && (printout *= " ($duration_m minutes)")
+    else
+        process_duration_s = round(time() - process_start_time, digits=2)
+        process_duration_m = round(process_duration_s / 60, digits=2)
+
+        printout = "Finished $task for $process_subtask in $process_duration_s seconds"
+        minutes && (printout *= " ($process_duration_m minutes)")
+        printout *= ", total running time $duration_s seconds ($duration_m minutes)"
+    end
+
+    println(printout)
+    return nothing
+end
+
+function init_raw(filepath; info=false)
+    if info
+        data = CSV.read(filepath, DataFrame)
+        _normalise_names!(data; info=true)
+    else
+        data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
+        _normalise_names!(data)
+        drop_allmissing!(data, dims=:cols)
+        drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
+    end
     return data
 end
 
@@ -90,29 +122,43 @@ function drop_allmissing!(df, cols; dims=1)
     end
 end
 
-function _normalise_names!(df)
-    n_id_cols = 3
-    n_date_cols = ncol(df) - n_id_cols
+function _normalise_names!(df; info=false)
+    if info
+        re_invalidchars_nonend = r"[^a-zA-Z0-9]+(?!$)"
+        re_invalidchars_end = r"[^a-zA-Z0-9]+$"
 
-    id_cols = names(df)[1:n_id_cols] .|> lowercase
-    
-    re_fieldname = r"^.+(?=\s?\r?\n\d{4}-\d{2})"
-    re_date = r"(?<=\n)\d{4}-\d{2}"
-    
-    fieldname_match = match(re_fieldname, names(df)[n_id_cols + 1]).match
-    fieldname = replace(fieldname_match, r"\r|\n| $" => "")
-    
-    start_date = match(re_date, names(df)[n_id_cols + 1]).match |> Dates.Date
-    last_date = match(re_date, last(names(df))).match |> Dates.Date
-    date_cols = [_offset_monthend(start_date, i) for i in 0:n_date_cols-1]
+        function namemap(x)
+            replace(x, re_invalidchars_nonend => "_") |> x ->
+            replace(x, re_invalidchars_end => "") |>
+            lowercase
+        end
 
-    last(date_cols) != last_date && @warn(
-        "The calculated end date ($(last(date_cols))) is not the same as the last date " *
-        "in the dataset for $fieldname ($last_date). This suggests that some date " *
-        "columns may be missing or incorrectly sequenced."
-    )
+        new_names = names(df) .|> namemap
+        rename!(df, new_names)
+    else
+        n_id_cols = 3
+        n_date_cols = ncol(df) - n_id_cols
 
-    rename!(df, Symbol.([id_cols; date_cols]))
+        id_cols = names(df)[1:n_id_cols] .|> lowercase
+        
+        re_fieldname = r"^.+(?=\s?\r?\n\d{4}-\d{2})"
+        re_date = r"(?<=\n)\d{4}-\d{2}"
+        
+        fieldname_match = match(re_fieldname, names(df)[n_id_cols + 1]).match
+        fieldname = replace(fieldname_match, r"\r|\n| $" => "")
+        
+        start_date = match(re_date, names(df)[n_id_cols + 1]).match |> Dates.Date
+        last_date = match(re_date, last(names(df))).match |> Dates.Date
+        date_cols = [_offset_monthend(start_date, i) for i in 0:n_date_cols-1]
+
+        last(date_cols) != last_date && @warn(
+            "The calculated end date ($(last(date_cols))) is not the same as the last date " *
+            "in the dataset for $fieldname ($last_date). This suggests that some date " *
+            "columns may be missing or incorrectly sequenced."
+        )
+
+        rename!(df, Symbol.([id_cols; date_cols]))
+    end
     return
 end
 

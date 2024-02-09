@@ -11,7 +11,7 @@ using .CommonConstants
 using .CommonFunctions
 
 function init_mf_data()
-    time_start = now()
+    task_start = time()
     mf_data_collection = _read_mf_data()
     mf_data = reduce(
         (l,r)->outerjoin(l,r; on=[:fundid, :secid, :date]),
@@ -20,7 +20,7 @@ function init_mf_data()
 
     drop_allmissing!(mf_data, Not([:fundid, :secid, :date]); dims=:rows)
 
-    println("Time taken: ", now() - time_start)
+    printtime("initialising mutual fund data", task_start, minutes=false)
     return mf_data
 end
 
@@ -51,5 +51,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     output_data = init_mf_data()
     output_filename = makepath(DIRS.mf.init, "mf-data.arrow")
 
+    task_start = time()
     Arrow.write(output_filename, output_data)
+    printtime("writing mutual fund data", task_start, minutes=false)
 end
