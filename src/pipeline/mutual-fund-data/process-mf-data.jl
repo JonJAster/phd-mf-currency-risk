@@ -10,7 +10,11 @@ using .CommonFunctions
 
 function process_mf_data()
     task_start = time()
-    return  
+    data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
+    info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
+
+    
+    return
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
