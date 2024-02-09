@@ -9,6 +9,8 @@ using .CommonConstants
 
 export dirslist
 export makepath
+export qhead
+export qview
 export printtime
 export init_raw
 export drop_allmissing!
@@ -48,6 +50,14 @@ function makepath(paths...)
 
     return pathstring
 end
+
+function qhead()
+    nothing
+end
+
+function qview()
+    nothing
+end    
 
 function printtime(
         task, start_time;
