@@ -1,9 +1,11 @@
-using CSV
 using DataFrames
+using CSV
+using Arrow
+using Dates
+using StatsBase
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
-includet("pipeline/mutual-fund-data/init-mf-data.jl")
 
 using .CommonConstants
 using .CommonFunctions
@@ -32,4 +34,13 @@ function test()
     dftest
 
     infodata = CSV.read(joinpath(DIRS.mf.raw, "info.csv"), DataFrame)
+
+    datafile = joinpath(DIRS.mf.init, "mf-data.arrow")
+    infofile = joinpath(DIRS.mf.init, "mf-info.arrow")
+    qhead(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    qview(joinpath(DIRS.mf.init, "mf-data.arrow"))
+
+    data = Arrow.Table(datafile)
+    data[2]
+    x = first(eachcol(DataFrame(data)))
 end

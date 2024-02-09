@@ -1,7 +1,8 @@
 module CommonFunctions
 
-using CSV
 using DataFrames
+using Arrow
+using CSV
 using Dates
 using StatsBase
 
@@ -58,7 +59,7 @@ function qhead(filename)
     return output
 end
 
-function qview()
+function qview(filename)
     data = Arrow.Table(filename)
     output = summarystats(data)
     return output
