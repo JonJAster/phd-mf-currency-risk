@@ -3,6 +3,7 @@ module CommonFunctions
 using CSV
 using DataFrames
 using Dates
+using StatsBase
 
 include("CommonConstants.jl")
 using .CommonConstants
@@ -51,12 +52,16 @@ function makepath(paths...)
     return pathstring
 end
 
-function qhead()
-    nothing
+function qhead(filename)
+    data = Arrow.Table(filename)
+    output = propertynames(data)
+    return output
 end
 
 function qview()
-    nothing
+    data = Arrow.Table(filename)
+    output = summarystats(data)
+    return output
 end    
 
 function printtime(
