@@ -109,7 +109,6 @@ function _null_out_small!(data)
 end
 
 function _trim_missing_tails!(data)
-    data = aggregate_data
     tail_dates = DataFrame(
         fundid = String[],
         first_date = Date[],
