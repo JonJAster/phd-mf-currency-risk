@@ -12,7 +12,8 @@ const DIRS = (
     ),
     eq = (
         raw = "data/equities/raw",
-    )
+    ),
+    test = "data/test"
 )
 
 end # module CommonConstants

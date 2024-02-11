@@ -10,6 +10,8 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
+SKIP_FILES = ["info.csv", "equity_allocation.csv", "non_us_equity_allocation.csv"]
+
 function init_mf_data()
     task_start = time()
     mf_data_collection = _read_mf_data()
@@ -29,7 +31,7 @@ function _read_mf_data()
     files = readdir(folder, )
     data = DataFrame[]
     for file in files
-        file == "info.csv" && continue
+        file in SKIP_FILES && continue
 
         filepath = joinpath(folder, file)
         fieldname = splitext(file)[1]

@@ -12,7 +12,8 @@ using .CommonConstants
 export dirslist
 export makepath
 export qhead
-export qview
+export qscan
+export qlookup
 export printtime
 export init_raw
 export drop_allmissing!
@@ -59,7 +60,7 @@ function qhead(filename)
     return output
 end
 
-function qview(filename)
+function qscan(filename)
     data = Arrow.Table(filename)
     println("------")
     for col in propertynames(data)
@@ -69,7 +70,19 @@ function qview(filename)
         println("------")
     end
     return
-end    
+end
+
+function qlookup(id; data=false)
+    data ? filestring = "mf-data.arrow" : filestring = "mf-info.arrow"
+    pathstring = joinpath(DIRS.mf.init, filestring)
+
+    data = Arrow.Table(pathstring) |> DataFrame
+
+    output = data[data.fundid .== id, :]
+    nrow(output) == 0 && (output = data[data.secid .== id, :])
+
+    return output
+end
 
 function printtime(
         task, start_time;
