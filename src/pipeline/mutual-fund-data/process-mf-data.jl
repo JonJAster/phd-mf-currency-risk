@@ -31,7 +31,7 @@ function process_mf_data()
 
     output = select(
         aggregate_data, 
-        [:fundid, :date, :flow, :gross_returns, :costs, :lagged_net_assets]
+        [:fundid, :date, :flow, :gross_returns, :costs, :net_assets_m1]
     )
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
