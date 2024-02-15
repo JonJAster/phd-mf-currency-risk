@@ -10,9 +10,17 @@ const DIRS = (
     ),
     fx = (
         raw = "data/currencies/raw",
+        refined = "data/currencies/refined",
+        factors = "data/currencies/factors"
     ),
     eq = (
         raw = "data/equities/raw",
+        refined = "data/currencies/refined",
+        factors = "data/currencies/factors"
+    ),
+    map = (
+        raw = "data/maps/raw",
+        refined = "data/maps/refined"
     ),
     test = "data/test"
 )

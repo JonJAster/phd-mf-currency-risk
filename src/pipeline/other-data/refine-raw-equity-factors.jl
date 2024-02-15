@@ -3,8 +3,8 @@ using CSV
 using Arrow
 using Dates
 
-include("shared/CommonConstants.jl")
-include("shared/CommonFunctions.jl")
+include("../../shared/CommonConstants.jl")
+include("../../shared/CommonFunctions.jl")
 using .CommonFunctions
 using .CommonConstants
 
@@ -19,11 +19,10 @@ const USA_FACTOR_LIST = ["mkt", "smb", "hml", "wml"]
 const GLOBAL_DATEFORMAT = DateFormat("yyyy-mm-dd")
 const USA_DATEFORMAT = DateFormat("dd/mm/yyyy")
 
-function main()
-    time_start = time()
+function refine_raw_equity_factors()
+    task_start = time()
 
-    println("Reading data...")
-    global_factors_list = read_global_factors_data()
+    global_factors_list = _read_global_factors_data()
 
     global_mkt_filename = joinpath(INPUT_DIR, "global_mkt.csv")
     global_mkt = CSV.read(global_mkt_filename, DataFrame, dateformat=USA_DATEFORMAT)
@@ -46,7 +45,7 @@ function main()
     println("Finished combining equity factors in $time_duration seconds")
 end
 
-function read_global_factors_data()
+function _read_global_factors_data()
     factors_list = []
 
     for factor_code in GLOBAL_FACTOR_LIST

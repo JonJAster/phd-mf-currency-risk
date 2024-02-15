@@ -16,7 +16,7 @@ export qscan
 export qlookup
 export printtime
 export init_raw
-export drop_allmissing!
+export _drop_allmissing!
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
 
@@ -114,19 +114,20 @@ end
 
 function init_raw(filepath; info=false)
     if info
-        data = CSV.read(filepath, DataFrame)
+        data = CSV.read(filepath, DataFrame; truestrings=["Yes"], falsestrings=["No"])
         _normalise_names!(data; info=true)
+        _null_empty_strings!(data)
     else
         data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
         _normalise_names!(data)
-        drop_allmissing!(data, dims=:cols)
-        drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
+        _drop_allmissing!(data, dims=:cols)
+        _drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
     end
     return data
 end
 
-drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
-function drop_allmissing!(df, cols; dims=1)
+_drop_allmissing!(df; dims=1) = _drop_allmissing!(df, propertynames(df); dims=dims)
+function _drop_allmissing!(df, cols; dims=1)
     if dims ∉ [1, 2, :row, :rows, :col, :cols]
         error("dims must be :rows or :cols")
     end
@@ -193,6 +194,15 @@ function _normalise_names!(df; info=false)
         )
 
         rename!(df, Symbol.([id_cols; date_cols]))
+    end
+    return
+end
+
+function _null_empty_strings!(df)
+    for col in propertynames(df)
+        if count(coalesce.(df[!, col] .== "", false)) > 0
+            df[!, col] = replace(df[!, col], "" => missing)
+        end
     end
     return
 end
