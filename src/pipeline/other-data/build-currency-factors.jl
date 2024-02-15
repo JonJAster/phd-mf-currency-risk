@@ -1,47 +1,13 @@
-using
-    DataFrames,
-    Arrow,
-    Statistics
-    
+using Revise
+using DataFrames
+using Arrow
+using Statistics
 using ShiftedArrays: lead, lag
 
-include("shared/CommonConstants.jl")
-include("shared/CommonFunctions.jl")
-using
-    .CommonFunctions,
-    .CommonConstants
-
-const INPUT_DIR = joinpath(DIRS.currency, "combined")
-const OUTPUT_DIR = joinpath(DIRS.currency, "factor-series")
-
-function main()
-    time_start = time()
-    println("Loading currency rates...")
-    filename = joinpath(INPUT_DIR, "currency_rates.arrow")
-
-    rates = Arrow.Table(filename) |> DataFrame
-    
-    println("Computing currency factors...")
-    compute_delta_spot!(rates)
-    compute_forward_discount!(rates)
-    compute_carry_returns!(rates)
-
-    compute_interest_rate_ranking!(rates)
-    assign_interest_rate_baskets!(rates)
-    combine_net_carry_returns!(rates)
-
-    basket_rates = aggregate_baskets(rates)
-
-    currency_factors = compute_factors(basket_rates)
-
-    output_filestring = makepath(OUTPUT_DIR, "currency_factors.arrow")
-
-    Arrow.write(output_filestring, currency_factors)
-
-    duration_s = round(time() - time_start, digits=2)
-
-    println("Finished computing currency factors in $duration_s seconds ")
-end
+includet("../../shared/CommonConstants.jl")
+includet("../../shared/CommonFunctions.jl")
+using .CommonFunctions
+using .CommonConstants
 
 const BASKET_ALLOCATION_ORDER = Dict(
     # Quantile number => Order that that quantile receives a currency added to the sample
@@ -53,21 +19,39 @@ const BASKET_ALLOCATION_ORDER = Dict(
     6 => 1
 )
 
-function compute_delta_spot!(df)
-    group_on = :currency
-    input = :spot_mid
-    output = :delta_spot
+function build_currency_factors()
+    task_start = time()
 
-    delta_spot_computation(spot) = log.(spot) - log.(lag(spot))
+    filename = joinpath(DIRS.fx.refined, "currency_data.arrow")
 
-    group_transform!(df, group_on, input, delta_spot_computation, output)
+    rates = Arrow.Table(filename) |> DataFrame
+    
+    _compute_delta_spot!(rates)
+    _compute_forward_discount!(rates)
+    _compute_carry_returns!(rates)
+
+    _compute_interest_rate_ranking!(rates)
+    _assign_interest_rate_baskets!(rates)
+    _combine_net_carry_returns!(rates)
+
+    basket_rates = _aggregate_baskets(rates)
+
+    currency_factors = _compute_factors(basket_rates)
+
+    printtime("building currency factors", task_start, minutes=false)
+    return currency_factors
 end
 
-function compute_forward_discount!(df)
-    group_on = :currency
-    input = [:spot_mid, :forward_mid]
-    output = :forward_discount
+function _compute_delta_spot!(df)
+    delta_spot_computation(spot) = log.(spot) - log.(lag(spot))
 
+    transform!(
+        groupby(df, :cur_code),
+        :spot_mid => delta_spot_computation => :delta_spot
+    )
+end
+
+function _compute_forward_discount!(df)
     function forward_discount_computation(spot, forward)
         missing_filter = 0*spot + 0*forward
         forward_discount = log.(lag(forward)) - log.(lag(spot)) + missing_filter
@@ -75,13 +59,20 @@ function compute_forward_discount!(df)
         return forward_discount
     end
 
-    group_transform!(df, group_on, input, forward_discount_computation, output)
+    transform!(
+        groupby(df, :cur_code),
+        [:spot_mid, :forward_mid] => forward_discount_computation => :forward_discount
+    )
 end
 
-function compute_carry_returns!(df)
-    group_on = :currency
+function _compute_carry_returns!(df)
     input = [
-        :delta_spot, :forward_discount, :forward_bid, :forward_ask, :spot_bid, :spot_ask
+        :delta_spot,
+        :forward_discount,
+        :forward_bid,
+        :forward_ask,
+        :spot_bid,
+        :spot_ask
     ]
     output = [:carry_return, :net_long_carry_return, :net_short_carry_return]
 
@@ -93,14 +84,13 @@ function compute_carry_returns!(df)
         gross_carry(d, Δs), long_net_carry(fb, sa), short_net_carry(fa, sb)
     )
 
-    group_transform!(df, group_on, input, carry_return_computations, output)
+    transform!(
+        groupby(df, :cur_code),
+        input => carry_return_computations => output
+    )
 end
 
-function compute_interest_rate_ranking!(df)
-    group_on = :date
-    input = :forward_discount
-    output = :interest_rate_rank
-
+function _compute_interest_rate_ranking!(df)
     function interest_rate_rank_computation(forward_discount)
         permutation_index = sortperm(forward_discount)
         rank = Array{Union{Missing, Int}}(undef, length(forward_discount))
@@ -112,14 +102,13 @@ function compute_interest_rate_ranking!(df)
         return rank
     end
 
-    group_transform!(df, group_on, input, interest_rate_rank_computation, output)
+    transform!(
+        groupby(df, :date),
+        :forward_discount => interest_rate_rank_computation => :interest_rate_rank
+    )
 end
 
-function assign_interest_rate_baskets!(df)
-    group_on = :date
-    input = :interest_rate_rank
-    output = :interest_rate_basket
-
+function _assign_interest_rate_baskets!(df)
     function interest_rate_basket_definition(rank)
         nonmissing_rank = skipmissing(rank)
         isempty(nonmissing_rank) && return fill(missing, length(rank))
@@ -129,21 +118,24 @@ function assign_interest_rate_baskets!(df)
 
         max_rank_per_basket = cumsum([basket_size(i) for i in 1:6])
 
-        basket = assign_basket_num.(rank, Ref(max_rank_per_basket))
+        basket = _assign_basket_num.(rank, Ref(max_rank_per_basket))
 
         return basket
     end
 
-    group_transform!(df, group_on, input, interest_rate_basket_definition, output)
+    transform!(
+        groupby(df, :date),
+        :interest_rate_rank => interest_rate_basket_definition => :interest_rate_basket
+    )
 end
 
-function assign_basket_num(row_rank, max_rank_per_basket)
+function _assign_basket_num(row_rank, max_rank_per_basket)
     ismissing(row_rank) && return missing
     basket_num = findfirst(>=(row_rank), max_rank_per_basket)
     return basket_num
 end
 
-function combine_net_carry_returns!(df)
+function _combine_net_carry_returns!(df)
     df.net_carry_return = Vector{Union{Missing, Float64}}(missing, nrow(df))
     for row in eachrow(df)
         !ismissing(row.interest_rate_basket) || continue
@@ -153,23 +145,18 @@ function combine_net_carry_returns!(df)
     end
 end
 
-function aggregate_baskets(df)
+function _aggregate_baskets(df)
     basketed_df = df[.!ismissing.(df.interest_rate_basket), :]
-
-    group_on = [:date, :interest_rate_basket]
     aggregated_columns = [:delta_spot, :forward_discount, :carry_return, :net_carry_return]
 
-    basket_rates = group_combine(
-        basketed_df, group_on, aggregated_columns, mean, aggregated_columns
+    basket_rates = combine(
+        groupby(basketed_df, [:date, :interest_rate_basket]),
+        aggregated_columns .=> mean .=> aggregated_columns
     )
-
-    sort!(basket_rates, [:date, :interest_rate_basket])
-
     return basket_rates
 end
 
-function compute_factors(df)
-    group_on = :date
+function _compute_factors(df)
     input = [:delta_spot, :carry_return, :net_carry_return, :interest_rate_basket]
     output = [:rx, :hml_fx, :rx_net, :hml_fx_net, :dollar, :carry]
 
@@ -192,11 +179,19 @@ function compute_factors(df)
         return [100 .* (rx, hml_fx, rx_net, hml_fx_net, dollar, carry)]
     end
 
-    factors = group_combine(df, group_on, input, factor_computations, output, cast=false)
+    factors = combine(
+        groupby(df, :date),
+        input => factor_computations => output
+    )
 
     return factors
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main()
+    output_data = build_currency_factors()
+    output_filename = makepath(DIRS.fx.factors, "currency_factors.arrow")
+
+    task_start = time()
+    Arrow.write(output_filename, output_data)
+    printtime("writing currency factors", task_start, minutes=false)
 end
