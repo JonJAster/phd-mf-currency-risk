@@ -1,6 +1,7 @@
 using Revise
 using DataFrames
 using Arrow
+using Dates
 using Statistics
 using ShiftedArrays: lead, lag
 
@@ -38,8 +39,16 @@ function build_currency_factors()
 
     currency_factors = _compute_factors(basket_rates)
 
+    currency_factors.date = firstdayofmonth.(currency_factors.date)
+    stacked_factors = stack(
+        currency_factors, Not(:date);
+        variable_name=:factor, value_name=:ret
+    )
+
+    stacked_factors.ret ./= 100
+
     printtime("building currency factors", task_start, minutes=false)
-    return currency_factors
+    return stacked_factors
 end
 
 function _compute_delta_spot!(df)

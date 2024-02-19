@@ -1,5 +1,6 @@
 using Revise
 using DataFrames
+using CSV
 using Arrow
 using Dates
 using Statistics
@@ -15,9 +16,11 @@ function process_mf_data()
     task_start = time()
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
     info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
+    market_filename = joinpath(DIRS.eq.raw, "country-mkt.csv")
 
     data = Arrow.Table(data_filename) |> DataFrame
     info = Arrow.Table(info_filename) |> DataFrame
+    market_returns = CSV.read(market_filename, DataFrame, dateformat="yyyy-mm-dd")
 
     active_data = _filter_out_passive(data, info)
     sort!(active_data, [:fundid, :date])
@@ -28,10 +31,15 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _windsorise_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
+    
+    riskfree = _calculate_riskfree(market_returns)
+
+    full_data = innerjoin(aggregate_data, riskfree, on=:date)
+    full_data.ret = full_data.gross_returns - full_data.rf
 
     output = select(
-        aggregate_data, 
-        [:fundid, :date, :flow, :gross_returns, :costs, :net_assets_m1]
+        full_data, 
+        [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
     )
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
@@ -167,6 +175,17 @@ function _filter_out_low_obs_funds!(data)
     valid_funds = fund_obs[fund_obs.nobs .>= 24, :fundid] |> Set
     filter!(row -> row.fundid in valid_funds, data)
     return
+end
+
+function _calculate_riskfree(market_returns)
+    usa_market = market_returns[market_returns.excntry .== "USA", :]
+    usa_market.rf = usa_market.mkt_vw - usa_market.mkt_vw_exc
+
+    rename!(usa_market, :eom => :date)
+    usa_market.date = firstdayofmonth.(usa_market.date)
+
+    select!(usa_market, [:date, :rf])
+    return usa_market
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

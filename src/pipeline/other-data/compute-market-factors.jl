@@ -4,8 +4,8 @@ using CSV
 using Arrow
 using Dates
 
-include("../../shared/CommonConstants.jl")
-include("../../shared/CommonFunctions.jl")
+includet("../../shared/CommonConstants.jl")
+includet("../../shared/CommonFunctions.jl")
 
 using .CommonConstants
 using .CommonFunctions
@@ -84,7 +84,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = compute_market_factors()
-    output_filestring = makepath(DIRS.eq.refined, "mkt.arrow")
+    output_filestring = makepath(DIRS.eq.factors, "mkt.arrow")
 
     task_start = time()
     Arrow.write(output_filestring, output_data)
