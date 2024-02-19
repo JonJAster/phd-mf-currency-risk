@@ -30,8 +30,6 @@ function compute_market_factors()
     mkt_wld = _weight_returns(mkt_data)
     _init_region_info!(mkt_wld, "WLD")
 
-    mkt_dev[mkt_dev.date .== Date(2022,10,1),:]
-
     msci_classified_data = innerjoin(mkt_data, msci_class_map, on=[:country_code, :date])
     emg_data = msci_classified_data[msci_classified_data.msci_class .== "EMG", :]
     dev_data = msci_classified_data[msci_classified_data.msci_class .== "DEV", :]
