@@ -14,9 +14,9 @@ const DIRS = (
         factors = "data/currencies/factors"
     ),
     eq = (
-        raw = "data/equities/raw",
-        refined = "data/currencies/refined",
-        factors = "data/currencies/factors"
+        raw = "data/equity-factors/raw",
+        refined = "data/equity-factors/refined",
+        factors = "data/equity-factors/factors"
     ),
     map = (
         raw = "data/maps/raw",

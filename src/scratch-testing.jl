@@ -57,5 +57,15 @@ function test()
 
     testdf = DataFrame(a=[1,2],b=[2,3])
 
+    function f(df)
+        df = df[df.a .== 2, :]
+    end
+
+    f(testdf)
+
+    testdf
+
     testdf[testdf.a .== 2, :b]
+
+
 end
