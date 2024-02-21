@@ -2,6 +2,7 @@ using Revise
 using DataFrames
 using CSV
 using Arrow
+using Dates
 
 includet("../../shared/CommonConstants.jl")
 includet("../../shared/CommonFunctions.jl")
@@ -39,13 +40,15 @@ function _init_factor_data!(data)
     region_name_map = Dict(
         "developed" => "DEV",
         "emerging" => "EMG",
-        "usa" => "USA"
+        "usa" => "USA",
+        "world" => "WLD"
     )
 
     map_name(name) = get(region_name_map, name, "")
 
+    data.date = firstdayofmonth.(data.date)
     data.region = map_name.(data.region)
-
+    
     select!(data, [:region, :date, :factor, :ret])
     return data
 end

@@ -15,9 +15,9 @@ function combine_factors()
     mkt_filename = joinpath(DIRS.eq.factors, "mkt.arrow")
     fx_filename = joinpath(DIRS.fx.factors, "currency_factors.arrow")
 
-    lms_data = Arrow.Table(lms_filename) |> DataFrame
-    mkt_data = Arrow.Table(mkt_filename) |> DataFrame
-    fx_data = Arrow.Table(fx_filename) |> DataFrame
+    lms_data = loadarrow(lms_filename)
+    mkt_data = loadarrow(mkt_filename)
+    fx_data = loadarrow(fx_filename)
 
     _prep_mkt!(mkt_data)
     _prep_fx!(fx_data)
