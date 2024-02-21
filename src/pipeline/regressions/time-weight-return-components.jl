@@ -13,7 +13,7 @@ function time_weight_return_components(model_name)
     task_start = time()
     model_returns_filename = joinpath(DIRS.combo.decomposed, "$model_name.arrow")
 
-    model_returns = Arrow.Table(model_returns_filename) |> DataFrame
+    model_returns = loadarrow(model_returns_filename)
     select!(model_returns, Not(:ex_ret))
 
     weighted_returns = _timeweight_returns(model_returns)

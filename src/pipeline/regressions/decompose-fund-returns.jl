@@ -15,7 +15,7 @@ function decompose_fund_returns(model_name) # model_name = "usa_capm_ver"
     main_data = initialise_base_data(model)
 
     betas_filestring = joinpath(DIRS.combo.return_betas, "$model_name.arrow")
-    regression_outputs = Arrow.Table(betas_filestring) |> DataFrame
+    regression_outputs = loadarrow(betas_filestring)
 
     betas = _extract_betas(regression_outputs)
     full_data = innerjoin(main_data, betas, on=[:fundid, :date])
