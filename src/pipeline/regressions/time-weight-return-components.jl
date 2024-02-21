@@ -77,7 +77,7 @@ end
 function main()
     for model_name in keys(MODELS)
         output_data = time_weight_return_components(model_name)
-        output_filename = joinpath(DIRS.combo.weighted, "$model_name.arrow")
+        output_filename = makepath(DIRS.combo.weighted, "$model_name.arrow")
 
         Arrow.write(output_filename, output_data)
     end
