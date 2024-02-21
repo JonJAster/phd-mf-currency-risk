@@ -2,12 +2,16 @@ module CommonConstants
 
 export BETA_LAGS
 export MIN_REGRESSION_OBS
+export DEFAULT_DECAY
+export TIMEWEIGHT_LAGS
 export DIRS
 export EQUITY_LMS_FACTORS
 export MODELS
 
 const BETA_LAGS = 60
 const MIN_REGRESSION_OBS = 36
+const DEFAULT_DECAY = 0.186
+const TIMEWEIGHT_LAGS = 18
 
 const DIRS = (
     mf = (
@@ -28,7 +32,8 @@ const DIRS = (
     combo = (
         factors = "data/combined/factors",
         return_betas = "data/combined/return-betas",
-        decomposed = "data/combined/decomposed"
+        decomposed = "data/combined/decomposed",
+        weighted = "data/combined/weighted"
     ),
     map = (
         raw = "data/maps/raw",

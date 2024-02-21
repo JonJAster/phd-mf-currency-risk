@@ -1,71 +1,46 @@
+using Revise
 using DataFrames
 using Arrow
 using Dates
-using Base.Threads
 
-include("../../shared/CommonConstants.jl")
-include("../../shared/CommonFunctions.jl")
+includet("../../shared/CommonConstants.jl")
+includet("../../shared/CommonFunctions.jl")
 
 using .CommonConstants
 using .CommonFunctions
 
-const INPUT_DIR = joinpath(DIRS.fund, "post-processing")
-const OUTPUT_DIR = INPUT_DIR
-
-const NONFACTOR_COLS = [:fundid, :date]
-
-const ReturnColumns = Matrix{Union{Missing, Float64}}
-
-function time_weight_return_components()
+function time_weight_return_components(model_name)
     task_start = time()
+    model_returns_filename = joinpath(DIRS.combo.decomposed, "$model_name.arrow")
 
-    savelock = ReentrantLock()
-    @threads for model in MODELS
-        model_name = model[1]
-        model_filename = joinpath(
-            INPUT_DIR, options_folder, "decompositions", "$model_name.arrow"
-        )
+    model_returns = Arrow.Table(model_returns_filename) |> DataFrame
+    select!(model_returns, Not(:ex_ret))
 
-        model_returns = Arrow.Table(model_filename) |> DataFrame
-        select!(model_returns, Not(:ex_ret))
+    weighted_returns = _timeweight_returns(model_returns)
 
-        weighted_returns = (
-            timeweight_returns(model_returns, DEFAULT_DECAY, DEFAULT_TIMEWEIGHT_LAGS)
-        )
-
-        lock(savelock) do
-            model_output_filename = makepath(
-                OUTPUT_DIR, options_folder, "weighted-decompositions", "$model_name.arrow"
-            )
-            
-            Arrow.write(model_output_filename, weighted_returns)
-        end
-    end
-
-    time_duration_s = round(time() - time_start, digits=2)
-    time_duration_m = round(time_duration_s/60, digits=2)
-    println(
-        "Finished time-weighting fund return components in $time_duration_s seconds " *
-        "($time_duration_m minutes)"
-    )
+    printtime("time-weighting decomposed returns for $model_name", task_start)
+    return weighted_returns
 end
 
-function timeweight_returns(model_returns, decay_rate, lags)
-    factor_return_cols = setdiff(propertynames(model_returns), NONFACTOR_COLS)
+function _timeweight_returns(model_returns)
+    nonfactor_cols = [:fundid, :date]
+    factor_return_cols = setdiff(propertynames(model_returns), nonfactor_cols)
     n_obs = size(model_returns, 1)
     n_factors = length(factor_return_cols)
     
     weighted_returns = copy(model_returns)
-    weighted_returns[!, factor_return_cols] = ReturnColumns(missing, n_obs, n_factors)
+    weighted_returns[!, factor_return_cols] = (
+        Matrix{Union{Missing, Float64}}(missing, n_obs, n_factors)
+    )
     
     for i in 1:size(model_returns, 1)
-        i <= lags && continue
+        i < TIMEWEIGHT_LAGS && continue
         window_fundid = model_returns[i, :fundid]
         window_enddate = model_returns[i, :date]
-        window_startdate = window_enddate - Dates.Month(lags)
+        window_startdate = window_enddate - Dates.Month(TIMEWEIGHT_LAGS)
 
-        extract_start = i-lags
-        extract_end = i-1
+        extract_start = i-TIMEWEIGHT_LAGS+1
+        extract_end = i
 
         model_returns[extract_start, :fundid] != window_fundid && continue
         date_extract = model_returns[extract_start:extract_end, :date]
@@ -74,11 +49,11 @@ function timeweight_returns(model_returns, decay_rate, lags)
         isnothing(date_start_offset) && continue
 
         window_start = extract_start + date_start_offset - 1
-        window_end = i-1
+        window_end = i
 
         for factor in factor_return_cols
             window_returns = model_returns[window_start:window_end, factor]
-            weighted_returns[i, factor] = decay_weighted(window_returns, decay_rate)
+            weighted_returns[i, factor] = _decay_weighted(window_returns)
         end
     end
 
@@ -87,18 +62,30 @@ function timeweight_returns(model_returns, decay_rate, lags)
     return weighted_returns
 end
 
-function decay_weighted(returns, decay_rate)
-    window_size = length(returns)
-    decay_factors = ℯ .^ (-decay_rate .* (window_size-1:-1:0))
+function _decay_weighted(window_returns)
+    window_size = length(window_returns)
+    decay_factors = ℯ .^ (-DEFAULT_DECAY .* (window_size-1:-1:0))
     weights = decay_factors ./ sum(decay_factors)
-    weighted_returns = returns .* weights
+    weighted_return_contributions = window_returns .* weights
 
-    count(!ismissing, weighted_returns) == 0 && return missing
+    count(!ismissing, weighted_return_contributions) == 0 && return missing
 
-    time_weighted_return = sum(skipmissing(weighted_returns))
+    time_weighted_return = sum(skipmissing(weighted_return_contributions))
     return time_weighted_return
 end
 
+function main()
+    for model_name in keys(MODELS)
+        output_data = time_weight_return_components(model_name)
+        output_filename = joinpath(DIRS.combo.weighted, "$model_name.arrow")
+
+        Arrow.write(output_filename, output_data)
+    end
+    return
+end
+
 if abspath(PROGRAM_FILE) == @__FILE__
+    task_start = time()
     main()
+    printtime("time-weighting all decomposed returns", task_start)
 end
