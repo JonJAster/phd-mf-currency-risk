@@ -27,7 +27,7 @@ const DIRS = (
     ),
     combo = (
         factors = "data/combined/factors",
-        return_betas = "data/combined/factor-betas",
+        return_betas = "data/combined/return-betas",
         decomposed = "data/combined/decomposed"
     ),
     map = (

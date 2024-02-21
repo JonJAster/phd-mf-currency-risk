@@ -11,17 +11,11 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
-function regress_fund_returns(model, model_name)
+function regress_fund_returns(model_name)
     task_start = time()
 
-    mf_filename = joinpath(DIRS.mf.refined, "mf-data.arrow")
-    factors_filename = joinpath(DIRS.combo.factors, "factors.arrow")
-
-    mf_data = loadarrow(mf_filename)
-    factors_data = loadarrow(factors_filename)
-
-    regression_factors = _prepare_factors(factors_data, model)
-    regression_data = innerjoin(mf_data, regression_factors, on=:date)
+    model = MODELS[model_name]
+    regression_data = initialise_base_data(model)
 
     model_factors = model[2]
     model_result = _compute_timevarying_betas(
@@ -30,24 +24,6 @@ function regress_fund_returns(model, model_name)
 
     printtime("regressing fund returns for model $model_name", task_start)
     return model_result
-end
-
-function _prepare_factors(factors_data, model)
-    model_region = model[1]
-    model_factors = model[2]
-
-    region_condition = (
-        factors_data.region .== model_region .||
-        factors_data.region .== "FX"
-    )
-
-    factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
-
-    regioned_factors = factors_data[region_condition .&& factor_condition, :]
-    wide_factors = unstack(regioned_factors, :date, :factor, :ret)
-    dropmissing!(wide_factors)
-
-    return wide_factors
 end
 
 function _compute_timevarying_betas(regression_data; id_col, date_col, y, X)
@@ -106,13 +82,11 @@ function _timevarying_regressions(date, y, X_cols...)
 end
 
 function main()
-    for model_key_value in MODELS
+    for model_name in keys(MODELS)
         # This loop is inefficient in that it reads the same data for each model, but is the
         # lowest effort way to enable calling the function for a single model from
         # elsewhere.
-        model_name = model_key_value[1]
-        model = model_key_value[2]
-        output_data = regress_fund_returns(model, model_name)
+        output_data = regress_fund_returns(model_name)
         output_filename = makepath(DIRS.combo.return_betas, "$model_name.arrow")
         
         Arrow.write(output_filename, output_data)
@@ -125,5 +99,5 @@ _combine_reg_results(date, rr...) = zip(repeat(date, inner=size(first(rr),1)), v
 if abspath(PROGRAM_FILE) == @__FILE__
     task_start = time()
     main()
-    printtime("regressing all fund returns", task_start)
+    printtime("regressing all fund returns", task_start; minutes=true)
 end

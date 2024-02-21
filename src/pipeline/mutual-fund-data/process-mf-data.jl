@@ -35,6 +35,10 @@ function process_mf_data()
     riskfree = _calculate_riskfree(market_returns)
 
     full_data = innerjoin(aggregate_data, riskfree, on=:date)
+
+    full_data[!, [:gross_returns, :costs]] .= (
+        full_data[!, [:gross_returns, :costs]] ./ 100
+    )
     full_data.ex_ret = full_data.gross_returns - full_data.rf
 
     output = select(
@@ -151,7 +155,7 @@ end
 
 function _calculate_fund_flows!(data)
     data.flow = (
-        100 .* (data.net_assets .- data.net_assets_m1 .+ data.net_returns) ./
+        (data.net_assets .- data.net_assets_m1 .+ data.net_returns) ./
         data.net_assets_m1
     )
     return

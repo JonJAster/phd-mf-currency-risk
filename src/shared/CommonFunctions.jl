@@ -15,6 +15,7 @@ export qhead
 export qscan
 export qlookup
 export loadarrow
+export initialise_base_data
 export printtime
 export init_raw
 export _drop_allmissing!
@@ -90,6 +91,37 @@ function loadarrow(filename)
     df = deepcopy(DataFrame(arrow_table))
     arrow_table = nothing
     return df
+end
+
+function initialise_base_data(model)
+    mf_filename = joinpath(DIRS.mf.refined, "mf-data.arrow")
+    factors_filename = joinpath(DIRS.combo.factors, "factors.arrow")
+
+    mf_data = loadarrow(mf_filename)
+    factors_data = loadarrow(factors_filename)
+
+    regression_factors = _prepare_factors(factors_data, model)
+    output = innerjoin(mf_data, regression_factors, on=:date)
+
+    return output
+end
+
+function _prepare_factors(factors_data, model)
+    model_region = model[1]
+    model_factors = model[2]
+
+    region_condition = (
+        factors_data.region .== model_region .||
+        factors_data.region .== "FX"
+    )
+
+    factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
+
+    regioned_factors = factors_data[region_condition .&& factor_condition, :]
+    wide_factors = unstack(regioned_factors, :date, :factor, :ret)
+    dropmissing!(wide_factors)
+
+    return wide_factors
 end
 
 function printtime(
