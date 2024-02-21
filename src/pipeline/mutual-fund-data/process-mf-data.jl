@@ -35,11 +35,11 @@ function process_mf_data()
     riskfree = _calculate_riskfree(market_returns)
 
     full_data = innerjoin(aggregate_data, riskfree, on=:date)
-    full_data.ret = full_data.gross_returns - full_data.rf
+    full_data.ex_ret = full_data.gross_returns - full_data.rf
 
     output = select(
         full_data, 
-        [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
+        [:fundid, :date, :flow, :ex_ret, :costs, :net_assets_m1]
     )
     printtime("processing mutual fund data", task_start, minutes=false)
     return output

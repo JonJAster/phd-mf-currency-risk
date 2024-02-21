@@ -14,6 +14,7 @@ export makepath
 export qhead
 export qscan
 export qlookup
+export loadarrow
 export printtime
 export init_raw
 export _drop_allmissing!
@@ -82,6 +83,13 @@ function qlookup(id; data=false)
     nrow(output) == 0 && (output = data[data.secid .== id, :])
 
     return output
+end
+
+function loadarrow(filename)
+    arrow_table = Arrow.Table(filename)
+    df = deepcopy(DataFrame(arrow_table))
+    arrow_table = nothing
+    return df
 end
 
 function printtime(
