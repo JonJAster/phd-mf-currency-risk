@@ -37,7 +37,7 @@ function regress_fund_flows(model_name)
 
     flow_betas = _flow_regression(regression_data, return_component_cols)
 
-    printtime("regressing flow betas on $model_name", process_start)
+    printtime("regressing flow betas on $model_name", task_start)
     return flow_betas
 end
 
