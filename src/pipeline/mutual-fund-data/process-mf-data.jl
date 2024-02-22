@@ -15,11 +15,11 @@ using .CommonFunctions
 function process_mf_data()
     task_start = time()
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
-    info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
+    info_filename = joinpath(DIRS.mf.raw, "info.csv")
     market_filename = joinpath(DIRS.eq.raw, "country-mkt.csv")
 
-    data = Arrow.Table(data_filename) |> DataFrame
-    info = Arrow.Table(info_filename) |> DataFrame
+    data = loadarrow(data_filename)
+    info = init_raw(info_filename)
     market_returns = CSV.read(market_filename, DataFrame, dateformat="yyyy-mm-dd")
 
     active_data = _filter_out_passive(data, info)

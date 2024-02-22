@@ -4,6 +4,8 @@ export BETA_LAGS
 export MIN_REGRESSION_OBS
 export DEFAULT_DECAY
 export TIMEWEIGHT_LAGS
+export AGE_FILTER
+export FLOW_CONTROL_LAGS
 export DIRS
 export EQUITY_LMS_FACTORS
 export MODELS
@@ -12,6 +14,8 @@ const BETA_LAGS = 60
 const MIN_REGRESSION_OBS = 36
 const DEFAULT_DECAY = 0.186
 const TIMEWEIGHT_LAGS = 18
+const AGE_FILTER = 36
+const FLOW_CONTROL_LAGS = 19
 
 const DIRS = (
     mf = (
@@ -33,7 +37,8 @@ const DIRS = (
         factors = "data/combined/factors",
         return_betas = "data/combined/return-betas",
         decomposed = "data/combined/decomposed",
-        weighted = "data/combined/weighted"
+        weighted = "data/combined/weighted",
+        flow_betas = "data/combined/flow-betas"
     ),
     map = (
         raw = "data/maps/raw",

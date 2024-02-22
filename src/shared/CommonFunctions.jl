@@ -5,6 +5,7 @@ using Arrow
 using CSV
 using Dates
 using StatsBase
+using ShiftedArrays: lead, lag
 
 include("CommonConstants.jl")
 using .CommonConstants
@@ -18,9 +19,20 @@ export loadarrow
 export initialise_base_data
 export printtime
 export init_raw
-export _drop_allmissing!
+export rolling_std
+export drop_allmissing!
+export regression_table
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
+
+const REGRESSION_ARGS = [
+    :plus_lags, :plus_lag, :lags, :lag, :categories, :cat, :time_fixed_effects, :tfe,
+    :entity_fixed_effects, :efe
+]
+const PARAMETER_REGRESSION_ARGS = [
+    :plus_lags, :plus_lag, :lags, :lag, :time_fixed_effects, :tfe
+]
+const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
 function dirslist()
     println("-- DIRS LIST --")
@@ -75,15 +87,23 @@ function qscan(filename)
 end
 
 function qlookup(id; data=false)
-    data ? filestring = "mf-data.arrow" : filestring = "mf-info.arrow"
-    pathstring = joinpath(DIRS.mf.init, filestring)
+    if data
+        filestring = joinpath(DIRS.mf.init, "mf-data.arrow")
+        mf_data = loadarrow(filestring)
+        output = mf_data[mf_data.fundid .== id, :]
+        nrow(output) == 0 && (output = mf_data[mf_data.secid .== id, :])
+        return output
+    else
+        filestring_raw = joinpath(DIRS.mf.raw, "info.csv")
+        mf_info = init_raw(filestring_raw, info=true)
+        output = mf_info[mf_info.fundid .== id, :]
+        nrow(output) > 0 && return output
 
-    data = Arrow.Table(pathstring) |> DataFrame
-
-    output = data[data.fundid .== id, :]
-    nrow(output) == 0 && (output = data[data.secid .== id, :])
-
-    return output
+        filestring_refined = joinpath(DIRS.mf.refined, "mf-info.arrow")
+        mf_info = loadarrow(filestring_refined)
+        output = mf_info[mf_info.fundid .== id, :]
+        return output
+    end
 end
 
 function loadarrow(filename)
@@ -160,14 +180,38 @@ function init_raw(filepath; info=false)
     else
         data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
         _normalise_names!(data)
-        _drop_allmissing!(data, dims=:cols)
-        _drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
+        drop_allmissing!(data, dims=:cols)
+        drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
     end
     return data
 end
 
-_drop_allmissing!(df; dims=1) = _drop_allmissing!(df, propertynames(df); dims=dims)
-function _drop_allmissing!(df, cols; dims=1)
+function rolling_std(data, col, window; lagged)
+    rolling_std = Vector{Union{Missing, Float64}}(missing, size(data, 1))
+
+    for i in 1:size(data, 1)
+        if lagged
+            i <= window && continue
+            window_start = i - window
+            window_end = i - 1
+        else
+            i < window && continue
+            window_start = i - window + 1
+            window_end = i
+        end
+
+        data[window_start, :fundid] != data[window_end, :fundid] && continue
+
+        start_date = data[window_end, :date] - Month(window-1)
+        data[window_start, :date] != start_date && continue
+        rolling_std[i] = std(data[window_start:window_end, col])
+    end
+
+    return rolling_std
+end
+
+drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
+function drop_allmissing!(df, cols; dims=1)
     if dims ∉ [1, 2, :row, :rows, :col, :cols]
         error("dims must be :rows or :cols")
     end
@@ -196,6 +240,161 @@ function _drop_allmissing!(df, cols; dims=1)
         all_missing = mask_matrix' * one_vector .== zero(size(mask_matrix,2))
         select!(df, Not(cols[all_missing]))
     end
+end
+
+function regression_table(data, entity_col, date_col, column_args...)
+    """
+    Returns a DataFrame containing columns to be used as inputs in a regression as
+    defined by the column_args. The column_args can be any combination of any number of the 
+    following sequences:
+        - A column name in the data DataFrame.
+        - A column name followed by a regression argument (see REGRESSION_ARGS).
+        - A column name followed by a regression argument that takes a parameter followed
+            by the parameter value (see PARAMETER_REGRESSION_ARGS).
+        - A regression argument that takes no column name (see NOCOLUMN_REGRESSION_ARGS).
+
+    Columns on their own will be included in the regression table as is. Columns followed
+    by a regression argument will be included in the regression table with the regression
+    argument applied to them or converted into a series of other columns, depending on the
+    argument.
+
+    Arguments
+    ---------
+    data : DataFrame
+        The DataFrame containing the columns to be used in the regression.
+    entity_col : Symbol
+        The name of the column in data containing the entity identifiers.
+    date_col : Symbol
+        The name of the column in data containing the dates.
+    column_args : Any
+        Any number of column names, column names followed by regression arguments followed
+        optionally by regression parameters, or regression arguments that take no column
+        name.
+
+    Returns
+    -------
+    regression_table : DataFrame
+        A DataFrame containing the columns to be used in the regression.
+    """
+    data_cols = propertynames(data)
+    reserved_usage = REGRESSION_ARGS ∩ data_cols
+    reserved_usage != [] && error("Reserved args used as column names: $reserved_usage.")
+
+    regression_table = select(data, entity_col, date_col)
+    temporary_column_names = [date_col => :date, entity_col => :entity]
+    rename!(regression_table, temporary_column_names)
+    !issorted(regression_table, [:entity, :date]) && sort!(
+        regression_table, [:entity, :date]
+    )
+
+    active_column = nothing
+    active_arg_call = nothing
+    for arg in column_args
+        if !isnothing(active_arg_call)
+            if arg ∈ REGRESSION_ARGS ∪ data_cols
+                _do_arg_call!(active_arg_call, regression_table, active_column)
+                active_column, active_arg_call = nothing, nothing
+            else
+                _do_arg_call!(
+                    active_arg_call, regression_table, active_column; parameter=arg
+                )
+                active_column, active_arg_call = nothing, nothing
+                continue
+            end
+        end
+
+        if arg ∈ data_cols
+            active_column = arg
+            regression_table[!, arg] = data[:, arg]
+            continue
+        end
+
+        arg ∈ REGRESSION_ARGS || error(
+            "$arg is not a valid column name or regression argument."
+        )
+
+        !isnothing(active_column) || arg ∈ NOCOLUMN_REGRESSION_ARGS || error(
+            "No column selected for $arg."
+        )
+        
+        if arg ∈ PARAMETER_REGRESSION_ARGS
+            active_arg_call = arg
+            continue
+        end
+
+        _do_arg_call!(arg, regression_table, active_column)
+        active_column = nothing
+    end
+
+    rename!(regression_table, reverse.(temporary_column_names))
+
+    return regression_table
+end
+
+function _do_arg_call!(arg, data, col; parameter=nothing)
+    if arg == :lags || arg == :lag
+        _add_lags!(data, col, nlags=parameter)
+        select!(data, Not(col))
+    elseif arg == :plus_lags || arg == :plus_lag
+        _add_lags!(data, col, nlags=parameter)
+    elseif arg == :categories || arg == :cat
+        _convert_to_category_dummies!(data, col)
+    elseif arg == :time_fixed_effects || arg == :tfe
+        _add_time_fe!(data, frequency=parameter)
+    elseif arg == :entity_fixed_effects || arg == :efe
+        _add_entity_fe!(data)
+    end
+end
+
+function _add_lags!(data, col; nlags)
+    isnothing(nlags) && (nlags = 1)
+    typeof(nlags) <: Integer || error("Number of lags must be an integer.")
+    gb = groupby(data, :entity)
+
+    for i in 1:nlags
+        transform!(gb, col => (col->lag(col, i)) => "$(col)_lag$i")
+    end
+end
+
+function _convert_to_category_dummies!(data, col)
+    categories = unique(data[!, col])[2:end]
+    for category in categories
+        data[!, "$(col)_$category"] = Int.(data[!, col] .== category)
+    end
+    select!(data, Not(col))
+end
+
+function _add_time_fe!(data; frequency)
+    if isnothing(frequency)
+        date_category = :fe_date_enum
+        unique_dates_indexer = (
+            unique(data.date) |> enumerate |> collect .|> reverse |> Dict
+        )
+        data[!, date_category] = get.(Ref(unique_dates_indexer), data.date, nothing)
+    elseif frequency ∈ [:d, :day, :daily]
+        date_category = :fe_date
+        data[!, date_category] = Dates.format.(data.date, "yyyymmdd")
+    elseif frequency ∈ [:m, :month, :monthly]
+        date_category = :fe_month
+        data[!, date_category] = Dates.format.(data.date, "yyyymm")
+    elseif frequency ∈ [:q, :quarter, :quarterly]
+        date_category = :fe_quarter
+        yearstr = string.(Dates.year.(data.date))
+        quarterstr = string.(Dates.quarterofyear.(data.date))
+        data[!, date_category] = String.(yearstr) .* "Q" .* String.(quarterstr)
+    elseif frequency ∈ [:y, :year, :yearly]
+        date_category = :fe_year
+        data[!, date_category] = Dates.format.(data.date, "yyyy")
+    else
+        error("Invalid frequency: $frequency. Must be :month, :quarter, or :year.")
+    end
+
+    _convert_to_category_dummies!(data, date_category)
+end
+
+function _add_entity_fe!(data)
+    data[!, :fe_entity] = data[!, :entity]
+    _convert_to_category_dummies!(data, :fe_entity)
 end
 
 function _normalise_names!(df; info=false)
@@ -246,7 +445,5 @@ function _null_empty_strings!(df)
     end
     return
 end
-
-_offset_monthend(date, offset=1) = date + Dates.Month(offset)
 
 end # module CommonFunctions
