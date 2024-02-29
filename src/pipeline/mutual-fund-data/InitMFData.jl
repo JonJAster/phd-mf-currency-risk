@@ -1,3 +1,5 @@
+module InitMFData
+
 using Revise
 using DataFrames
 using CSV
@@ -10,9 +12,9 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
-SKIP_FILES = ["info.csv", "equity_allocation.csv", "non_us_equity_allocation.csv"]
+const SKIP_FILES = ["info.csv", "equity_allocation.csv", "non_us_equity_allocation.csv"]
 
-function init_mf_data()
+function init_mf_data(save=true)
     task_start = time()
     mf_data_collection = _read_mf_data()
     mf_data = reduce(
@@ -23,6 +25,15 @@ function init_mf_data()
     drop_allmissing!(mf_data, Not([:fundid, :secid, :date]); dims=:rows)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
+
+    if save
+        output_filename = makepath(DIRS.mf.init, "mf-data.arrow")
+
+        write_start = time()
+        Arrow.write(output_filename, mf_data)
+        printtime("writing mutual fund data", write_start, minutes=false)
+    end
+
     return mf_data
 end
 
@@ -49,11 +60,4 @@ function _read_mf_data()
     return data
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    output_data = init_mf_data()
-    output_filename = makepath(DIRS.mf.init, "mf-data.arrow")
-
-    task_start = time()
-    Arrow.write(output_filename, output_data)
-    printtime("writing mutual fund data", task_start, minutes=false)
-end
+end # module InitMFData
