@@ -3,7 +3,7 @@ using DataFrames
 using Arrow
 using Dates
 using GLM
-using Base.Threads
+using Distributions
 
 includet("../../shared/CommonConstants.jl")
 includet("../../shared/CommonFunctions.jl")
@@ -79,24 +79,21 @@ function _initialise_flow_data(model_name)
 end
 
 function _flow_regression(regression_data, return_component_cols)
-    y = regression_data.flow
-    n_obs = length(y)
-    
-    X_cols = setdiff(propertynames(regression_data), [:fundid, :date, :flow])
-    X_no_constant = Matrix(regression_data[!, X_cols])
-    X = hcat(ones(n_obs), X_no_constant)
-    
-    regfit = lm(X, y)
-    return_col_indices = findall(in(return_component_cols), [:const; X_cols])
+    X_names = regression_data[!, Not([:fundid, :date, :flow])] |> names
+    reg_formula = term(:flow) ~ sum(term.(X_names))
 
+    regfit = lm(reg_formula, regression_data)
+    return_col_indices = findall(x->in(x,return_component_cols), Symbol.(coefnames(regfit)))
+    
     flow_betas = DataFrame(
         factor = return_component_cols,
         coef = coef(regfit)[return_col_indices],
         se = stderror(regfit)[return_col_indices]
     )
 
-    df = n_obs - size(X, 2)
+    df = nrow(regression_data) - length(X_names) - 1
     flow_betas.tstat = flow_betas.coef ./ flow_betas.se
+    flow_betas.pval = 2 * cdf(TDist(df), -abs.(flow_betas.tstat))
 
     return flow_betas
 end
