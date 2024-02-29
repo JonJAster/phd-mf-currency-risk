@@ -19,7 +19,7 @@ function process_mf_data()
     market_filename = joinpath(DIRS.eq.raw, "country-mkt.csv")
 
     data = loadarrow(data_filename)
-    info = init_raw(info_filename)
+    info = init_raw(info_filename, info=true)
     market_returns = CSV.read(market_filename, DataFrame, dateformat="yyyy-mm-dd")
 
     active_data = _filter_out_passive(data, info)
@@ -31,6 +31,7 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _windsorise_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
+    #_categorise_by_investment!(aggregate_data, info)
     
     riskfree = _calculate_riskfree(market_returns)
 
@@ -154,10 +155,7 @@ function _trim_missing_tails!(data)
 end
 
 function _calculate_fund_flows!(data)
-    data.flow = (
-        (data.net_assets .- data.net_assets_m1 .+ data.net_returns) ./
-        data.net_assets_m1
-    )
+    data.flow = (data.net_assets ./ data.net_assets_m1) .- (1 .+ (data.net_returns ./ 100))
     return
 end
 
