@@ -21,7 +21,11 @@ function test()
     betas = loadarrow(betas_filename)
     old_betas = loadarrow(betas_filename_old)
 
-    function compare_data(id_index, column=nothing; old_data=old_data, new_data=new_data)
+    # regression_data = initialise_base_data(MODELS["wld_ff3_ver"])
+
+    # CSV.write(joinpath(DIRS.test, "beta_handtest.csv"), regression_data)
+
+    function compare_data(id_index, column=nothing; join_cols=[:fundid, :date], old_data=old_data, new_data=new_data)
         common_funds = intersect(old_data.fundid, new_data.fundid) |> collect
 
         if isnothing(column)
@@ -30,6 +34,7 @@ function test()
             column = Symbol.([column...])
             show_cols = vcat([:fundid, :date], column)
         end
+        
 
         fundid = common_funds[id_index]
         old_data = old_data[old_data.fundid .== fundid, show_cols]
@@ -41,7 +46,8 @@ function test()
         println("")
 
         if !isnothing(column)
-            combo_data = innerjoin(old_data, new_data, on=[:fundid, :date], makeunique=true)
+            combo_data = outerjoin(old_data, new_data, on=join_cols, makeunique=true)
+            sort!(combo_data, [:fundid, :date])
             println(combo_data)
         else
             println("Old Data: \n\n", old_data)
@@ -52,7 +58,7 @@ function test()
         println("")
     end
 
-    compare_data(1, [:factor, :coef]; old_data=old_betas, new_data=betas)
+    compare_data(2, [:factor, :coef]; join_cols=[:fundid, :date, :factor], old_data=old_betas, new_data=betas)
 
     countmap(betas[betas.fundid .== "FS00008KSC",:coef])
 
