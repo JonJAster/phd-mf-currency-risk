@@ -40,6 +40,8 @@ function convert_excess_fund_data()
     select!(new_data, [:fundid, :date, :flow, :ex_ret, :costs, :net_assets_m1])
 
     Arrow.write(new_filepath, new_data)
+
+    new_data[!, [:flow, :ex_ret, :costs]] ./= 100
     Arrow.write(backup_filepath, new_data)
 end
 
