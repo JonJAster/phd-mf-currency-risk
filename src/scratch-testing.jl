@@ -16,6 +16,36 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    old_format_folder = joinpath(DIRS.test, "old-comparison-data/old-format")
+    old_data_filename = joinpath(old_format_folder, "old_world_ff3_verdelhan_betas.arrow")
+    new_data_filename = joinpath(DIRS.combo.return_betas, "dev_ff3_ver.arrow")
+
+    old_data = loadarrow(old_data_filename)
+    new_data = loadarrow(new_data_filename)
+
+    new_data = dropmissing(new_data)
+
+    old_data[old_data.factor .== :const, :]
+    dropmissing(new_data[new_data.factor .== :const, :])
+
+    testid = old_data.fundid[findfirst(x->in(x,new_data.fundid), old_data.fundid)]
+
+    old_data[old_data.fundid .== testid, :]
+    new_data[new_data.fundid .== testid, :]
+
+
+
+
+
+
+    findfirst(x->in(x,old_data.fundid), new_data.fundid)
+    testid = new_data.fundid[findfirst(x->in(x,old_data.fundid), new_data.fundid)]
+
+    old_data[old_data.fundid .== testid, :]
+    
+    loadarrow(joinpath(DIRS.test, "old-comparison-data/new-format/mf-data.arrow"))
+    old_data.fund_assets_m1 = lag(old_data.fund_assets)
+
     old_dev_mkt_filename = joinpath(DIRS.test, "old_dev_mkt.csv")
     new_mkt_filename = joinpath(DIRS.eq.factors, "mkt.arrow")
 
