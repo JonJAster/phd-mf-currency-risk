@@ -11,7 +11,7 @@ using .CommonConstants
 function decompose_fund_returns(model_name) # model_name = "usa_capm_ver"
     task_start = time()
 
-    model = MODELS["usa_capm_ver"]
+    model = MODELS[model_name]
     main_data = initialise_base_data(model)
 
     betas_filestring = joinpath(DIRS.combo.return_betas, "$model_name.arrow")
@@ -54,7 +54,7 @@ function _decompose_returns(full_data, model)
 end
 
 function main()
-    for model_name in keys(MODELS)
+    for model_name in ["usa_capm_ver"]
         # This loop is inefficient in that it reads the same data for each model, but is the
         # lowest effort way to enable calling the function for a single model from
         # elsewhere.
