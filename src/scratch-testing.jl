@@ -6,6 +6,7 @@ using Dates
 using StatsBase
 using Base.Threads
 using LinearAlgebra
+using Plots
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
@@ -15,7 +16,53 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-    betas_filename = joinpath(DIRS.combo.return_betas, "wld_ff3_ver.arrow")
+    old_dev_mkt_filename = joinpath(DIRS.test, "old_dev_mkt.csv")
+    new_mkt_filename = joinpath(DIRS.eq.factors, "mkt.arrow")
+
+    old_dev_mkt = CSV.read(old_dev_mkt_filename, DataFrame, dateformat="dd/mm/yyyy")
+    new_mkt = loadarrow(new_mkt_filename)
+    
+    old_dev_mkt.date .= firstdayofmonth.(old_dev_mkt.date)
+    new_mkt_wide = unstack(new_mkt, :region, :mkt_exc)
+    new_dev_wld_mkt = new_mkt_wide[!, [:date, :WLD, :DEV]]
+    compare_mkt = innerjoin(old_dev_mkt, new_dev_wld_mkt, on=:date)
+
+    rename!(compare_mkt, :mkt=>:OLD_DEV)
+
+    compare_mkt.OLD_DEV ./= 100
+
+    plot(compare_mkt.date, [compare_mkt.WLD, compare_mkt.OLD_DEV])
+
+    compare_mkt.deviation_for_wld = (compare_mkt.WLD .- compare_mkt.OLD_DEV)
+
+    plot(compare_mkt.date, compare_mkt.deviation_for_wld, label="Deviation for WLD")
+
+    cor(compare_mkt.DEV, compare_mkt.OLD_DEV)
+
+    plot(compare_mkt.date, [compare_mkt.DEV, compare_mkt.OLD_DEV], label=["New Dev" "Old Dev"])
+
+    compare_mkt.deviation_for_dev = (compare_mkt.DEV .- compare_mkt.OLD_DEV)
+
+    plot(compare_mkt.date, compare_mkt.deviation_for_wld, label="Deviation for WLD")
+    plot!(compare_mkt.date, compare_mkt.deviation_for_dev, label="Deviation for Dev")
+
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    betas_filename = joinpath(DIRS.combo.return_betas, "dev_ff3_ver.arrow")
     betas_filename_old = joinpath(DIRS.test, "old_world_ff3_verdelhan_betas.arrow")
 
     betas = loadarrow(betas_filename)
@@ -25,7 +72,7 @@ function test()
 
     # CSV.write(joinpath(DIRS.test, "beta_handtest.csv"), regression_data)
 
-    function compare_data(id_index, column=nothing; join_cols=[:fundid, :date], old_data=old_data, new_data=new_data)
+    function compare_data(id_index, column=nothing; join_cols=[:fundid, :date], old_data=old_data, new_data=new_data, returns=false)
         common_funds = intersect(old_data.fundid, new_data.fundid) |> collect
 
         if isnothing(column)
@@ -48,7 +95,11 @@ function test()
         if !isnothing(column)
             combo_data = outerjoin(old_data, new_data, on=join_cols, makeunique=true)
             sort!(combo_data, [:fundid, :date])
-            println(combo_data)
+            if returns
+                return combo_data
+            else
+                println(combo_data)
+            end
         else
             println("Old Data: \n\n", old_data)
             println("")
@@ -58,7 +109,25 @@ function test()
         println("")
     end
 
-    compare_data(2, [:factor, :coef]; join_cols=[:fundid, :date, :factor], old_data=old_betas, new_data=betas)
+    test_data = compare_data(5, [:factor, :coef]; join_cols=[:fundid, :date, :factor], old_data=old_betas, new_data=betas, returns=true)
+    dropmissing!(test_data)
+    test_data_old = test_data[!, [:date, :factor, :coef]]
+    test_data_new = test_data[!, [:date, :factor, :coef_1]]
+
+    test_old_wide = unstack(test_data_old, :factor, :coef)
+    test_new_wide = unstack(test_data_new, :factor, :coef_1)
+
+    for factor in names(test_old_wide[:, Not(:date)])
+        println(factor, ": ", cor(test_old_wide[!, factor], test_new_wide[!, factor]))
+        display(
+            plot(
+                test_old_wide.date,
+                [test_old_wide[!, factor], test_new_wide[!, factor]],
+                label=["Old $factor" "New $factor"],
+                title=factor
+            )
+        )
+    end
 
     countmap(betas[betas.fundid .== "FS00008KSC",:coef])
 
