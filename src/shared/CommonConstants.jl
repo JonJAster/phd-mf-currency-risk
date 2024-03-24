@@ -36,7 +36,7 @@ const DIRS = (
         factors = "data/equity-factors/factors"
     ),
     combo = (
-        factors = "data/combined/factors",
+        factors = [HACKDIR, "data/combined/factors"][TEST_STATUS],
         return_betas = [HACKDIR, "data/combined/return-betas"][TEST_STATUS],
         decomposed = "data/combined/decomposed",
         weighted = "data/combined/weighted",

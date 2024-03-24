@@ -119,9 +119,7 @@ function initialise_base_data(model)
 
     mf_data = loadarrow(mf_filename)
     factors_data = loadarrow(factors_filename)
-
-    model_name = "dev_ff3_ver"
-    model = MODELS[model_name]
+    
     regression_factors = _prepare_factors(factors_data, model)
     output = innerjoin(mf_data, regression_factors, on=:date)
 
