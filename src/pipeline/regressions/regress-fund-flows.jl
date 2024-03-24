@@ -11,7 +11,7 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonFunctions
 using .CommonConstants
 
-function regress_fund_flows(model_name)
+function regress_fund_flows(model_name) # model_name = "dev_ff3_ver"
     task_start = time()
 
     flow_data = _initialise_flow_data(model_name)
@@ -114,7 +114,7 @@ function _drop_zero_cols!(data)
 end
 
 function main()
-    for model_name in keys(MODELS)
+    for model_name in keys(MODELS) # model_name = "dev_ff3_ver"
         output_data = regress_fund_flows(model_name)
         output_filename = makepath(DIRS.combo.flow_betas, "$model_name.arrow")
 

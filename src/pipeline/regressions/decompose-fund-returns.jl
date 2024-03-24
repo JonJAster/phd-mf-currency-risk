@@ -8,7 +8,7 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonFunctions
 using .CommonConstants
 
-function decompose_fund_returns(model_name) # model_name = "usa_capm_ver"
+function decompose_fund_returns(model_name) # model_name = "dev_ff3_ver"
     task_start = time()
 
     model = MODELS[model_name]
