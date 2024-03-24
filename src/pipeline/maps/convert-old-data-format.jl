@@ -17,10 +17,7 @@ const BACKUP_DIRPATH = joinpath(DIRS.test, "old-comparison-data/new-format/magni
 
 function main()
     convert_excess_fund_data()
-    convert_betas_data()
 end
-
-function convert_betas_data()
 
 function convert_excess_fund_data()
     old_filename="old_excess_fund_data.arrow"
@@ -32,7 +29,7 @@ function convert_excess_fund_data()
 
     old_data = loadarrow(old_filepath)
     new_data = copy(old_data)
-    new_data.data = firstdayofmonth.(old_data.date)
+    new_data.date = firstdayofmonth.(old_data.date)
     new_data.net_assets_m1 = lag(old_data.fund_assets)
     rename!(
         new_data,
