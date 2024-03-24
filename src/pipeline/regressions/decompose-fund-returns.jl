@@ -18,6 +18,7 @@ function decompose_fund_returns(model_name) # model_name = "dev_ff3_ver"
     regression_outputs = loadarrow(betas_filestring)
 
     betas = _extract_betas(regression_outputs)
+    betas.date = firstdayofmonth.(betas.date)
     full_data = innerjoin(main_data, betas, on=[:fundid, :date])
 
     decomposed_returns = _decompose_returns(full_data, model)
