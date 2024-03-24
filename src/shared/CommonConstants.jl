@@ -17,12 +17,13 @@ const TIMEWEIGHT_LAGS = 18
 const AGE_FILTER = 36
 const FLOW_CONTROL_LAGS = 19
 
-const HACKDIR = "data/test/old-comparison-data/new-format"
+const HACKDIR = "data/test/old-comparison-data/new-format/magnitude-adjusted"
+const TEST_STATUS = 1
 const DIRS = (
     mf = (
         raw = "data/mutual-funds/raw",
         init = "data/mutual-funds/init",
-        refined = HACKDIR
+        refined = [HACKDIR, "data/mutual-funds/refined"][TEST_STATUS]
     ),
     fx = (
         raw = "data/currencies/raw",
@@ -36,7 +37,7 @@ const DIRS = (
     ),
     combo = (
         factors = "data/combined/factors",
-        return_betas = HACKDIR,
+        return_betas = [HACKDIR, "data/combined/return-betas"][TEST_STATUS],
         decomposed = "data/combined/decomposed",
         weighted = "data/combined/weighted",
         flow_betas = "data/combined/flow-betas"
