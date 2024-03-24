@@ -54,7 +54,7 @@ function _decompose_returns(full_data, model)
 end
 
 function main()
-    for model_name in ["usa_capm_ver"]
+    for model_name in ["dev_ff3_ver"]
         # This loop is inefficient in that it reads the same data for each model, but is the
         # lowest effort way to enable calling the function for a single model from
         # elsewhere.
