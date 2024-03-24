@@ -11,7 +11,7 @@ using .CommonConstants
 function decompose_fund_returns(model_name) # model_name = "usa_capm_ver"
     task_start = time()
 
-    model = MODELS[model_name]
+    model = "usa_capm_ver"
     main_data = initialise_base_data(model)
 
     betas_filestring = joinpath(DIRS.combo.return_betas, "$model_name.arrow")

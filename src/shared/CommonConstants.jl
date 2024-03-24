@@ -21,7 +21,7 @@ const DIRS = (
     mf = (
         raw = "data/mutual-funds/raw",
         init = "data/mutual-funds/init",
-        refined = "data/mutual-funds/refined"
+        refined = "data/test/new-format"
     ),
     fx = (
         raw = "data/currencies/raw",
@@ -35,7 +35,7 @@ const DIRS = (
     ),
     combo = (
         factors = "data/combined/factors",
-        return_betas = "data/combined/return-betas",
+        return_betas = "data/test/new-format",
         decomposed = "data/combined/decomposed",
         weighted = "data/combined/weighted",
         flow_betas = "data/combined/flow-betas"
