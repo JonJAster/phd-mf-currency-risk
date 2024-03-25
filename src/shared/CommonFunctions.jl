@@ -17,6 +17,7 @@ export qscan
 export qlookup
 export loadarrow
 export initialise_base_data
+export initialise_flow_data
 export printtime
 export init_raw
 export rolling_std
@@ -124,6 +125,45 @@ function initialise_base_data(model)
     output = innerjoin(mf_data, regression_factors, on=:date)
 
     return output
+end
+
+function initialise_flow_data(model_name)
+    filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
+    filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
+    filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
+
+    fund_base_data = loadarrow(filename_mf)
+    fund_info = loadarrow(filename_info)
+    decomposed_returns = loadarrow(filename_decomposition)
+
+    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ex_ret, 12; lagged=true)
+
+    select!(
+        fund_base_data,
+        [:fundid, :date, :flow, :net_assets_m1, :costs, :std_return_12m]
+    )
+    select!(fund_info, [:fundid, :true_no_load, :inception_date])
+
+    fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
+
+    fund_full_data = innerjoin(
+        fund_rets_data, fund_info, on=:fundid, matchmissing=:notequal
+    )
+
+    fund_full_data.age = (
+        12*(year.(fund_full_data.date) .- year.(fund_full_data.inception_date)) .+
+        (month.(fund_full_data.date) .- month.(fund_full_data.inception_date)) .+ 1
+    )
+
+    output_data = fund_full_data[fund_full_data.age .>= AGE_FILTER, :]
+
+    output_data.log_lag_size = log.(output_data.net_assets_m1)
+    output_data.log_age = log.(output_data.age)
+    
+    sort!(output_data, [:fundid, :date])
+    select!(output_data, Not(["inception_date", "age", "net_assets_m1"]))
+
+    return output_data
 end
 
 function _prepare_factors(factors_data, model)

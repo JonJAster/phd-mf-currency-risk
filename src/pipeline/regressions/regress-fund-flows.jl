@@ -18,7 +18,7 @@ export regress_fund_flows
 function regress_fund_flows(model_name; filter_by=nothing)
     task_start = time()
 
-    flow_data = _initialise_flow_data(model_name)
+    flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
         info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
@@ -31,6 +31,10 @@ function regress_fund_flows(model_name; filter_by=nothing)
     cols = names(flow_data)
     find_return_col(name) = !isnothing(match(r"ret_", name))
     return_component_cols = cols[find_return_col.(cols)] .|> Symbol
+
+    if in_points
+        flow_data[!, :flow, return_component_cols...] .*= 100
+    end
 
     regression_data = regression_table(
         flow_data, :fundid, :date,
@@ -51,45 +55,6 @@ function regress_fund_flows(model_name; filter_by=nothing)
 
     printtime("regressing flow betas on $model_name", task_start)
     return flow_betas
-end
-
-function _initialise_flow_data(model_name)
-    filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
-    filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
-    filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
-
-    fund_base_data = loadarrow(filename_mf)
-    fund_info = loadarrow(filename_info)
-    decomposed_returns = loadarrow(filename_decomposition)
-
-    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ex_ret, 12; lagged=true)
-
-    select!(
-        fund_base_data,
-        [:fundid, :date, :flow, :net_assets_m1, :costs, :std_return_12m]
-    )
-    select!(fund_info, [:fundid, :true_no_load, :inception_date])
-
-    fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
-
-    fund_full_data = innerjoin(
-        fund_rets_data, fund_info, on=:fundid, matchmissing=:notequal
-    )
-
-    fund_full_data.age = (
-        12*(year.(fund_full_data.date) .- year.(fund_full_data.inception_date)) .+
-        (month.(fund_full_data.date) .- month.(fund_full_data.inception_date)) .+ 1
-    )
-
-    output_data = fund_full_data[fund_full_data.age .>= AGE_FILTER, :]
-
-    output_data.log_lag_size = log.(output_data.net_assets_m1)
-    output_data.log_age = log.(output_data.age)
-    
-    sort!(output_data, [:fundid, :date])
-    select!(output_data, Not(["inception_date", "age", "net_assets_m1"]))
-
-    return output_data
 end
 
 function _flow_regression(regression_data, return_component_cols)
