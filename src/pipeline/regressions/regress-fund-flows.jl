@@ -88,6 +88,8 @@ function _initialise_flow_data(model_name)
     
     sort!(output_data, [:fundid, :date])
     select!(output_data, Not(["inception_date", "age", "net_assets_m1"]))
+
+    return output_data
 end
 
 function _flow_regression(regression_data, return_component_cols)
