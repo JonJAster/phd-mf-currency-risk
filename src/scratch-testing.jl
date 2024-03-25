@@ -1,3 +1,4 @@
+using Revise
 using DataFrames
 using CSV
 using Arrow
@@ -16,6 +17,135 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    data_test = loadarrow(joinpath(DIRS.combo.weighted, "dev_ff3_ver.arrow"))
+
+
+    
+    
+    old_data_fn = joinpath(DIRS.test, "old-comparison-data/new-format/magnitude-adjusted/mf_info.arrow")
+    new_data_fn = joinpath(DIRS.mf.init, "mf-info.arrow")
+
+    old_data = loadarrow(old_data_fn)
+    new_data2 = loadarrow(new_data_fn)
+
+    describe(new_data)
+
+    old_compare = select(old_data, [:fundid, :no_load, :inception_date])
+    rename!(old_compare, :no_load => :true_no_load_old, :inception_date => :inception_date_old)
+    new_compare = select(new_data, [:fundid, :true_no_load, :inception_date])
+
+   
+
+
+    compare_data = innerjoin(old_compare, new_compare, on=:fundid)
+    countmap(compare_data.true_no_load_old)
+    countmap(compare_data[.!isequal.(compare_data.true_no_load_old, compare_data.true_no_load), :true_no_load])
+    compare_data[.!isequal.(compare_data.true_no_load_old, compare_data.true_no_load) .&& (compare_data.true_no_load .== true), :]
+
+    old_data_old_method_fn = joinpath(DIRS.test, "old-comparison-data/old-format/old_world_ff3_verdelhan_decomposition.arrow")
+    old_data_new_method_fn = joinpath(DIRS.test, "old-comparison-data/new-format/magnitude-adjusted/decomposed/dev_ff3_ver.arrow")
+
+    old_data_old_method_fn = joinpath(DIRS.test, "old-comparison-data/old-format/old_world_ff3_verdelhan_weighted_decompositions.arrow")
+    old_data_new_method_fn = joinpath(DIRS.test, "old-comparison-data/new-format/magnitude-adjusted/weighted/dev_ff3_ver.arrow")
+
+    old_data_old_method = loadarrow(old_data_old_method_fn)
+    old_data_new_method = loadarrow(old_data_new_method_fn)
+
+    testid = "FS00008L0W"
+    testdate = Date(2018,3,1)
+
+    old_data_old_method[(old_data_old_method.fundid .== testid) .&& (firstdayofmonth.(old_data_old_method.date) .== testdate), :]
+    old_data_new_method[(old_data_new_method.fundid .== testid) .&& (firstdayofmonth.(old_data_new_method.date) .== testdate), :]
+        
+    handtest_df = old_data_new_method[(old_data_new_method.fundid .== testid),:]
+
+    CSV.write(joinpath(DIRS.test, "handtest_decomposition_weighting_raw.csv"), handtest_df)
+
+    old_data_new_method[old_data_new_method.fundid .== testid, :]
+
+    weighted_rets[2:2, :]
+    old_weighted_rets[1:1, :]
+    
+    
+    combo_factors_fn = joinpath(DIRS.combo.factors, "factors.arrow")
+
+    combo_factors = loadarrow(combo_factors_fn)
+    println(unique(combo_factors.factor))
+    
+    old_equity_factors = loadarrow(joinpath(DIRS.test, "old-comparison-data/old-format/old_global_equity_factors.arrow"))
+
+    combo_factors_compare = combo_factors[in.(combo_factors.factor, Ref(["smb", "hml", "cma", "rmw", "wml", "mkt"])), :]
+    combo_factors_compare = combo_factors_compare[combo_factors_compare.region .== "DEV", :]
+
+    select!(combo_factors_compare, Not(:region))
+
+    wide_new_factors = unstack(combo_factors_compare, :factor, :ret)
+    select!(wide_new_factors, [:date, :smb, :hml, :cma, :rmw, :wml, :mkt])
+
+    wide_new_factors = wide_new_factors[wide_new_factors.date .>= Date(1990, 7, 1), :]
+    wide_new_factors
+    old_equity_factors
+
+    function compare_line(line; old=old_equity_factors, new=wide_new_factors)
+        comparison_df = vcat(old[line:line, :], new[line:line, :])
+        return comparison_df
+    end
+
+    compare_line(1)
+    dev_mkt = combo_factors[(combo_factors.factor .== "mkt") .&& (combo_factors.region .=="DEV"), :]
+
+    compare_mkt_fn = joinpath(DIRS.test, "old-comparison-data/old-format/old_dev_mkt.csv")
+    compare_mkt = CSV.read(compare_mkt_fn, DataFrame, dateformat="dd/mm/yyyy")
+
+    dated_dev_mkt = dev_mkt[dev_mkt.date .>= Date(1990, 7, 1),:]
+    first(dated_dev_mkt, 5)
+
+    compare_mkt.date = firstdayofmonth.(compare_mkt.date)
+    first(compare_mkt, 5)
+
+    combo_mkt = outerjoin(first(dated_dev_mkt, 5), first(compare_mkt, 5), on=:date)
+    rf_fn = joinpath(DIRS.test, "old-comparison-data/old-format/old_usd_riskfree.csv")
+    old_rf = CSV.read(rf_fn, DataFrame, dateformat="dd/mm/yyyy")
+    old_rf.date = firstdayofmonth.(old_rf.date)
+
+    combo_mkt_rf = innerjoin(combo_mkt, old_rf, on=:date)
+
+    combo_mkt_rf[!, [:mkt, :rf]] ./= 100
+
+    combo_mkt_rf.compare_ret = combo_mkt_rf.mkt .- combo_mkt_rf.rf
+
+    combo_mkt_rf
+
+    old_format_folder = joinpath(DIRS.test, "old-comparison-data/old-format")
+    old_data_filename = joinpath(old_format_folder, "old_world_ff3_verdelhan_betas.arrow")
+    new_data_filename = joinpath(DIRS.combo.return_betas, "dev_ff3_ver.arrow")
+
+    old_data = loadarrow(old_data_filename)
+    new_data = loadarrow(new_data_filename)
+
+    new_data = dropmissing(new_data)
+
+    old_data[old_data.factor .== :const, :]
+    dropmissing(new_data[new_data.factor .== :const, :])
+
+    testid = old_data.fundid[findfirst(x->in(x,new_data.fundid), old_data.fundid)]
+
+    old_data[old_data.fundid .== testid, :]
+    new_data[new_data.fundid .== testid, :]
+
+
+
+
+
+
+    findfirst(x->in(x,old_data.fundid), new_data.fundid)
+    testid = new_data.fundid[findfirst(x->in(x,old_data.fundid), new_data.fundid)]
+
+    old_data[old_data.fundid .== testid, :]
+    
+    loadarrow(joinpath(DIRS.test, "old-comparison-data/new-format/mf-data.arrow"))
+    old_data.fund_assets_m1 = lag(old_data.fund_assets)
+
     old_dev_mkt_filename = joinpath(DIRS.test, "old_dev_mkt.csv")
     new_mkt_filename = joinpath(DIRS.eq.factors, "mkt.arrow")
 
