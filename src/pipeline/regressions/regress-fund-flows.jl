@@ -1,3 +1,5 @@
+module RegressFundFlows
+
 using Revise
 using DataFrames
 using Arrow
@@ -11,10 +13,20 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonFunctions
 using .CommonConstants
 
-function regress_fund_flows(model_name)
+export regress_fund_flows
+
+function regress_fund_flows(model_name; filter_by=nothing)
     task_start = time()
 
     flow_data = _initialise_flow_data(model_name)
+
+    if !isnothing(filter_by)
+        info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
+        info = loadarrow(info_filename)
+
+        filtered_ids = info[filter_by(info),:fundid]
+        flow_data = innerjoin(flow_data, filtered_ids, on=:fundid)
+    end
 
     cols = names(flow_data)
     find_return_col(name) = !isnothing(match(r"ret_", name))
@@ -128,3 +140,5 @@ if abspath(PROGRAM_FILE) == @__FILE__
     main()
     printtime("regressing all flows", task_start; minutes=true)
 end
+
+end # module RegressFundFlows

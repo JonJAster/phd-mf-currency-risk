@@ -12,18 +12,14 @@ using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
+includet("pipeline/regressions/regress-fund-flows.jl")
 
 using .CommonConstants
 using .CommonFunctions
+using .RegressFundFlows
 
 function analysis()
-    for model_name in keys(MODELS)
-        println("Flow betas for $model_name")
-        flow_betas_fn = joinpath(DIRS.combo.flow_betas, "$model_name.arrow")
-        flow_betas = loadarrow(flow_betas_fn)
-        println(flow_betas)
-        println()
-    end
+    regress_fund_flows
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
