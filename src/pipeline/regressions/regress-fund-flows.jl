@@ -44,7 +44,7 @@ end
 function _initialise_flow_data(model_name)
     filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
     filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
-    filename_decomposition = joinpath(DIRS.combo.decomposed, "$model_name.arrow")
+    filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
 
     fund_base_data = loadarrow(filename_mf)
     fund_info = loadarrow(filename_info)
