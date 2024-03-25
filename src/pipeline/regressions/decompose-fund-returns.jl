@@ -24,6 +24,8 @@ function decompose_fund_returns(model_name) # model_name = "dev_ff3_ver"
 
     decomposed_returns = _decompose_returns(full_data, model)
     
+    decomposed_returns[(decomposed_returns.fundid .== "FS00008L0W") .&& (decomposed_returns.date .== Date(2018,2,1)), :]
+    
     printtime("decomposing fund returns for $model_name", task_start)
     return decomposed_returns
 end

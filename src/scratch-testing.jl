@@ -16,6 +16,13 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    fully_manual_test_fn = "data/test/old-comparison-data/new-format/magnitude-adjusted/decomposed/dev_ff3_ver.arrow"
+    fully_manual_test_fn = "data/combined/decomposed/dev_ff3_ver.arrow"
+    fully_manual_test = loadarrow(fully_manual_test_fn)
+
+    fully_manual_test[(fully_manual_test.fundid .== "FS00008L0W") .&& (fully_manual_test.date .== Date(2018,2,1)), :]
+
+
     test_data_fn = joinpath(DIRS.test, "old-comparison-data/new-format/magnitude-adjusted/dev_ff3_ver.arrow")
     test_data = loadarrow(test_data_fn)
     test_data = test_data[test_data.fundid .== "FS00008L0W", :]
@@ -32,11 +39,15 @@ function test()
     old_data_new_method = loadarrow(old_data_new_method_fn)
 
     testid = "FS00008L0W"
-    testdate = Date(2018,2,1)
+    testdate = Date(2018,3,1)
 
     old_data_old_method[(old_data_old_method.fundid .== testid) .&& (firstdayofmonth.(old_data_old_method.date) .== testdate), :]
     old_data_new_method[(old_data_new_method.fundid .== testid) .&& (firstdayofmonth.(old_data_new_method.date) .== testdate), :]
         
+    handtest_df = old_data_new_method[(old_data_new_method.fundid .== testid),:]
+
+    CSV.write(joinpath(DIRS.test, "handtest_decomposition_weighting_raw.csv"), handtest_df)
+
     old_data_new_method[old_data_new_method.fundid .== testid, :]
 
     weighted_rets[2:2, :]

@@ -18,7 +18,7 @@ const AGE_FILTER = 36
 const FLOW_CONTROL_LAGS = 19
 
 const HACKDIR = "data/test/old-comparison-data/new-format/magnitude-adjusted"
-const TEST_STATUS = 1
+const TEST_STATUS = 2
 const DIRS = (
     mf = (
         raw = "data/mutual-funds/raw",
@@ -38,9 +38,9 @@ const DIRS = (
     combo = (
         factors = [HACKDIR, "data/combined/factors"][TEST_STATUS],
         return_betas = [HACKDIR, "data/combined/return-betas"][TEST_STATUS],
-        decomposed = "data/combined/decomposed",
-        weighted = "data/combined/weighted",
-        flow_betas = "data/combined/flow-betas"
+        decomposed = [joinpath(HACKDIR, "decomposed"), "data/combined/decomposed"][TEST_STATUS],
+        weighted = [joinpath(HACKDIR, "weighted"), "data/combined/weighted"][TEST_STATUS],
+        flow_betas = [joinpath(HACKDIR, "flow-betas"), "data/combined/flow-betas"][TEST_STATUS]
     ),
     map = (
         raw = "data/maps/raw",
