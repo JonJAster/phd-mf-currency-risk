@@ -25,7 +25,7 @@ end
 function _timeweight_returns(model_returns)
     nonfactor_cols = [:fundid, :date]
     factor_return_cols = setdiff(propertynames(model_returns), nonfactor_cols)
-    n_obs = size(model_returns, 1)
+    n_obs = nrow(model_returns)
     n_factors = length(factor_return_cols)
     
     weighted_returns = copy(model_returns)
@@ -33,14 +33,14 @@ function _timeweight_returns(model_returns)
         Matrix{Union{Missing, Float64}}(missing, n_obs, n_factors)
     )
     
-    for i in 1:size(model_returns, 1)
-        i < TIMEWEIGHT_LAGS && continue
+    for i in 1:nrow(model_returns)
+        i <= TIMEWEIGHT_LAGS && continue
         window_fundid = model_returns[i, :fundid]
-        window_enddate = model_returns[i, :date]
+        window_enddate = model_returns[i, :date] - Dates.Month(1)
         window_startdate = window_enddate - Dates.Month(TIMEWEIGHT_LAGS)
 
-        extract_start = i-TIMEWEIGHT_LAGS+1
-        extract_end = i
+        extract_start = i-TIMEWEIGHT_LAGS
+        extract_end = i-1
 
         model_returns[extract_start, :fundid] != window_fundid && continue
         date_extract = model_returns[extract_start:extract_end, :date]
@@ -49,7 +49,7 @@ function _timeweight_returns(model_returns)
         isnothing(date_start_offset) && continue
 
         window_start = extract_start + date_start_offset - 1
-        window_end = i
+        window_end = extract_end
 
         for factor in factor_return_cols
             window_returns = model_returns[window_start:window_end, factor]

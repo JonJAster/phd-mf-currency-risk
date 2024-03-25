@@ -8,7 +8,7 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonFunctions
 using .CommonConstants
 
-function decompose_fund_returns(model_name) # model_name = "usa_capm_ver"
+function decompose_fund_returns(model_name)
     task_start = time()
 
     model = MODELS[model_name]
@@ -35,7 +35,7 @@ function _decompose_returns(full_data, model)
     decomposed_returns = full_data[!, [:fundid, :date, :ex_ret]]
     decomposed_returns.ret_alpha .= 0.0
 
-    for factor in model_factors # factor = first(model_factors)
+    for factor in model_factors
         decomposed_returns[!, "ret_$(factor)"] = (
             full_data[!, factor] .* full_data[!, "$(factor)_beta"]
         )
