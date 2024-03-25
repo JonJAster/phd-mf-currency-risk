@@ -18,7 +18,7 @@ const AGE_FILTER = 36
 const FLOW_CONTROL_LAGS = 19
 
 const HACKDIR = "data/test/old-comparison-data/new-format/magnitude-adjusted"
-const TEST_STATUS = 2
+const TEST_STATUS = 1
 const DIRS = (
     mf = (
         raw = "data/mutual-funds/raw",

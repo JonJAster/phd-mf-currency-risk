@@ -14,16 +14,7 @@ using .CommonConstants
 function regress_fund_flows(model_name) # model_name = "dev_ff3_ver"
     task_start = time()
 
-    # flow_data_old = _initialise_flow_data(model_name; compare_old=true)
-    flow_data = _initialise_flow_data(model_name; compare_old=false)
-
-    #id_filter = flow_data_old[!, [:fundid, :date]]
-    #flow_data_new_filtered = innerjoin(flow_data_new, id_filter, on=[:fundid, :date])
-
-    # compareview = vcat(
-    #     flow_data_old[1:2, :],
-    #     flow_data_new_filtered[1:2, :]
-    # )
+    flow_data = _initialise_flow_data(model_name)
 
     cols = names(flow_data)
     find_return_col(name) = !isnothing(match(r"ret_", name))
@@ -50,14 +41,9 @@ function regress_fund_flows(model_name) # model_name = "dev_ff3_ver"
     return flow_betas
 end
 
-function _initialise_flow_data(model_name; compare_old=false) # compare_old = false
-    if compare_old
-        filename_mf = joinpath(DIRS.test, "old-comparison-data/new-format/magnitude-adjusted/mf-data.arrow")
-        filename_decomposition = joinpath(DIRS.test, "old-comparison-data/new-format/magnitude-adjusted/weighted/dev_ff3_ver.arrow")
-    else
-        filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
-        filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
-    end
+function _initialise_flow_data(model_name)
+    filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
+    filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
     
     filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
 
