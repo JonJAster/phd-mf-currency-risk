@@ -282,6 +282,31 @@ function drop_allmissing!(df, cols; dims=1)
     end
 end
 
+function investment_target_is(data, target)
+    if target ∉ [:usa, :wld, :emg]
+        error("Invalid target: $target. Must be :usa, :wld, or :emg.")
+    end
+
+    if target == :usa
+        condition = (
+            (.!ismissing.(data.us_category_group) .&& (data.us_category_group .== "US Equity")) .||
+            (.!ismissing.(data.investment_area) .&& (data.investment_area .== "United States of America"))
+        )
+    elseif target == :wld
+        condition = (
+            (.!ismissing.(data.us_category_group) .&& (data.us_category_group .== "International Equity")) .||
+            (.!ismissing.(data.investment_area) .&& (data.investment_area .!= "United States of America"))
+        )
+    elseif target == :emg
+        condition = (
+            data.morningstar_category .== "US Fund Diversified Emerging Mkts" .||
+            (.!ismissing.(data.investment_area) .&& (data.investment_area .== "Global Emerging Mkts"))
+        )
+    end
+
+    return condition
+end
+
 function regression_table(data, entity_col, date_col, column_args...)
     """
     Returns a DataFrame containing columns to be used as inputs in a regression as
