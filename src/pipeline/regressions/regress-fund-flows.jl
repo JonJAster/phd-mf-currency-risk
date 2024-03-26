@@ -14,10 +14,20 @@ using .CommonFunctions
 using .CommonConstants
 
 export regress_fund_flows
+export flow_regression_table
 
 function regress_fund_flows(model_name; filter_by=nothing)
     task_start = time()
 
+    regression_data = flow_regression_table(model_name)
+
+    flow_betas = _flow_regression(regression_data, return_component_cols)
+
+    printtime("regressing flow betas on $model_name", task_start)
+    return flow_betas
+end
+
+function flow_regression_table(model_name)
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
@@ -43,10 +53,7 @@ function regress_fund_flows(model_name; filter_by=nothing)
     dropmissing!(regression_data)
     _drop_zero_cols!(regression_data)
 
-    flow_betas = _flow_regression(regression_data, return_component_cols)
-
-    printtime("regressing flow betas on $model_name", task_start)
-    return flow_betas
+    return regression_data
 end
 
 function _flow_regression(regression_data, return_component_cols)
