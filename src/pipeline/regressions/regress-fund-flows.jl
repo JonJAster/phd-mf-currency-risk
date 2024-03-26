@@ -19,7 +19,7 @@ export flow_regression_table
 function regress_fund_flows(model_name; filter_by=nothing)
     task_start = time()
 
-    regression_data = flow_regression_table(model_name)
+    regression_data = flow_regression_table(model_name; filter_by=filter_by)
 
     flow_betas = _flow_regression(regression_data, return_component_cols)
 
@@ -27,7 +27,7 @@ function regress_fund_flows(model_name; filter_by=nothing)
     return flow_betas
 end
 
-function flow_regression_table(model_name)
+function flow_regression_table(model_name, filter_by=nothing)
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
