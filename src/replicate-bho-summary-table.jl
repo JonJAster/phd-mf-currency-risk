@@ -5,17 +5,17 @@ using StatsBase
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
+includet("pipeline/regressions/regress-fund-flows.jl")
 
 using .CommonConstants
 using .CommonFunctions
+using .RegressFundFlows
 
 function replicate_bho_summary_table()
     return_beta_filename = joinpath(DIRS.combo.return_betas, "usa_ff3.arrow")
     
     return_betas = loadarrow(return_beta_filename)
-    main_data = initialise_flow_data("usa_ff3")
-
-    # main_data = # filter to usa targets
+    main_data = flow_regression_table("usa_ff3"; filter_by=x->investment_target_is(x, :usa))
 
     main_data.lag_size = ℯ .^ (main_data.log_lag_size)
     main_data.age = ℯ .^ (main_data.log_age)
