@@ -19,24 +19,10 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function analysis()
-    domestic_condition(x) = (
-        (.!ismissing.(x.us_category_group) .&& (x.us_category_group .== "US Equity")) .||
-        (.!ismissing.(x.investment_area) .&& (x.investment_area .== "United States of America"))
-    )
-    
-    international_condition(x) = (
-        (.!ismissing.(x.us_category_group) .&& (x.us_category_group .== "International Equity")) .||
-        (.!ismissing.(x.investment_area) .&& (x.investment_area .!= "United States of America"))
-    )
+    regress_fund_flows("usa_capm", filter_by=x->investment_target_is(x, :usa))
+    regress_fund_flows("usa_ff3", filter_by=x->investment_target_is(x, :usa))
 
-    emerging_condition(x) = (
-        x.morningstar_category .== "US Fund Diversified Emerging Mkts" .||
-        (.!ismissing.(x.investment_area) .&& (x.investment_area .== "Global Emerging Mkts"))
-    )
-
-    regress_fund_flows("usa_capm", filter_by=domestic_condition)
-    regress_fund_flows("usa_ff3", filter_by=domestic_condition)
-    regress_fund_flows("usa_ff3", filter_by=domestic_condition)
+    regress_fund_flows("dev_ff3_ver")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

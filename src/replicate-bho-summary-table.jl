@@ -25,6 +25,14 @@ function _replicate_characteristics(start_month=nothing, end_month=nothing)
     
     main_data = regression_packet.regression_data
 
+    if !isnothing(start_month)
+        main_data = main_data[main_data.date .>= start_month, :]
+    end
+
+    if !isnothing(end_month)
+        main_data = main_data[main_data.date .<= end_month, :]
+    end
+
     summary_parameters = OrderedDict(
         :flow => "Percentage fund flow",
         :log_lag_size => "Fund size (\$mil)",
@@ -59,6 +67,14 @@ function _replicate_betas(start_month=nothing, end_month=nothing)
     
     return_betas = loadarrow(return_beta_filename)
 
+    if !isnothing(start_month)
+        return_betas = return_betas[return_betas.date .>= start_month, :]
+    end
+
+    if !isnothing(end_month)
+        return_betas = return_betas[return_betas.date .<= end_month, :]
+    end
+
     return_betas = unstack(return_betas, [:fundid, :date], :factor, :coef)
     dropmissing!(return_betas)
 
@@ -91,6 +107,14 @@ function _replicate_return_components(start_month=nothing, end_month=nothing)
     return_components_filename = joinpath(DIRS.combo.weighted, "usa_ff3.arrow")
 
     return_components = loadarrow(return_data_filename)
+
+    if !isnothing(start_month)
+        return_components = return_components[return_components.date .>= start_month, :]
+    end
+
+    if !isnothing(end_month)
+        return_components = return_components[return_components.date .<= end_month, :]
+    end
 
     return_parameters = OrderedDict(
         :ret_alpha => "ALPHA",
