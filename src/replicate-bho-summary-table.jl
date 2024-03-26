@@ -2,6 +2,7 @@ using Revise
 using DataFrames
 using Arrow
 using StatsBase
+using Dates
 using DataStructures
 
 includet("shared/CommonConstants.jl")
@@ -13,9 +14,9 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function replicate_bho_summary_table()
-    output_characteristics = _replicate_characteristics()
-    output_betas = _replicate_betas()
-    output_return_components = _replicate_return_components()
+    output_characteristics = _replicate_characteristics(Date(1996,1,1), Date(2011,11,1))
+    output_betas = _replicate_betas(Date(1996,1,1), Date(2011,11,1))
+    output_return_components = _replicate_return_components(Date(1996,1,1), Date(2011,11,1))
 end
 
 function _replicate_characteristics(start_month=nothing, end_month=nothing)
