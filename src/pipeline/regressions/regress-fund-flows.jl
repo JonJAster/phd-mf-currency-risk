@@ -32,10 +32,6 @@ function regress_fund_flows(model_name; filter_by=nothing)
     find_return_col(name) = !isnothing(match(r"ret_", name))
     return_component_cols = cols[find_return_col.(cols)] .|> Symbol
 
-    if in_points
-        flow_data[!, :flow, return_component_cols...] .*= 100
-    end
-
     regression_data = regression_table(
         flow_data, :fundid, :date,
         :flow, :plus_lag, FLOW_CONTROL_LAGS,
