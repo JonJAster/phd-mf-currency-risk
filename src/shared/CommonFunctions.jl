@@ -22,6 +22,7 @@ export printtime
 export init_raw
 export rolling_std
 export drop_allmissing!
+export investment_target_is
 export regression_table
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
