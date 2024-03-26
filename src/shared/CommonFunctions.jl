@@ -22,6 +22,7 @@ export printtime
 export init_raw
 export rolling_std
 export drop_allmissing!
+export filter_fundids
 export investment_target_is
 export regression_table
 
@@ -281,6 +282,16 @@ function drop_allmissing!(df, cols; dims=1)
         all_missing = mask_matrix' * one_vector .== zero(size(mask_matrix,2))
         select!(df, Not(cols[all_missing]))
     end
+end
+
+function filter_fundids(condition, data)
+    info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
+    info = loadarrow(info_filename)
+
+    filtered_ids = info[condition(info),[:fundid]]
+    filtered_data = innerjoin(data, filtered_ids, on=:fundid)
+
+    return filtered_data
 end
 
 function investment_target_is(data, target)

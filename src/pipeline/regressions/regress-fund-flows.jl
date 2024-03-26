@@ -21,11 +21,7 @@ function regress_fund_flows(model_name; filter_by=nothing)
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
-        info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
-        info = loadarrow(info_filename)
-
-        filtered_ids = info[filter_by(info),[:fundid]]
-        flow_data = innerjoin(flow_data, filtered_ids, on=:fundid)
+        flow_data = filter_fundids(filter_by, flow_data)
     end
 
     cols = names(flow_data)
