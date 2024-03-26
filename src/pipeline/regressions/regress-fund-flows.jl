@@ -49,7 +49,7 @@ function flow_regression_table(model_name; filter_by=nothing)
         :true_no_load,
         :std_return_12m,
         :log_lag_size,
-        :log_age,
+        :log_age, :lag,
         :tfe, :month
     )
     
