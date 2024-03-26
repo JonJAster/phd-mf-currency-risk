@@ -4,6 +4,7 @@ using CSV
 using Arrow
 using GLM
 using Dates
+using DataStructures
 using StatsBase
 using Base.Threads
 using LinearAlgebra
