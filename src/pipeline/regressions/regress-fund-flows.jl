@@ -53,7 +53,12 @@ function flow_regression_table(model_name; filter_by=nothing)
     dropmissing!(regression_data)
     _drop_zero_cols!(regression_data)
 
-    return regression_data
+    output = (
+        regression_data = regression_data,
+        return_component_cols = return_component_cols
+    )
+
+    return output
 end
 
 function _flow_regression(regression_data, return_component_cols)
