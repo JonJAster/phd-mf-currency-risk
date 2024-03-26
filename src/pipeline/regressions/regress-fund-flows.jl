@@ -27,7 +27,7 @@ function regress_fund_flows(model_name; filter_by=nothing)
     return flow_betas
 end
 
-function flow_regression_table(model_name, filter_by=nothing)
+function flow_regression_table(model_name; filter_by=nothing)
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
