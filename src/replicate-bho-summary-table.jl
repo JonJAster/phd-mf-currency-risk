@@ -18,7 +18,7 @@ function replicate_bho_summary_table()
     output_return_components = _replicate_return_components()
 end
 
-function _replicate_characteristics()
+function _replicate_characteristics(start_month=nothing, end_month=nothing)
     regression_packet = (
         flow_regression_table("usa_ff3"; filter_by=x->investment_target_is(x, :usa))
     )
@@ -54,7 +54,7 @@ function _replicate_characteristics()
     return output_characteristics
 end
 
-function _replicate_betas()
+function _replicate_betas(start_month=nothing, end_month=nothing)
     return_beta_filename = joinpath(DIRS.combo.return_betas, "usa_ff3.arrow")
     
     return_betas = loadarrow(return_beta_filename)
@@ -87,7 +87,7 @@ function _replicate_betas()
     return output_betas
 end
 
-function _replicate_return_components()
+function _replicate_return_components(start_month=nothing, end_month=nothing)
     return_components_filename = joinpath(DIRS.combo.weighted, "usa_ff3.arrow")
 
     return_components = loadarrow(return_data_filename)
