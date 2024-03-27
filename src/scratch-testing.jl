@@ -1,4 +1,5 @@
 using Revise
+using BenchmarkTools
 using DataFrames
 using CSV
 using Arrow
@@ -9,6 +10,7 @@ using StatsBase
 using Base.Threads
 using LinearAlgebra
 using Plots
+using PlotlyJS
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
@@ -18,6 +20,37 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    raw_costs = init_raw(joinpath(DIRS.mf.raw, "costs.csv"))
+    raw_gross = init_raw(joinpath(DIRS.mf.raw, "gross_returns.csv"))
+    raw_net = init_raw(joinpath(DIRS.mf.raw, "net_returns.csv"))
+    
+    mf_data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
+
+    mf_data[!, [:ex_ret, :costs]] = 100 .* ((1 .+ mf_data[!, [:ex_ret, :costs]]) .^ 12 .- 1)
+
+    mf_data = dropmissing(mf_data, :net_assets_m1)
+
+    size_deciles = quantile(skipmissing(mf_data.net_assets_m1), 0.1:0.1:1)
+
+    mf_data.size_decile = [findfirst(x -> x >= y, size_deciles) for y in mf_data.net_assets_m1]
+
+    mf_data.ex_ret_net = mf_data.ex_ret .- mf_data.costs
+
+    fund_averages = combine(
+        groupby(mf_data, :size_decile),
+        :costs => (x->mean(skipmissing(x))) => :average_costs,
+        :ex_ret => (x->mean(skipmissing(x))) => :average_ex_ret,
+        :ex_ret_net => (x->mean(skipmissing(x))) => :average_ex_ret_net
+    )
+
+    # Bar plot of side-by-side all averages with x labels on all individual bars and x and y axes titles
+    PlotlyJS.plot(
+        [
+            PlotlyJS.bar(fund_averages, x=:size_decile, y=y, name=String(y))
+            for y in [:average_ex_ret, :average_ex_ret_net, :average_costs]
+        ]
+    )
+
     loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     info = loadarrow(joinpath(DIRS.mf.refined, "mf-info.arrow"))
     
