@@ -424,7 +424,7 @@ function _normalise_names!(df; info=false)
         
         start_date = match(re_date, names(df)[n_id_cols + 1]).match |> Dates.Date
         last_date = match(re_date, last(names(df))).match |> Dates.Date
-        date_cols = [_offset_monthend(start_date, i) for i in 0:n_date_cols-1]
+        date_cols = [start_date + Month(i) for i in 0:n_date_cols-1]
 
         last(date_cols) != last_date && @warn(
             "The calculated end date ($(last(date_cols))) is not the same as the last date " *
