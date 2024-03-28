@@ -14,6 +14,7 @@ using .CommonFunctions
 const RATE_SETTLEMENTS = ["spot", "forward"]
 const RATE_LEVELS = ["bid", "mid", "ask"]
 const INVERTED_RATE_LEVELS = Dict("bid" => "ask", "mid" => "mid", "ask" => "bid")
+const RATE_LEVEL_CODES = Dict("bid" => "EB", "mid" => "ER", "ask" => "EO")
 const RATE_TYPES =  Iterators.product(RATE_SETTLEMENTS, RATE_LEVELS)
 const RATE_TYPE_NAMES = (vec ∘ collect)("$(a)_$b" for (a,b) in RATE_TYPES)
 
@@ -44,16 +45,35 @@ const EURO_CONSTITUENTS = [
 function refine_raw_currency_data()
     task_start = time()
     info_filename = joinpath(DIRS.fx.raw, "currency_info.csv")
+    data_filename = joinpath(DIRS.fx.raw, "currency_data.csv")
     info = CSV.read(info_filename, DataFrame)
+    
+    rate_data_table = CSV.read(
+        data_filename, DataFrame;
+        missingstring="", dateformat=DateFormat("dd/mm/yyyy")
+    )
 
     rate_data = Dict{RateType, DataFrame}()
-    for (a, b) in RATE_TYPES
-        rate_data[(a, b)] = CSV.read(
-            joinpath(DIRS.fx.raw, "$(a)_$b.csv"),
-            DataFrame, missingstring="NA", dateformat=DateFormat("dd/mm/yyyy"),
-            types=Dict(:date => Date)
-        )
+    for (settlement, level) in RATE_TYPES
+        if settlement == "spot"
+            target_series_codes = info.symbol_s
+        elseif settlement == "forward"
+            target_series_codes = info.symbol_f
+        else
+            error("Invalid settlement type: $settlement")
+        end
+
+        level_code = RATE_LEVEL_CODES[level]
+        target_columns = [
+            Symbol("$settle_code($level_code)") for settle_code in target_series_codes
+        ]
+        target_data = rate_data_table[:, [:date, target_columns...]]
+        rename!(target_data, target_columns .=> target_series_codes)
+        
+        rate_data[(settlement, level)] = target_data
     end
+
+    rate_data[("spot", "bid")]
 
     _assert_equal_dates!(rate_data)
 
@@ -115,7 +135,13 @@ function _push_source_to_rate_sets!(currency_rate_sets, series_source, rate_data
             series_source.f_denom
         )
         
-        push!(currency_rate_sets[("spot", level)], _termcheck(spot_series, term))
+        try
+            push!(currency_rate_sets[("spot", level)], _termcheck(spot_series, term))
+        catch e
+            println("Error in spot series for $spot_rate_code")
+            println(spot_series)
+            throw(e)
+        end
         push!(
             currency_rate_sets[("forward", level)], _termcheck(forward_series, term)
         )

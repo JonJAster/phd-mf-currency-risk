@@ -19,6 +19,42 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    old_fx_raw_fn = joinpath(DIRS.test, "old-comparison-data/spot_mid.csv")
+    old_fx = CSV.read(old_fx_raw_fn, DataFrame, missingstring="NA", dateformat=DateFormat("dd/mm/yyyy"))
+
+    new_fx_raw_fn = joinpath(DIRS.fx.raw, "spot_mid.csv")
+    new_fx = CSV.read(new_fx_raw_fn, DataFrame, missingstring="", dateformat=DateFormat("dd/mm/yyyy"))
+
+    old_fx
+    new_fx
+
+    dropmissing(old_fx, :BBAUDSP)
+    dropmissing(new_fx, :BBAUDSP)
+
+
+
+
+    old_fx = loadarrow(joinpath(DIRS.test, "old-comparison-data/currency_factors.arrow"))
+    new_fx = loadarrow(joinpath(DIRS.fx.factors, "currency_factors.arrow"))
+
+    old_end_date = maximum(old_fx.date)
+    new_end_date = maximum(new_fx.date)
+
+    old_start_date = minimum(old_fx.date)
+    new_start_date = minimum(new_fx.date)
+
+    old_cut = old_fx[old_fx.date .>= new_start_date, :]
+    new_cut = new_fx[new_fx.date .<= old_end_date, :]
+
+    describe(old_cut)
+    describe(new_cut)
+
+    for i in unique(old_fx.factor)
+        println(i)
+        println(cor(old_cut[old_cut.factor .== i, :ret], new_cut[new_cut.factor .== i, :ret]))
+    end
+
+
     raw_costs = init_raw(joinpath(DIRS.mf.raw, "costs.csv"))
     raw_gross = init_raw(joinpath(DIRS.mf.raw, "gross_returns.csv"))
     raw_net = init_raw(joinpath(DIRS.mf.raw, "net_returns.csv"))
