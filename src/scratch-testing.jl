@@ -10,7 +10,6 @@ using StatsBase
 using Base.Threads
 using LinearAlgebra
 using Plots
-using PlotlyJS
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
@@ -23,7 +22,41 @@ function test()
     raw_costs = init_raw(joinpath(DIRS.mf.raw, "costs.csv"))
     raw_gross = init_raw(joinpath(DIRS.mf.raw, "gross_returns.csv"))
     raw_net = init_raw(joinpath(DIRS.mf.raw, "net_returns.csv"))
+
+    raw_data = reduce(
+        (x, y) -> innerjoin(x, y, on = [:fundid, :secid, :date]),
+        [
+            stack(
+                t[1], Not([:name, :fundid, :secid]), [:fundid, :secid];
+                variable_name=:date, value_name=t[2]
+            )
+            for t in [
+                (raw_costs, :costs),
+                (raw_gross, :gross_ret),
+                (raw_net, :net_ret)
+            ]
+        ]
+    )
     
+    dropmissing!(raw_data)
+
+    raw_data.re_costs = round.(100*(1 .- (1 .+ raw_data.net_ret/100) ./ (1 .+ raw_data.gross_ret/100)), digits=5)
+
+    raw_data.cost_deviation = round.(raw_data.costs, digits=3) .- round.(raw_data.re_costs, digits=3)
+
+    Plots.histogram(raw_data.cost_deviation, bins=100, title="Cost Deviation Histogram", xlabel="Cost Deviation", ylabel="Frequency")
+
+    countmap(raw_data.cost_deviation)
+    max = maximum(raw_data.cost_deviation)
+
+    raw_data[raw_data.cost_deviation .== max, :]
+    sort(countmap(raw_data.cost_deviation) |> collect, by = x -> x[2], rev = true)
+
+    
+
+
+
+
     mf_data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
 
     mf_data[!, [:ex_ret, :costs]] = 100 .* ((1 .+ mf_data[!, [:ex_ret, :costs]]) .^ 12 .- 1)
