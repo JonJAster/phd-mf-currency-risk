@@ -19,21 +19,6 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-    old_fx_raw_fn = joinpath(DIRS.test, "old-comparison-data/spot_mid.csv")
-    old_fx = CSV.read(old_fx_raw_fn, DataFrame, missingstring="NA", dateformat=DateFormat("dd/mm/yyyy"))
-
-    new_fx_raw_fn = joinpath(DIRS.fx.raw, "spot_mid.csv")
-    new_fx = CSV.read(new_fx_raw_fn, DataFrame, missingstring="", dateformat=DateFormat("dd/mm/yyyy"))
-
-    old_fx
-    new_fx
-
-    dropmissing(old_fx, :BBAUDSP)
-    dropmissing(new_fx, :BBAUDSP)
-
-
-
-
     old_fx = loadarrow(joinpath(DIRS.test, "old-comparison-data/currency_factors.arrow"))
     new_fx = loadarrow(joinpath(DIRS.fx.factors, "currency_factors.arrow"))
 
@@ -43,15 +28,17 @@ function test()
     old_start_date = minimum(old_fx.date)
     new_start_date = minimum(new_fx.date)
 
-    old_cut = old_fx[old_fx.date .>= new_start_date, :]
     new_cut = new_fx[new_fx.date .<= old_end_date, :]
 
-    describe(old_cut)
+    describe(old_fx)
     describe(new_cut)
+
+
+    isequal(old_fx, new_cut)
 
     for i in unique(old_fx.factor)
         println(i)
-        println(cor(old_cut[old_cut.factor .== i, :ret], new_cut[new_cut.factor .== i, :ret]))
+        println(cor(old_fx[old_fx.factor .== i, :ret], new_cut[new_cut.factor .== i, :ret]))
     end
 
 
