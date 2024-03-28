@@ -263,15 +263,6 @@ function drop_allmissing!(df, cols; dims=1)
         dims = dimsmap[dims]
     end
 
-    testdf = DataFrame(
-        name = ["A", "B", "C", "D", "E"],
-        fundid = [1, 2, 3, 4, 5],
-        secid = [1, 2, 3, 4, 5],
-        date = ["2020-01", "2020-02", "2020-03", "2020-04", "2020-05"],
-        value = [missing, missing, missing, missing, missing]
-    )
-    df = copy(testdf)
-    cols = names(df)
     mask_matrix = .!(Matrix(df[!, cols]) .|> ismissing)
     if dims == 1
         one_vector = ones(size(mask_matrix,2))
