@@ -48,6 +48,8 @@ function test()
     ###
 
     data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+
+    data[data.fundid .== "FS00009GK0" .&& data.date .== Date(2019,1,1), :]
     count_obs(data, :gross_returns)
 
     data_fundid = combine(
