@@ -223,7 +223,6 @@ function init_raw(filepath; info=false)
         data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
         _normalise_names!(data)
         drop_allmissing!(data, dims=:cols)
-        drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
     end
     return data
 end
