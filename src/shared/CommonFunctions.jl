@@ -10,8 +10,9 @@ using ShiftedArrays: lead, lag
 include("CommonConstants.jl")
 using .CommonConstants
 
-export count_secid_obs
-export count_fundid_obs
+export att
+export drange
+export countobs
 export dirslist
 export makepath
 export qhead
@@ -39,70 +40,78 @@ const PARAMETER_REGRESSION_ARGS = [
 ]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
-function count_secid_obs(df, count_col; compare=nothing)
-    valid_secids = combine(
-        groupby(df, :secid),
-        count_col => (x->any(!ismissing, x)) => :any_valid
-    )
-    valid_secids = valid_secids[valid_secids.any_valid, :secid] |> Set
-    valid_secid_data = df[df.secid .∈ Ref(valid_secids), :]
-
-    df_fundid = combine(
-        groupby(df, [:fundid, :date]),
-        count_col => (x->all(!ismissing, x)) => :all_valid_on_date
-    )
-
-    valid_fundids = combine(
-        groupby(df_fundid, :fundid),
-        :all_valid_on_date => any => :any_valid
-    )
-
-    valid_fundids = valid_fundids[valid_fundids.any_valid, :fundid] |> Set
-    valid_fundid_mask = df_fundid[df_fundid.fundid .∈ Ref(valid_fundids), :]
-
-    output = (
-        unique_secids = length(valid_secids),
-        unique_fundids = length(valid_fundids),
-        class_month_obs = count(!ismissing, valid_secid_data[!, count_col]),
-        fund_month_obs = count(x->x, valid_fundid_mask[!, :all_valid_on_date])
-    )
-
-    if !isnothing(compare)
-        comparison = count_secid_obs(compare, count_col)
-        attrition_rates = (
-            secid_attrition = round(100*(1 - output.unique_secids / comparison.unique_secids),digits=3),
-            fundid_attrition = round(100*(1 - output.unique_fundids / comparison.unique_fundids),digits=3),
-            class_month_attrition = round(100*(1 - output.class_month_obs / comparison.class_month_obs),digits=3),
-            fund_month_attrition = round(100*(1 - output.fund_month_obs / comparison.fund_month_obs),digits=3)
-        )
-        output = merge(output, attrition_rates)
-    end
-
-    return output
+function att(new, old)
+    return "$(round(100*(new - old) / old, digits=3))%"
 end
 
-function count_fundid_obs(df, count_col; compare=nothing)
-    valid_fundids = combine(
-        groupby(df, :fundid),
-        count_col => (x->any(!ismissing, x)) => :any_valid
-    )
-    valid_fundids = valid_fundids[valid_fundids.any_valid, :fundid] |> Set
-    valid_fundid_data = df[df.fundid .∈ Ref(valid_fundids), :]
+function drange(data)
+    date_format = DateFormat("u yyyy")
+    mindate = Dates.format(DateTime(minimum(data.date)), date_format)
+    maxdate = Dates.format(DateTime(maximum(data.date)), date_format)
+    return "$mindate to $maxdate"
+end
 
-    output = (
-        unique_fundids = length(valid_fundids),
-        fund_month_obs = count(!ismissing, valid_fundid_data[!, count_col])
-    )
-
-    if !isnothing(compare)
-        comparison = count_fundid_obs(compare, count_col)
-        attrition_rates = (
-            fundid_attrition = round(100*(1 - output.unique_fundids / comparison.unique_fundids),digits=3),
-            fund_month_attrition = round(100*(1 - output.fund_month_obs / comparison.fund_month_obs),digits=3)
+function countobs(df, count_col; compare=nothing)
+    if :secid in propertynames(df)
+        valid_secids = combine(
+            groupby(df, :secid),
+            count_col => (x->any(!ismissing, x)) => :any_valid
         )
-        output = merge(output, attrition_rates)
-    end
+        valid_secids = valid_secids[valid_secids.any_valid, :secid] |> Set
+        valid_secid_data = df[df.secid .∈ Ref(valid_secids), :]
 
+        df_fundid = combine(
+            groupby(df, [:fundid, :date]),
+            count_col => (x->all(!ismissing, x)) => :all_valid_on_date
+        )
+
+        valid_fundids = combine(
+            groupby(df_fundid, :fundid),
+            :all_valid_on_date => any => :any_valid
+        )
+
+        valid_fundids = valid_fundids[valid_fundids.any_valid, :fundid] |> Set
+        valid_fundid_mask = df_fundid[df_fundid.fundid .∈ Ref(valid_fundids), :]
+
+        output = (
+            unique_secids = length(valid_secids),
+            unique_fundids = length(valid_fundids),
+            class_month_obs = count(!ismissing, valid_secid_data[!, count_col]),
+            fund_month_obs = count(x->x, valid_fundid_mask[!, :all_valid_on_date])
+        )
+
+        if !isnothing(compare)
+            comparison = count_secid_obs(compare, count_col)
+            attrition_rates = (
+                secid_attrition = att(output.unique_secids, comparison.unique_secids),
+                fundid_attrition = att(output.unique_fundids, comparison.unique_fundids),
+                class_month_attrition = att(output.class_month_obs, comparison.class_month_obs),
+                fund_month_attrition = att(output.fund_month_obs, comparison.fund_month_obs)
+            )
+            output = merge(output, attrition_rates)
+        end
+    else
+        valid_fundids = combine(
+            groupby(df, :fundid),
+            count_col => (x->any(!ismissing, x)) => :any_valid
+        )
+        valid_fundids = valid_fundids[valid_fundids.any_valid, :fundid] |> Set
+        valid_fundid_data = df[df.fundid .∈ Ref(valid_fundids), :]
+    
+        output = (
+            unique_fundids = length(valid_fundids),
+            fund_month_obs = count(!ismissing, valid_fundid_data[!, count_col])
+        )
+    
+        if !isnothing(compare)
+            comparison = count_fundid_obs(compare, count_col)
+            attrition_rates = (
+                fundid_attrition = att(output.unique_fundids, comparison.unique_fundids),
+                fund_month_attrition = att(output.fund_month_obs, comparison.fund_month_obs)
+            )
+            output = merge(output, attrition_rates)
+        end
+    end
     return output
 end
 
@@ -193,6 +202,7 @@ function initialise_base_data(model)
     factors_data = loadarrow(factors_filename)
 
     regression_factors = _prepare_factors(factors_data, model)
+    
     output = innerjoin(mf_data, regression_factors, on=:date)
 
     return output
