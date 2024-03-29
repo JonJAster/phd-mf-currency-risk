@@ -10,7 +10,7 @@ using ShiftedArrays: lead, lag
 include("CommonConstants.jl")
 using .CommonConstants
 
-export count_obs
+export count_secid_bs
 export dirslist
 export makepath
 export qhead
@@ -38,37 +38,35 @@ const PARAMETER_REGRESSION_ARGS = [
 ]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
-function count_obs(df, count_col; filter_down=false)
-    if :secid in propertynames(df)
-        valid_secids = combine(
-            groupby(df, :secid),
-            count_col => (x->any(!ismissing, x)) => :any_valid
-        )
-        valid_secids = valid_secids[valid_secids.any_valid, :secid] |> Set
-        valid_secid_data = df[df.secid .∈ Ref(valid_secids), :]
+function count_secid_obs(df, count_col)
+    valid_secids = combine(
+        groupby(df, :secid),
+        count_col => (x->any(!ismissing, x)) => :any_valid
+    )
+    valid_secids = valid_secids[valid_secids.any_valid, :secid] |> Set
+    valid_secid_data = df[df.secid .∈ Ref(valid_secids), :]
 
-        df_fundid = combine(
-            groupby(df, [:fundid, :date]),
-            count_col => (x->all(!ismissing, x)) => :all_valid_on_date
-        )
+    df_fundid = combine(
+        groupby(df, [:fundid, :date]),
+        count_col => (x->all(!ismissing, x)) => :all_valid_on_date
+    )
 
-        valid_fundids = combine(
-            groupby(df_fundid, :fundid),
-            :all_valid_on_date => any => :any_valid
-        )
+    valid_fundids = combine(
+        groupby(df_fundid, :fundid),
+        :all_valid_on_date => any => :any_valid
+    )
 
-        valid_fundids = valid_fundids[valid_fundids.any_valid, :fundid] |> Set
-        valid_fundid_mask = df_fundid[df_fundid.fundid .∈ Ref(valid_fundids), :]
+    valid_fundids = valid_fundids[valid_fundids.any_valid, :fundid] |> Set
+    valid_fundid_mask = df_fundid[df_fundid.fundid .∈ Ref(valid_fundids), :]
 
-        output = (
-            unique_secids = length(valid_secids),
-            unique_fundids = length(valid_fundids),
-            class_month_obs = count(!ismissing, valid_secid_data[!, count_col]),
-            fund_month_obs = count(x->x, valid_fundid_mask[!, :all_valid_on_date])
-        )
+    output = (
+        unique_secids = length(valid_secids),
+        unique_fundids = length(valid_fundids),
+        class_month_obs = count(!ismissing, valid_secid_data[!, count_col]),
+        fund_month_obs = count(x->x, valid_fundid_mask[!, :all_valid_on_date])
+    )
 
-        return output
-    end
+    return output
 end
 
 
