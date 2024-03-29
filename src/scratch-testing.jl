@@ -28,11 +28,6 @@ function test()
 
     data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
 
-        data_fundids = union(data_fundids, file_fundids)
-        data_secids = union(data_secids, file_secids)
-    end
-
-    gret_data = CSV.read(joinpath(DIRS.mf.raw, "gross_returns.csv"), DataFrame)
-    println(count(!ismissing, gret_data[:, 4:end]|>Matrix))
-    21330*410
+    data_fundids = union(data_fundids, file_fundids)
+    data_secids = union(data_secids, file_secids)
 end
