@@ -21,49 +21,7 @@ function init_mf_data()
         mf_data_collection
     )
 
-    ###
-    x = mf_data_collection[2]
-    x[x.fundid .== "FSUSA003JQ" .&& x.date .== Date(2022,11,1), :]
-    gb = groupby(mf_data, [:fundid, :date])
-    fund_init_gret_mean = combine(
-        gb,
-        :gross_returns => mean => :non_missing_fund_gret
-    )
-
-    count(!ismissing, fund_init_gret_mean.non_missing_fund_gret)
-
-    raw_gret = CSV.read(joinpath(DIRS.mf.raw, "gross_returns.csv"), DataFrame)
-
-    gb = groupby(raw_gret, :FundId)
-    fund_raw_gret_mean = combine(
-        gb,
-        propertynames(raw_gret)[4:end] .=> mean
-    )
-
-    unique_raw = Set(round.(fund_raw_gret_mean[:, 2:end] |> Matrix,digits=4))
-
-    unique_init = Set(round.(fund_init_gret_mean.non_missing_fund_gret, digits=4))
-
-    setdiff(unique_raw, unique_init)
-
-    for i in unique_init
-        if !(i in unique_raw)
-            error(i)
-        end
-    end
-
-    9.4965 in unique_init
-
-    fund_init_gret_mean[coalesce.(round.(fund_init_gret_mean.non_missing_fund_gret,digits=4) .== 13.6586,false), :]
-
-    rename!(fund_raw_gret_mean, [:fundid, Symbol.([Date(1990,1,1) + Month(i) for i in 0:size(fund_raw_gret_mean, 2)-2])...])
-
-    fund_raw_gret_mean[fund_raw_gret_mean.fundid .== "FSUSA003JQ", Symbol(Date(2022,11,1))]
-
-    raw_gret[raw_gret.FundId .== "FSUSA003JQ", r"Name|FundId|SecId|.*2022-11.*"]
-    mf_data[mf_data.fundid .== "FSUSA003JQ" .&& mf_data.date .== Date(2022,11,1), :]
-
-    drop_allmissing!(mf_data, Not([:fundid, :secid, :date]); dims=:rows)
+    _drop_allmissing_funds!(mf_data)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
     return mf_data
@@ -73,7 +31,7 @@ function _read_mf_data()
     folder = DIRS.mf.raw
     files = readdir(folder, )
     data = DataFrame[]
-    for file in files # file = "gross_returns.csv"
+    for file in files
         file in SKIP_FILES && continue
 
         filepath = joinpath(folder, file)
@@ -90,6 +48,22 @@ function _read_mf_data()
         push!(data, data_part_melt)
     end
     return data
+end
+
+function _drop_allmissing_funds!(data)
+    fund_level_missing_mask = combine(
+        groupby(data, :fundid),
+        [
+            col => (x->all(ismissing, x)) => col*"_mask"
+            for col in names(data[:, Not(:fundid, :secid, :date)])
+        ]...
+    )
+
+    all_missing_funds = fund_level_missing_mask[
+        all.(eachrow(fund_level_missing_mask[:, Not(:fundid)])), :fundid
+    ]
+
+    delete!(data, findall(in(all_missing_funds), data.fundid))
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
