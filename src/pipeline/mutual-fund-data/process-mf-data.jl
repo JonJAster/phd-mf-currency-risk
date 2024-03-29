@@ -36,13 +36,6 @@ function process_mf_data()
 
     full_data = innerjoin(aggregate_data, riskfree, on=:date)
 
-    ###
-    count_fundid_obs(full_data, :gross_returns; compare=aggregate_data)
-    test_merge = outerjoin(aggregate_data, riskfree, on=:date)
-
-    test_merge[ismissing.(test_merge.rf),:]
-    ###
-
     full_data[!, [:gross_returns, :costs]] .= (
         full_data[!, [:gross_returns, :costs]] ./ 100
     )
@@ -55,8 +48,6 @@ function process_mf_data()
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
 end
-
-round(100*(1-255997/373330),digits=3)
 
 function _filter_out_passive(data, info)
     passive_keywords = [
@@ -87,7 +78,7 @@ function _filter_out_passive(data, info)
     return active_data
 end
 
-function _aggregate_to_fundid(data) # data = active_data
+function _aggregate_to_fundid(data)
     total_assets = combine(
         groupby(data, [:fundid, :date]),
         :net_assets => sum => :total_net_assets
@@ -179,7 +170,7 @@ function _clip_fund_flows!(data)
     return
 end
 
-function _filter_out_low_obs_funds!(data) # data = copy(aggregate_data)
+function _filter_out_low_obs_funds!(data)
     fund_obs = combine(
         groupby(data, :fundid),
         :date => length => :nobs
