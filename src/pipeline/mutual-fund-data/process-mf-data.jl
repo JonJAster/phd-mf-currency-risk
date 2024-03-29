@@ -29,13 +29,19 @@ function process_mf_data()
     _null_out_small!(aggregate_data)
     _trim_missing_tails!(aggregate_data)
     _calculate_fund_flows!(aggregate_data)
-    _windsorise_fund_flows!(aggregate_data)
+    _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    #_categorise_by_investment!(aggregate_data, info)
     
     riskfree = _calculate_riskfree(market_returns)
 
     full_data = innerjoin(aggregate_data, riskfree, on=:date)
+
+    ###
+    count_fundid_obs(full_data, :gross_returns; compare=aggregate_data)
+    test_merge = outerjoin(aggregate_data, riskfree, on=:date)
+
+    test_merge[ismissing.(test_merge.rf),:]
+    ###
 
     full_data[!, [:gross_returns, :costs]] .= (
         full_data[!, [:gross_returns, :costs]] ./ 100
@@ -49,6 +55,8 @@ function process_mf_data()
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
 end
+
+round(100*(1-255997/373330),digits=3)
 
 function _filter_out_passive(data, info)
     passive_keywords = [
@@ -79,7 +87,7 @@ function _filter_out_passive(data, info)
     return active_data
 end
 
-function _aggregate_to_fundid(data)
+function _aggregate_to_fundid(data) # data = active_data
     total_assets = combine(
         groupby(data, [:fundid, :date]),
         :net_assets => sum => :total_net_assets
@@ -159,16 +167,19 @@ function _calculate_fund_flows!(data)
     return
 end
 
-function _windsorise_fund_flows!(data)
-    flow_lowerbound = quantile(skipmissing(data.flow), 0.01)
-    flow_upperbound = quantile(skipmissing(data.flow), 0.99)
+function _clip_fund_flows!(data)
+    flow_lowerbound = -0.9
+    flow_upperbound = 10
 
-    data[coalesce.(data.flow .< flow_lowerbound, false), :flow] .= flow_lowerbound
-    data[coalesce.(data.flow .> flow_upperbound, false), :flow] .= flow_upperbound
+    data[
+        coalesce.(data.flow .<= flow_lowerbound,false) .||
+        coalesce.(data.flow .>= flow_upperbound,false),
+        [:net_assets, :net_returns, :gross_returns, :costs, :net_assets_m1, :flow]
+    ] .= missing
     return
 end
 
-function _filter_out_low_obs_funds!(data)
+function _filter_out_low_obs_funds!(data) # data = copy(aggregate_data)
     fund_obs = combine(
         groupby(data, :fundid),
         :date => length => :nobs
