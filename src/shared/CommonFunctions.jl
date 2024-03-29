@@ -10,7 +10,7 @@ using ShiftedArrays: lead, lag
 include("CommonConstants.jl")
 using .CommonConstants
 
-export count_secid_bs
+export count_secid_obs
 export dirslist
 export makepath
 export qhead
