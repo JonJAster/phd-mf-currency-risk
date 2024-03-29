@@ -19,11 +19,41 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-    raw_factor_data_fn = joinpath(DIRS.eq.raw, "region-lms.csv")
-    raw_factor_data = CSV.read(raw_factor_data_fn, DataFrame, dateformat="yyyy-mm-dd")
-    maximum(raw_factor_data.date)
+    refined_mf = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
 
-    raw_mkt_data_fn = joinpath(DIRS.eq.raw, "country-mkt.csv")
-    raw_mkt_data = CSV.read(raw_mkt_data_fn, DataFrame, dateformat="yyyy-mm-dd")
-    usa_mkt = raw_mkt_data[raw_mkt_data.excntry .== "USA",:]
+    refined_mf = transform(
+        groupby(refined_mf, :fundid),
+        :ex_ret => (x->1:length(x)) => :cumcount
+    )
+
+    mature_mf_old = refined_mf[refined_mf.cumcount .>= 60,:]
+    mature_mf = refined_mf[refined_mf.cumcount .> 60,:]
+
+    drange(mature_mf_old)
+    drange(mature_mf)
+
+    countobs(mature_mf_old, :ex_ret)
+    countobs(mature_mf, :ex_ret)
+    drange(mature_mf)
+    ###
+
+    ret_betas = loadarrow(joinpath(DIRS.combo.return_betas, "dev_ff3_ver.arrow"))
+    ret_betas_wide = unstack(ret_betas, [:fundid, :date], :factor, :coef)
+
+    select!(ret_betas_wide, Not(:const))
+    dropmissing!(ret_betas_wide)
+
+    full_data = innerjoin(refined_mf, ret_betas_wide, on=[:fundid, :date])
+
+    test1 = mature_mf[mature_mf.fundid .== "FS00008KNP", :]
+    test2 = full_data[full_data.fundid .== "FS00008KNP", :]
+
+    drange(test1)
+    drange(test2)
+
+    x = countobs(full_data, :ex_ret)
+    drange(full_data)
+    att(x[1], 2019)
+    att(x[2], 255997)
+
 end
