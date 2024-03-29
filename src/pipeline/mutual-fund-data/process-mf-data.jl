@@ -29,9 +29,8 @@ function process_mf_data()
     _null_out_small!(aggregate_data)
     _trim_missing_tails!(aggregate_data)
     _calculate_fund_flows!(aggregate_data)
-    _windsorise_fund_flows!(aggregate_data)
+    _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    #_categorise_by_investment!(aggregate_data, info)
     
     riskfree = _calculate_riskfree(market_returns)
 
@@ -159,12 +158,15 @@ function _calculate_fund_flows!(data)
     return
 end
 
-function _windsorise_fund_flows!(data)
-    flow_lowerbound = quantile(skipmissing(data.flow), 0.01)
-    flow_upperbound = quantile(skipmissing(data.flow), 0.99)
+function _clip_fund_flows!(data)
+    flow_lowerbound = -0.9
+    flow_upperbound = 10
 
-    data[coalesce.(data.flow .< flow_lowerbound, false), :flow] .= flow_lowerbound
-    data[coalesce.(data.flow .> flow_upperbound, false), :flow] .= flow_upperbound
+    data[
+        coalesce.(data.flow .<= flow_lowerbound,false) .||
+        coalesce.(data.flow .>= flow_upperbound,false),
+        [:net_assets, :net_returns, :gross_returns, :costs, :net_assets_m1, :flow]
+    ] .= missing
     return
 end
 
