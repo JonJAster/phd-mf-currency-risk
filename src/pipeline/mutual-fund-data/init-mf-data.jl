@@ -20,7 +20,7 @@ function init_mf_data()
         mf_data_collection
     )
 
-    drop_allmissing!(mf_data, Not([:fundid, :secid, :date]); dims=:rows)
+    _drop_allmissing_funds!(mf_data, Not([:fundid, :secid, :date]); dims=:rows)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
     return mf_data
@@ -47,6 +47,22 @@ function _read_mf_data()
         push!(data, data_part_melt)
     end
     return data
+end
+
+function _drop_allmissing_funds!(data)
+    fund_level_missing_mask = combine(
+        groupby(data, :fundid),
+        [
+            col => (x->all(ismissing, x)) => col*"_mask"
+            for col in names(data[:, Not(:fundid, :secid, :date)])
+        ]...
+    )
+
+    all_missing_funds = fund_level_missing_mask[
+        all.(eachrow(fund_level_missing_mask[:, Not(:fundid)])), :fundid
+    ]
+
+    delete!(data, findall(in(all_missing_funds), data.fundid))
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
