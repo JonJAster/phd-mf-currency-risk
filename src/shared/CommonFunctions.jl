@@ -11,6 +11,7 @@ include("CommonConstants.jl")
 using .CommonConstants
 
 export count_secid_obs
+export count_fundid_obs
 export dirslist
 export makepath
 export qhead
@@ -38,7 +39,7 @@ const PARAMETER_REGRESSION_ARGS = [
 ]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
-function count_secid_obs(df, count_col)
+function count_secid_obs(df, count_col; compare=nothing)
     valid_secids = combine(
         groupby(df, :secid),
         count_col => (x->any(!ismissing, x)) => :any_valid
@@ -66,10 +67,44 @@ function count_secid_obs(df, count_col)
         fund_month_obs = count(x->x, valid_fundid_mask[!, :all_valid_on_date])
     )
 
+    if !isnothing(compare)
+        comparison = count_secid_obs(compare, count_col)
+        attrition_rates = (
+            secid_attrition = round(100*(1 - output.unique_secids / comparison.unique_secids),digits=3),
+            fundid_attrition = round(100*(1 - output.unique_fundids / comparison.unique_fundids),digits=3),
+            class_month_attrition = round(100*(1 - output.class_month_obs / comparison.class_month_obs),digits=3),
+            fund_month_attrition = round(100*(1 - output.fund_month_obs / comparison.fund_month_obs),digits=3)
+        )
+        output = merge(output, attrition_rates)
+    end
+
     return output
 end
 
+function count_fundid_obs(df, count_col; compare=nothing)
+    valid_fundids = combine(
+        groupby(df, :fundid),
+        count_col => (x->any(!ismissing, x)) => :any_valid
+    )
+    valid_fundids = valid_fundids[valid_fundids.any_valid, :fundid] |> Set
+    valid_fundid_data = df[df.fundid .∈ Ref(valid_fundids), :]
 
+    output = (
+        unique_fundids = length(valid_fundids),
+        fund_month_obs = count(!ismissing, valid_fundid_data[!, count_col])
+    )
+
+    if !isnothing(compare)
+        comparison = count_fundid_obs(compare, count_col)
+        attrition_rates = (
+            fundid_attrition = round(100*(1 - output.unique_fundids / comparison.unique_fundids),digits=3),
+            fund_month_attrition = round(100*(1 - output.fund_month_obs / comparison.fund_month_obs),digits=3)
+        )
+        output = merge(output, attrition_rates)
+    end
+
+    return output
+end
 
 function dirslist()
     println("-- DIRS LIST --")
