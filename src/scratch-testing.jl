@@ -19,153 +19,27 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-    old_fx = loadarrow(joinpath(DIRS.test, "old-comparison-data/currency_factors.arrow"))
-    new_fx = loadarrow(joinpath(DIRS.fx.factors, "currency_factors.arrow"))
+    info = CSV.read(joinpath(DIRS.mf.raw, "info.csv"), DataFrame)
 
-    old_end_date = maximum(old_fx.date)
-    new_end_date = maximum(new_fx.date)
+    info_fundids = info.FundId |> Set
+    info_secids = info.SecId |> Set
 
-    old_start_date = minimum(old_fx.date)
-    new_start_date = minimum(new_fx.date)
+    raw_gret = CSV.read(joinpath(DIRS.mf.raw, "gross_returns.csv"), DataFrame)
 
-    new_cut = new_fx[new_fx.date .<= old_end_date, :]
-
-    describe(old_fx)
-    describe(new_cut)
-
-
-    isequal(old_fx, new_cut)
-
-    for i in unique(old_fx.factor)
-        println(i)
-        println(cor(old_fx[old_fx.factor .== i, :ret], new_cut[new_cut.factor .== i, :ret]))
-    end
-
-
-    raw_costs = init_raw(joinpath(DIRS.mf.raw, "costs.csv"))
-    raw_gross = init_raw(joinpath(DIRS.mf.raw, "gross_returns.csv"))
-    raw_net = init_raw(joinpath(DIRS.mf.raw, "net_returns.csv"))
-
-    raw_data = reduce(
-        (x, y) -> innerjoin(x, y, on = [:fundid, :secid, :date]),
-        [
-            stack(
-                t[1], Not([:name, :fundid, :secid]), [:fundid, :secid];
-                variable_name=:date, value_name=t[2]
-            )
-            for t in [
-                (raw_costs, :costs),
-                (raw_gross, :gross_ret),
-                (raw_net, :net_ret)
-            ]
-        ]
+    gb = groupby(raw_gret, :FundId)
+    fund_raw_gret = combine(
+        gb,
+        propertynames(raw_gret)[4:end] .=> (x->all(!ismissing, x)) 
     )
+
+    count(x->x, fund_raw_gret[:, 2:end] |> Matrix)
+
+    data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+
+    1-length(unique(data.fundid))/5145
+    1-length(unique(data.secid))/21333
     
-    dropmissing!(raw_data)
-
-    raw_data.re_costs = round.(100*(1 .- (1 .+ raw_data.net_ret/100) ./ (1 .+ raw_data.gross_ret/100)), digits=5)
-
-    raw_data.cost_deviation = round.(raw_data.costs, digits=3) .- round.(raw_data.re_costs, digits=3)
-
-    Plots.histogram(raw_data.cost_deviation, bins=100, title="Cost Deviation Histogram", xlabel="Cost Deviation", ylabel="Frequency")
-
-    countmap(raw_data.cost_deviation)
-    max = maximum(raw_data.cost_deviation)
-
-    raw_data[raw_data.cost_deviation .== max, :]
-    sort(countmap(raw_data.cost_deviation) |> collect, by = x -> x[2], rev = true)
-
-    
-
-
-
-
-    mf_data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
-
-    mf_data[!, [:ex_ret, :costs]] = 100 .* ((1 .+ mf_data[!, [:ex_ret, :costs]]) .^ 12 .- 1)
-
-    mf_data = dropmissing(mf_data, :net_assets_m1)
-
-    size_deciles = quantile(skipmissing(mf_data.net_assets_m1), 0.1:0.1:1)
-
-    mf_data.size_decile = [findfirst(x -> x >= y, size_deciles) for y in mf_data.net_assets_m1]
-
-    mf_data.ex_ret_net = mf_data.ex_ret .- mf_data.costs
-
-    fund_averages = combine(
-        groupby(mf_data, :size_decile),
-        :costs => (x->mean(skipmissing(x))) => :average_costs,
-        :ex_ret => (x->mean(skipmissing(x))) => :average_ex_ret,
-        :ex_ret_net => (x->mean(skipmissing(x))) => :average_ex_ret_net
-    )
-
-    # Bar plot of side-by-side all averages with x labels on all individual bars and x and y axes titles
-    PlotlyJS.plot(
-        [
-            PlotlyJS.bar(fund_averages, x=:size_decile, y=y, name=String(y))
-            for y in [:average_ex_ret, :average_ex_ret_net, :average_costs]
-        ]
-    )
-
-    loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
-    info = loadarrow(joinpath(DIRS.mf.refined, "mf-info.arrow"))
-    
-    domestic_condition(x) = (
-        (.!ismissing.(x.us_category_group) .&& (x.us_category_group .== "US Equity")) .||
-        (.!ismissing.(x.investment_area) .&& (x.investment_area .== "United States of America"))
-    )
-    
-    international_condition(x) = (
-        (.!ismissing.(x.us_category_group) .&& (x.us_category_group .== "International Equity")) .||
-        (.!ismissing.(x.investment_area) .&& (x.investment_area .!= "United States of America"))
-    )
-
-    emerging_condition(x) = (
-        x.morningstar_category .== "US Fund Diversified Emerging Mkts" .||
-        (.!ismissing.(x.investment_area) .&& (x.investment_area .== "Global Emerging Mkts"))
-    )
-
-    domestic_funds = info[domestic_condition(info),:]
-    international_funds = info[international_condition(info),:]
-    emerging_funds = info[emerging_condition(info),:]
-    international_ex_emerging_funds = info[international_condition(info) .&& .!emerging_condition(info),:]
-    
-
-    domestic_funds
-
-    [println(x) for x in (countmap(info.us_category_group) |> collect)]
-    countmap(info[coalesce.(info.us_category_group .== "Sector Equity",false),:].investment_area)
-    x = info[info.morningstar_category .== "US Fund Diversified Emerging Mkts",:]
-
-    (info[coalesce.(info.investment_area .== "Global Emerging Mkts",false) .&& coalesce.(info.morningstar_category .!= "US Fund Diversified Emerging Mkts"),:])
-    countmap(x.investment_area)
-    info[coalesce.(info.us_category_group .== "International Equity",true),:]
-    println(info[ismissing.(info.us_category_group),:])
-    describe(info[coalesce.(in.(info.global_category, Ref(["Global Emerging Markets Equity", "Europe Emerging Markets Equity"])),false),:])
-
-    println(sort(countmap(info.global_category) |> collect, by = x -> x[2], rev = true))
-
-    old_betas_fn = joinpath(DIRS.test, "old-comparison-data/old-format/old_world_ff3_verdelhan_betas.arrow")
-
-    betas = loadarrow(betas_fn)
-    old_betas = loadarrow(old_betas_fn)
-
-    describe(betas)
-    describe(old_betas)
-
-    idfilter = betas[!, [:fundid, :date, :factor]]
-    old_betas.date = firstdayofmonth.(old_betas.date)
-
-    filtered_betas = innerjoin(idfilter, old_betas, on = [:fundid, :date, :factor])
-    rename!(betas, :coef => :new_coef)
-
-    combo_data = innerjoin(filtered_betas, betas[!, [:fundid, :date, :new_coef, :factor]], on = [:fundid, :date, :factor])
-
-    missing_data = combo_data[ismissing.(combo_data.new_coef), :]
-
-    combo_data[combo_data.fundid .== "FS00008L0W", :]
-
-
-
-    describe(betas)
+    gret_data = CSV.read(joinpath(DIRS.mf.raw, "gross_returns.csv"), DataFrame)
+    println(count(!ismissing, gret_data[:, 4:end]|>Matrix))
+    21330*410
 end
