@@ -71,7 +71,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = refine_raw_lms_data()
-    output_filestring = makepath(DIRS.eq.factors, "lms.arrow")
+    output_filestring = makepath(DIRS.eq.factors, "jkp-lms.arrow")
     
     task_start = time()
     Arrow.write(output_filestring, output_data)

@@ -84,7 +84,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = compute_market_factors()
-    output_filestring = makepath(DIRS.eq.factors, "mkt.arrow")
+    output_filestring = makepath(DIRS.eq.factors, "jkp-mkt.arrow")
 
     task_start = time()
     Arrow.write(output_filestring, output_data)
