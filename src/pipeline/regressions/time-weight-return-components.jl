@@ -9,11 +9,12 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
-function time_weight_return_components(model_name)
+function time_weight_return_components(model_name) # model_name = "dev_ff3_ver"
     task_start = time()
     model_returns_filename = joinpath(DIRS.combo.decomposed, "$model_name.arrow")
 
     model_returns = loadarrow(model_returns_filename)
+    
     select!(model_returns, Not(:ex_ret))
 
     weighted_returns = _timeweight_returns(model_returns)
@@ -25,11 +26,13 @@ end
 function _timeweight_returns(model_returns)
     nonfactor_cols = [:fundid, :date]
     factor_return_cols = setdiff(propertynames(model_returns), nonfactor_cols)
+    lag_weighted_cols = ["$(i)_m1" for i in factor_return_cols]
     n_obs = nrow(model_returns)
     n_factors = length(factor_return_cols)
     
     weighted_returns = copy(model_returns)
-    weighted_returns[!, factor_return_cols] = (
+    rename!(weighted_returns, factor_return_cols .=> lag_weighted_cols)
+    weighted_returns[!, lag_weighted_cols] = (
         Matrix{Union{Missing, Float64}}(missing, n_obs, n_factors)
     )
     
@@ -53,11 +56,11 @@ function _timeweight_returns(model_returns)
 
         for factor in factor_return_cols
             window_returns = model_returns[window_start:window_end, factor]
-            weighted_returns[i, factor] = _decay_weighted(window_returns)
+            weighted_returns[i, "$(factor)_m1"] = _decay_weighted(window_returns)
         end
     end
 
-    dropmissing!(weighted_returns, factor_return_cols)
+    dropmissing!(weighted_returns, lag_weighted_cols)
 
     return weighted_returns
 end
