@@ -31,19 +31,10 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    
-    riskfree = _calculate_riskfree(market_returns)
-
-    full_data = innerjoin(aggregate_data, riskfree, on=:date)
-
-    full_data[!, [:gross_returns, :costs]] .= (
-        full_data[!, [:gross_returns, :costs]] ./ 100
-    )
-    full_data.ex_ret = full_data.gross_returns - full_data.rf
 
     output = select(
         full_data, 
-        [:fundid, :date, :flow, :ex_ret, :costs, :net_assets_m1]
+        [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
     )
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
