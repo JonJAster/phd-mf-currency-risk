@@ -10,11 +10,11 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
-function refine_raw_lms_data()
+function refine_raw_jkp_lms_data()
     task_start = time()
 
-    usa_filename = joinpath(DIRS.eq.raw, "usa-lms.csv")
-    region_filename = joinpath(DIRS.eq.raw, "region-lms.csv")
+    usa_filename = joinpath(DIRS.eq.raw, "jkp-usa-lms.csv")
+    region_filename = joinpath(DIRS.eq.raw, "jkp-region-lms.csv")
 
     usa_data = CSV.read(usa_filename, DataFrame; dateformat="yyyy-mm-dd")
     region_data = CSV.read(region_filename, DataFrame; dateformat="yyyy-mm-dd")
