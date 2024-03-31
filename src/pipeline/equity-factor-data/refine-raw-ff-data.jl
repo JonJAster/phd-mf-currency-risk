@@ -27,7 +27,7 @@ function refine_raw_ff_data()
     return ff_data
 end
 
-function _read_ff_raw(filename; read_start, read_end) # filename = "ff-usa.csv"; read_start = 4; read_end = 731
+function _read_ff_raw(filename; read_start, read_end)
     filepath = joinpath(DIRS.eq.raw, filename)
 
     file_height = countlines(filepath)
@@ -47,33 +47,6 @@ function _read_ff_raw(filename; read_start, read_end) # filename = "ff-usa.csv";
     rename!(raw_data, new_names)
 
     raw_data[!, Not(:date)] ./= 100
-
-    ###
-    compare_rf = CSV.read(joinpath(DIRS.eq.raw, "jkp-country-mkt.csv"), DataFrame; dateformat="yyyy-mm-dd")
-    compare_rf.rf = round.(compare_rf.mkt_vw .- compare_rf.mkt_vw_exc, digits= 4)
-
-    dated_compare = compare_rf[firstdayofmonth.(compare_rf.eom) .∈ Ref(raw_data.date) .&& compare_rf.excntry .== "USA", :]
-    dated_raw = raw_data[raw_data.date .∈ Ref(firstdayofmonth.(compare_rf.eom)), :]
-
-    dated_compare.date = firstdayofmonth.(dated_compare.eom)
-
-    compare_rf = innerjoin(
-        dated_raw[!, [:date, :rf]], dated_compare[!, [:date, :rf]];
-        on=:date, renamecols="_raw"=>"_compare"
-    )
-
-    modern_compare_rf = compare_rf[compare_rf.date .> Date(1990, 1, 1), :]
-
-    cor(modern_compare_rf.rf_raw, modern_compare_rf.rf_compare)
-
-    plot(modern_compare_rf.rf_raw, modern_compare_rf.rf_compare, seriestype=:scatter, legend=false, title="Raw vs. Compare RF", xlabel="Raw RF", ylabel="Compare RF")
-
-    cor(dated_raw.rf, dated_compare.rf)
-    plot(dated_raw.rf, dated_compare.rf, seriestype=:scatter, legend=false, title="Raw vs. Compare RF", xlabel="Raw RF", ylabel="Compare RF")
-
-    plot(dated_raw.date, dated_raw.rf, seriestype=:line, title="Raw vs Compare", ylabel="Date", xlabel="RF", label="Raw")
-    plot!(firstdayofmonth.(dated_compare.eom), dated_compare.rf, seriestype=:line, label="Compare")
-    ###
 end
 
 function _normalise_names(names)
