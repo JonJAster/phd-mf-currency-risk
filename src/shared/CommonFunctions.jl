@@ -157,15 +157,13 @@ function initialise_flow_data(model_name)
         (month.(fund_full_data.date) .- month.(fund_full_data.inception_date)) .+ 1
     )
 
-    output_data = fund_full_data[fund_full_data.age .>= AGE_FILTER, :]
-
-    output_data.log_lag_size = log.(output_data.net_assets_m1)
-    output_data.log_age = log.(output_data.age)
+    fund_full_data.log_size_m1 = log.(fund_full_data.net_assets_m1)
+    fund_full_data.log_age = log.(fund_full_data.age)
     
-    sort!(output_data, [:fundid, :date])
-    select!(output_data, Not(["inception_date", "age", "net_assets_m1"]))
+    sort!(fund_full_data, [:fundid, :date])
+    select!(fund_full_data, Not(["inception_date", "age", "net_assets_m1"]))
 
-    return output_data
+    return fund_full_data
 end
 
 function _prepare_factors(factors_data, model)
