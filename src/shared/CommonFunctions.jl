@@ -217,11 +217,6 @@ function initialise_flow_data(model_name) # model_name = "dev_ff3_ver"
     fund_info = loadarrow(filename_info)
     decomposed_returns = loadarrow(filename_decomposition)
 
-    ###
-    decomposed_returns
-    countobs(decomposed_returns, :ret_alpha)
-    ###
-
     fund_base_data.std_return_12m = rolling_std(fund_base_data, :ex_ret, 12; lagged=true)
 
     select!(
@@ -232,10 +227,6 @@ function initialise_flow_data(model_name) # model_name = "dev_ff3_ver"
 
     fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
 
-    ###
-    countobs(fund_rets_data, :ex_ret)
-    ###
-
     fund_full_data = innerjoin(
         fund_rets_data, fund_info, on=:fundid, matchmissing=:notequal
     )
@@ -245,15 +236,13 @@ function initialise_flow_data(model_name) # model_name = "dev_ff3_ver"
         (month.(fund_full_data.date) .- month.(fund_full_data.inception_date)) .+ 1
     )
 
-    output_data = fund_full_data[fund_full_data.age .>= AGE_FILTER, :]
-
-    output_data.log_lag_size = log.(output_data.net_assets_m1)
-    output_data.log_age = log.(output_data.age)
+    fund_full_data.log_size_m1 = log.(fund_full_data.net_assets_m1)
+    fund_full_data.log_age = log.(fund_full_data.age)
     
-    sort!(output_data, [:fundid, :date])
-    select!(output_data, Not(["inception_date", "age", "net_assets_m1"]))
+    sort!(fund_full_data, [:fundid, :date])
+    select!(fund_full_data, Not(["inception_date", "age", "net_assets_m1"]))
 
-    return output_data
+    return fund_full_data
 end
 
 function _prepare_factors(factors_data, model)
