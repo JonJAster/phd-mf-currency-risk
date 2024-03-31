@@ -10,7 +10,7 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
-function compute_market_factors()
+function compute_jkp_market_factors()
     task_start = time()
 
     map_filename = joinpath(DIRS.map.refined, "msci-class.csv")
