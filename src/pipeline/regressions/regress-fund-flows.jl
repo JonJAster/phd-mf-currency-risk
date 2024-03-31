@@ -1,14 +1,14 @@
-module RegressFundFlows
+#module RegressFundFlows
 
-#using Revise
+using Revise
 using DataFrames
 using Arrow
 using Dates
 using GLM
 using Distributions
 
-include("../../shared/CommonConstants.jl")
-include("../../shared/CommonFunctions.jl")
+includet("../../shared/CommonConstants.jl")
+includet("../../shared/CommonFunctions.jl")
 
 using .CommonFunctions
 using .CommonConstants
@@ -21,7 +21,6 @@ function regress_fund_flows(model_name; filter_by=nothing) # model_name = "dev_f
 
     regression_packet = flow_regression_table(model_name; filter_by=filter_by)
 
-    countobs(regression_packet[1], :flow)
     regression_data = regression_packet.regression_data
     return_component_cols = regression_packet.return_component_cols
 
@@ -33,8 +32,6 @@ end
 
 function flow_regression_table(model_name; filter_by=nothing)
     flow_data = initialise_flow_data(model_name)
-
-    countobs(flow_data, :flow)
 
     if !isnothing(filter_by)
         flow_data = filter_fundids(filter_by, flow_data)
@@ -51,11 +48,11 @@ function flow_regression_table(model_name; filter_by=nothing)
         :costs, :lag, FLOW_CONTROL_LAGS,
         :true_no_load,
         :std_return_12m,
-        :log_lag_size,
+        :log_size_m1,
         :log_age, :lag,
         :tfe, :month
     )
-    
+
     dropmissing!(regression_data)
     _drop_zero_cols!(regression_data)
 
@@ -73,9 +70,13 @@ function _flow_regression(regression_data, return_component_cols)
 
     regfit = lm(reg_formula, regression_data)
     return_col_indices = findall(x->in(x,return_component_cols), Symbol.(coefnames(regfit)))
+
+    factor_names = [
+        match(r"(?<=ret_).+(?=_m1)", string(name)).match for name in return_component_cols
+    ]
     
     flow_betas = DataFrame(
-        factor = return_component_cols,
+        factor = factor_names,
         coef = coef(regfit)[return_col_indices],
         se = stderror(regfit)[return_col_indices]
     )
@@ -118,4 +119,4 @@ if abspath(PROGRAM_FILE) == @__FILE__
     printtime("regressing all flows", task_start; minutes=true)
 end
 
-end # module RegressFundFlows
+#end # module RegressFundFlows
