@@ -14,7 +14,7 @@ function compute_market_factors()
     task_start = time()
 
     map_filename = joinpath(DIRS.map.refined, "msci-class.csv")
-    data_filename = joinpath(DIRS.eq.raw, "country-mkt.csv")
+    data_filename = joinpath(DIRS.eq.raw, "jkp-country-mkt.csv")
 
     msci_class_map = CSV.read(map_filename, DataFrame; dateformat="d/mm/yyyy")
     mkt_data = CSV.read(
@@ -25,20 +25,20 @@ function compute_market_factors()
     _init_mkt_data!(mkt_data)
 
     mkt_usa = mkt_data[mkt_data.country_code .== "USA", :]
-    _init_region_info!(mkt_usa, "USA")
+    _init_source_info!(mkt_usa, "jkp_usa")
 
     mkt_wld = _weight_returns(mkt_data)
-    _init_region_info!(mkt_wld, "WLD")
+    _init_source_info!(mkt_wld, "jkp_wld")
 
     msci_classified_data = innerjoin(mkt_data, msci_class_map, on=[:country_code, :date])
     emg_data = msci_classified_data[msci_classified_data.msci_class .== "EMG", :]
     dev_data = msci_classified_data[msci_classified_data.msci_class .== "DEV", :]
 
     mkt_emg = _weight_returns(emg_data)
-    _init_region_info!(mkt_emg, "EMG")
+    _init_source_info!(mkt_emg, "jkp_emg")
 
     mkt_dev = _weight_returns(dev_data)
-    _init_region_info!(mkt_dev, "DEV")
+    _init_source_info!(mkt_dev, "jkp_dev")
 
     mkt_factors = reduce(vcat, [mkt_usa, mkt_wld, mkt_emg, mkt_dev])
 
@@ -58,9 +58,9 @@ function _init_mkt_data!(mkt_data)
     return mkt_data
 end
 
-function _init_region_info!(region_data, region)
-    region_data.region .= region
-    select!(region_data, [:region, :date, :mkt_exc])
+function _init_source_info!(region_data, source_id)
+    region_data.source_id .= source_id
+    select!(region_data, [:source_id, :date, :mkt_exc])
     sort!(region_data, :date)
     return region_data
 end
