@@ -16,11 +16,12 @@ using .CommonConstants
 export regress_fund_flows
 export flow_regression_table
 
-function regress_fund_flows(model_name; filter_by=nothing)
+function regress_fund_flows(model_name; filter_by=nothing) # model_name = "dev_ff3_ver"; filter_by = nothing
     task_start = time()
 
     regression_packet = flow_regression_table(model_name; filter_by=filter_by)
 
+    countobs(regression_packet[1], :flow)
     regression_data = regression_packet.regression_data
     return_component_cols = regression_packet.return_component_cols
 
@@ -32,6 +33,8 @@ end
 
 function flow_regression_table(model_name; filter_by=nothing)
     flow_data = initialise_flow_data(model_name)
+
+    countobs(flow_data, :flow)
 
     if !isnothing(filter_by)
         flow_data = filter_fundids(filter_by, flow_data)

@@ -20,8 +20,8 @@ function decompose_fund_returns(model_name)
     betas = _extract_betas(regression_outputs)
     full_data = innerjoin(main_data, betas, on=[:fundid, :date])
 
-    decomposed_returns = _decompose_returns(full_data, model)
-    
+    decomposed_returns = _decompose_returns(full_data, model)    
+
     printtime("decomposing fund returns for $model_name", task_start)
     return decomposed_returns
 end

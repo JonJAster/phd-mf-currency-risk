@@ -104,7 +104,7 @@ function countobs(df, count_col; compare=nothing)
         )
     
         if !isnothing(compare)
-            comparison = count_fundid_obs(compare, count_col)
+            comparison = countobs(compare, count_col)
             attrition_rates = (
                 fundid_attrition = att(output.unique_fundids, comparison.unique_fundids),
                 fund_month_attrition = att(output.fund_month_obs, comparison.fund_month_obs)
@@ -208,7 +208,7 @@ function initialise_base_data(model)
     return output
 end
 
-function initialise_flow_data(model_name)
+function initialise_flow_data(model_name) # model_name = "dev_ff3_ver"
     filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
     filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
@@ -217,15 +217,24 @@ function initialise_flow_data(model_name)
     fund_info = loadarrow(filename_info)
     decomposed_returns = loadarrow(filename_decomposition)
 
+    ###
+    decomposed_returns
+    countobs(decomposed_returns, :ret_alpha)
+    ###
+
     fund_base_data.std_return_12m = rolling_std(fund_base_data, :ex_ret, 12; lagged=true)
 
     select!(
         fund_base_data,
-        [:fundid, :date, :flow, :net_assets_m1, :costs, :std_return_12m]
+        [:fundid, :date, :flow, :ex_ret, :net_assets_m1, :costs, :std_return_12m]
     )
     select!(fund_info, [:fundid, :true_no_load, :inception_date])
 
     fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
+
+    ###
+    countobs(fund_rets_data, :ex_ret)
+    ###
 
     fund_full_data = innerjoin(
         fund_rets_data, fund_info, on=:fundid, matchmissing=:notequal
