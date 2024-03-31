@@ -26,6 +26,8 @@ function refine_raw_lms_data()
 
     lms_factors = _filter_to_desired_factors(lms_factors_full, EQUITY_LMS_FACTORS)
 
+    countmap(lms_factors.source_id)
+
     printtime("refining raw equity data", task_start, minutes=false)
     return lms_factors
 end
@@ -37,27 +39,31 @@ function _init_factor_data!(data)
         :name => :factor
     )
 
-    region_name_map = Dict(
-        "developed" => "DEV",
-        "emerging" => "EMG",
-        "usa" => "USA",
-        "world" => "WLD"
+    source_id_map = Dict(
+        "developed" => "jkp_dev",
+        "emerging" => "jkp_emg",
+        "usa" => "jkp_usa",
+        "world" => "jkp_wld"
     )
 
-    map_name(name) = get(region_name_map, name, "")
+    map_name(name) = get(source_id_map, name, "")
 
     data.date = firstdayofmonth.(data.date)
-    data.region = map_name.(data.region)
+    data.source_id = map_name.(data.region)
     
-    select!(data, [:region, :date, :factor, :ret])
+    sort!(data, [:source_id, :factor, :date])
+    select!(data, [:source_id, :factor, :date, :ret])
     return data
 end
 
 function _filter_to_desired_factors(lms_factors_full, factor_names_map)
     desired_lms_factors = keys(EQUITY_LMS_FACTORS) |> Set
-    lms_factors = (
-        lms_factors_full[in.(lms_factors_full.factor, Ref(desired_lms_factors)), :]
-    )
+    
+    factors_condition(df) = in.(df.factor, Ref(desired_lms_factors))
+    source_condition(df) = df.source_id .!= ""
+    filter_condition(df) = factors_condition(df) .&& source_condition(df)
+
+    lms_factors = lms_factors_full[filter_condition(lms_factors_full), :]
 
     lms_factors.factor = map(x -> factor_names_map[x], lms_factors.factor)
     return lms_factors
