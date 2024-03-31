@@ -42,7 +42,7 @@ function compute_jkp_market_factors()
 
     mkt_factors = reduce(vcat, [mkt_usa, mkt_wld, mkt_emg, mkt_dev])
 
-    printtime("computing market factors", task_start, minutes=false)
+    printtime("computing JKP market factors", task_start, minutes=false)
     return mkt_factors
 end
 
