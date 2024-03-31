@@ -146,10 +146,10 @@ function initialise_flow_data(model_name)
     )
     select!(fund_info, [:fundid, :true_no_load, :inception_date])
 
-    fund_rets_data = innerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
+    fund_rets_data = outerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
 
     fund_full_data = innerjoin(
-        fund_rets_data, fund_info, on=:fundid, matchmissing=:notequal
+        fund_rets_data, fund_info, on=:fundid
     )
 
     fund_full_data.age = (
