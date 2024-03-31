@@ -16,10 +16,10 @@ using .CommonConstants
 export regress_fund_flows
 export flow_regression_table
 
-function regress_fund_flows(model_name; filter_by=nothing) # model_name = "dev_ff3_ver"; filter_by = nothing
+function regress_fund_flows(model_name; filter_by=nothing)
     task_start = time()
 
-    regression_packet = flow_regression_table(model_name; filter_by=filter_by)
+    regression_packet = flow_regression_table(model_name; filter_by=x->investment_target_is(x, :usa))
 
     regression_data = regression_packet.regression_data
     return_component_cols = regression_packet.return_component_cols
