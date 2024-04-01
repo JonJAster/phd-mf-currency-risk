@@ -116,7 +116,7 @@ function loadarrow(filename)
     return df
 end
 
-function initialise_base_data(model) # model = ("ff_usa", ["mkt", "smb", "hml"])
+function initialise_base_data(model)
     mf_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     factors_filename = joinpath(DIRS.combo.factors, "factors.arrow")
 
@@ -178,6 +178,7 @@ function _prepare_factors(factors_data, model)
     factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
 
     source_factors = factors_data[source_condition .&& factor_condition, :]
+
     wide_factors = unstack(source_factors, :date, :factor, :ret)
     dropmissing!(wide_factors)
 
