@@ -26,8 +26,6 @@ function refine_raw_jkp_lms_data()
 
     lms_factors = _filter_to_desired_factors(lms_factors_full, EQUITY_LMS_FACTORS)
 
-    countmap(lms_factors.source_id)
-
     printtime("refining raw JKP equity data", task_start, minutes=false)
     return lms_factors
 end
