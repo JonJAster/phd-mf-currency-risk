@@ -11,7 +11,7 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
-function regress_fund_returns(model_name) # model_name = :ff_usa_ff3
+function regress_fund_returns(model_name)
     task_start = time()
 
     model = MODELS[model_name]
