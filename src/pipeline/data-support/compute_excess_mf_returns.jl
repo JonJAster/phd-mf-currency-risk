@@ -20,6 +20,8 @@ function compute_excess_mf_returns()
     mf_data = innerjoin(mf_data, rf_data, on=:date)
     mf_data.ex_ret = mf_data.ret - mf_data.rf
 
+    select!(mf_data, Not(:ret, :rf))
+
     printtime("computing excess mutual fund returns", task_start, minutes=false)
 end
 
