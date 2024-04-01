@@ -117,7 +117,7 @@ function loadarrow(filename)
 end
 
 function initialise_base_data(model)
-    mf_filename = joinpath(DIRS.mf.refined, "mf-data.arrow")
+    mf_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     factors_filename = joinpath(DIRS.combo.factors, "factors.arrow")
 
     mf_data = loadarrow(mf_filename)
@@ -130,7 +130,7 @@ function initialise_base_data(model)
 end
 
 function initialise_flow_data(model_name)
-    filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
+    filename_mf = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
 
