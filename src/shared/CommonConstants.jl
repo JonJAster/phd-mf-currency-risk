@@ -1,5 +1,7 @@
 module CommonConstants
 
+using DataStructures
+
 export BETA_LAGS
 export MIN_REGRESSION_OBS
 export DEFAULT_DECAY
@@ -53,7 +55,7 @@ const EQUITY_LMS_FACTORS = Dict(
     "at_gr1" => "cma"
 )
 
-const MODELS = Dict(
+const MODELS = OrderedDict(
     :ff_usa_capm => ("ff_usa", [:mkt]),
     :ff_usa_capm_lrv => ("ff_usa", [:mkt, :rx, :hml_fx]),
     :ff_usa_capm_ver => ("ff_usa", [:mkt, :dollar, :carry]),
