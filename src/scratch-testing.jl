@@ -22,7 +22,54 @@ function test()
     factors_data = loadarrow(joinpath(DIRS.combo.factors, "factors.arrow"))
     mf_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
 
-    
+    function compare_betas(model_name_suffix, factor)
+        factor = Symbol(factor)
+        ff_model_name = "ff_$model_name_suffix"
+        jkp_model_name = "jkp_$model_name_suffix"
+        
+        ff_betas = loadarrow(joinpath(DIRS.combo.return_betas, "$ff_model_name.arrow"))
+        ff_factor = ff_betas[ff_betas.factor .== factor, :]
+        select!(ff_factor, [:fundid, :date, :coef])
+        dropmissing!(ff_factor)
+
+        jkp_betas = loadarrow(joinpath(DIRS.combo.return_betas, "$jkp_model_name.arrow"))
+        jkp_factor = jkp_betas[jkp_betas.factor .== factor, :]
+        select!(jkp_factor, [:fundid, :date, :coef])
+        dropmissing!(jkp_factor)
+
+        compare_df = innerjoin(
+            ff_factor,
+            jkp_factor;
+            on = [:fundid, :date],
+            renamecols = "_ff" => "_jkp"
+        )
+
+        compare_df = sort(compare_df[compare_df.date .>= Date(1990,1,1), :], [:fundid, :date])
+
+        println("Correlation between ff and jkp $factor betas: ", cor(compare_df.coef_ff, compare_df.coef_jkp))
+        println()
+        println("Summary statistics for $factor betas:")
+        println("FF")
+        describe(compare_df.coef_ff)
+        println()
+        println("JKP")
+        describe(compare_df.coef_jkp)
+        println()
+
+        plot(compare_df.coef_ff, compare_df.coef_jkp, seriestype = :scatter, title = factor, xlabel = "ff", ylabel = "jkp") |> display
+        # plot(
+        #     plot(compare_df.coef_ff, compare_df.coef_jkp, seriestype = :scatter, title = factor, xlabel = "ff", ylabel = "jkp"),
+        #     plot(compare_df.date, [compare_df.coef_ff compare_df.coef_jkp], label = ["ff" "jkp"], title = factor, xlabel = "Date", ylabel = "Betas"),
+        #     layout = (2, 1),
+        #     size = (800, 800)
+        # )
+
+        return compare_df
+    end
+
+    compare_betas("dev_ffc6", "hml")
+
+    ###
 
     ff_usa = factors_data[factors_data.source_id .== "ff_usa", :]
     jkp_usa = factors_data[factors_data.source_id .== "jkp_usa", :]
