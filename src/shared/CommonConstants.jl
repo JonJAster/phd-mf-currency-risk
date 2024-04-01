@@ -13,7 +13,7 @@ export MODELS
 
 const BETA_LAGS = 60
 const MIN_REGRESSION_OBS = 36
-const DEFAULT_DECAY = 0.186
+const DEFAULT_DECAY = 0.125
 const TIMEWEIGHT_LAGS = 18
 const FLOW_CONTROL_LAGS = 19
 
@@ -35,10 +35,10 @@ const DIRS = (
     ),
     combo = (
         factors = "data/combined/factors",
-        return_betas = "data/combined/return-betas",
-        decomposed = "data/combined/decomposed",
-        weighted = "data/combined/weighted",
-        flow_betas = "data/combined/flow-betas"
+        return_betas = "data/combined/return-betas/decay-125",
+        decomposed = "data/combined/decomposed/decay-125",
+        weighted = "data/combined/weighted/decay-125",
+        flow_betas = "data/combined/flow-betas/decay-125"
     ),
     map = (
         raw = "data/maps/raw",
