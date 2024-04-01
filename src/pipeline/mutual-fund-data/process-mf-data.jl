@@ -31,6 +31,7 @@ function process_mf_data()
     _filter_out_low_obs_funds!(aggregate_data)
 
     rename!(aggregate_data, :gross_returns => :ret)
+    aggregate_data.ret ./= 100
 
     output = select(
         aggregate_data, 
