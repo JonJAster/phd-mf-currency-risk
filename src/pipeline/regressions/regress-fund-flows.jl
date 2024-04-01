@@ -53,8 +53,6 @@ function flow_regression_table(model_name; filter_by=nothing)
         :tfe, :month
     )
 
-    println(names(regression_data))
-
     dropmissing!(regression_data)
     _drop_zero_cols!(regression_data)
 
