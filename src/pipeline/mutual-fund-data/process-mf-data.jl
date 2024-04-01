@@ -31,7 +31,7 @@ function process_mf_data()
     _filter_out_low_obs_funds!(aggregate_data)
 
     output = select(
-        full_data, 
+        aggregate_data, 
         [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
     )
     printtime("processing mutual fund data", task_start, minutes=false)
