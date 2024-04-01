@@ -83,7 +83,7 @@ function _weight_returns(data)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    output_data = compute_market_factors()
+    output_data = compute_jkp_market_factors()
     output_filestring = makepath(DIRS.eq.factors, "jkp-mkt.arrow")
 
     task_start = time()
