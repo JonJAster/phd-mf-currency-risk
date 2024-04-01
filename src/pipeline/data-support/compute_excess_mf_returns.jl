@@ -23,6 +23,8 @@ function compute_excess_mf_returns()
     select!(mf_data, Not(:ret, :rf))
 
     printtime("computing excess mutual fund returns", task_start, minutes=false)
+
+    return mf_data
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
