@@ -30,6 +30,8 @@ function process_mf_data()
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
 
+    rename!(aggregate_data, :gross_returns => :ret)
+
     output = select(
         aggregate_data, 
         [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
@@ -183,7 +185,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = process_mf_data()
-    output_filename = makepath(DIRS.mf.refined, "mf-data.arrow")
+    output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
 
     task_start = time()
     Arrow.write(output_filename, output_data)
