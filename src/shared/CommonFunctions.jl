@@ -116,7 +116,7 @@ function loadarrow(filename)
     return df
 end
 
-function initialise_base_data(model)
+function initialise_base_data(model) # model = ("ff_usa", ["mkt", "smb", "hml"])
     mf_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     factors_filename = joinpath(DIRS.combo.factors, "factors.arrow")
 
@@ -166,19 +166,19 @@ function initialise_flow_data(model_name)
     return fund_full_data
 end
 
-function _prepare_factors(factors_data, model)
-    model_region = model[1]
+function _prepare_factors(factors_data, model) 
+    model_source = model[1]
     model_factors = model[2]
 
-    region_condition = (
-        factors_data.region .== model_region .||
-        factors_data.region .== "FX"
+    source_condition = (
+        factors_data.source_id .== model_source .||
+        factors_data.source_id .== "fx"
     )
 
     factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
 
-    regioned_factors = factors_data[region_condition .&& factor_condition, :]
-    wide_factors = unstack(regioned_factors, :date, :factor, :ret)
+    source_factors = factors_data[source_condition .&& factor_condition, :]
+    wide_factors = unstack(source_factors, :date, :factor, :ret)
     dropmissing!(wide_factors)
 
     return wide_factors
