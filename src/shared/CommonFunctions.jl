@@ -24,6 +24,7 @@ export rolling_std
 export drop_allmissing!
 export filter_fundids
 export investment_target_is
+export bho_dates_only
 export regression_table
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
@@ -277,9 +278,10 @@ end
 function filter_fundids(condition, data)
     info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
     info = loadarrow(info_filename)
+    select!(info, [:fundid, :global_category, :morningstar_category, :us_category_group, :investment_area])
 
-    filtered_ids = info[condition(info),[:fundid]]
-    filtered_data = innerjoin(data, filtered_ids, on=:fundid)
+    joined_data = innerjoin(data, info, on=:fundid)
+    filtered_data = joined_data[condition(joined_data), propertynames(data)]
 
     return filtered_data
 end
@@ -308,6 +310,8 @@ function investment_target_is(data, target)
 
     return condition
 end
+
+bho_dates_only(data) = (data.date .>= Date(1996,1,1)) .&& (data.date .<= Date(2011,11,1))
 
 function regression_table(data, entity_col, date_col, column_args...)
     """
