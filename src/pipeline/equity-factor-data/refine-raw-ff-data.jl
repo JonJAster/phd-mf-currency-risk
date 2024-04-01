@@ -67,6 +67,7 @@ function _read_ff_raw(filename; read_start, read_end)
     ) |> DataFrame
 
     series_names = names(raw_data)[2:end] |> _normalise_names .|> Symbol
+    
     new_names = [:date; series_names]
 
     rename!(raw_data, new_names)
@@ -76,7 +77,8 @@ end
 
 function _normalise_names(names)
     cut_excess_label(name) = replace(name, "-rf" => "")
-    normal_names = names .|> lowercase .|> cut_excess_label
+    fix_wml_label(name) = replace(name, "mom   " => "wml")
+    normal_names = names .|> lowercase .|> cut_excess_label |> fix_wml_label
     return normal_names
 end
 
