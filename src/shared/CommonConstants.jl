@@ -54,30 +54,66 @@ const EQUITY_LMS_FACTORS = Dict(
 )
 
 const MODELS = Dict(
-    "usa_capm" => ("USA", [:mkt]),
-    "usa_capm_lrv" => ("USA", [:mkt, :rx, :hml_fx]),
-    "usa_capm_ver" => ("USA", [:mkt, :dollar, :carry]),
-    "usa_ff3" => ("USA", [:mkt, :smb, :hml]),
-    "usa_ff3_lrv" => ("USA", [:mkt, :smb, :hml, :rx, :hml_fx]),
-    "usa_ff3_ver" => ("USA", [:mkt, :smb, :hml, :dollar, :carry]),
-    "wld_capm" => ("WLD", [:mkt]),
-    "wld_capm_lrv" => ("WLD", [:mkt, :rx, :hml_fx]),
-    "wld_capm_ver" => ("WLD", [:mkt, :dollar, :carry]),
-    "wld_ff3" => ("WLD", [:mkt, :smb, :hml]),
-    "wld_ff3_lrv" => ("WLD", [:mkt, :smb, :hml, :rx, :hml_fx]),
-    "wld_ff3_ver" => ("WLD", [:mkt, :smb, :hml, :dollar, :carry]),
-    "dev_capm" => ("DEV", [:mkt]),
-    "dev_capm_lrv" => ("DEV", [:mkt, :rx, :hml_fx]),
-    "dev_capm_ver" => ("DEV", [:mkt, :dollar, :carry]),
-    "dev_ff3" => ("DEV", [:mkt, :smb, :hml]),
-    "dev_ff3_lrv" => ("DEV", [:mkt, :smb, :hml, :rx, :hml_fx]),
-    "dev_ff3_ver" => ("DEV", [:mkt, :smb, :hml, :dollar, :carry]),
-    "emg_capm" => ("EMG", [:mkt]),
-    "emg_capm_lrv" => ("EMG", [:mkt, :rx, :hml_fx]),
-    "emg_capm_ver" => ("EMG", [:mkt, :dollar, :carry]),
-    "emg_ff3" => ("EMG", [:mkt, :smb, :hml]),
-    "emg_ff3_lrv" => ("EMG", [:mkt, :smb, :hml, :rx, :hml_fx]),
-    "emg_ff3_ver" => ("EMG", [:mkt, :smb, :hml, :dollar, :carry])
+    :ff_usa_capm => ("ff_usa", ["mkt"]),
+    :ff_usa_capm_lrv => ("ff_usa", ["mkt", "rx", "hml_fx"]),
+    :ff_usa_capm_ver => ("ff_usa", ["mkt", "dollar", "carry"]),
+    :ff_usa_ff3 => ("ff_usa", ["mkt", "smb", "hml"]),
+    :ff_usa_ff3_lrv => ("ff_usa", ["mkt", "smb", "hml", "rx", "hml_fx"]),
+    :ff_usa_ff3_ver => ("ff_usa", ["mkt", "smb", "hml", "dollar", "carry"]),
+    :ff_usa_ffc6 => ("ff_usa", ["mkt", "smb", "hml", "wml", "rmw", "cma"]),
+    :ff_usa_ffc6_lrv => (
+        "ff_usa",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "rx", "hml_fx"]
+    ),
+    :ff_usa_ffc6_ver => (
+        "ff_usa",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "dollar", "carry"]
+    ),
+    :ff_dev_capm => ("ff_dev", ["mkt"]),
+    :ff_dev_capm_lrv => ("ff_dev", ["mkt", "rx", "hml_fx"]),
+    :ff_dev_capm_ver => ("ff_dev", ["mkt", "dollar", "carry"]),
+    :ff_dev_ff3 => ("ff_dev", ["mkt", "smb", "hml"]),
+    :ff_dev_ff3_lrv => ("ff_dev", ["mkt", "smb", "hml", "rx", "hml_fx"]),
+    :ff_dev_ff3_ver => ("ff_dev", ["mkt", "smb", "hml", "dollar", "carry"]),
+    :ff_dev_ffc6 => ("ff_dev", ["mkt", "smb", "hml", "wml", "rmw", "cma"]),
+    :ff_dev_ffc6_lrv => (
+        "ff_dev",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "rx", "hml_fx"]
+    ),
+    :ff_dev_ffc6_ver => (
+        "ff_dev",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "dollar", "carry"]
+    ),
+    :jkp_usa_capm => ("jkp_usa", ["mkt"]),
+    :jkp_usa_capm_lrv => ("jkp_usa", ["mkt", "rx", "hml_fx"]),
+    :jkp_usa_capm_ver => ("jkp_usa", ["mkt", "dollar", "carry"]),
+    :jkp_usa_ff3 => ("jkp_usa", ["mkt", "smb", "hml"]),
+    :jkp_usa_ff3_lrv => ("jkp_usa", ["mkt", "smb", "hml", "rx", "hml_fx"]),
+    :jkp_usa_ff3_ver => ("jkp_usa", ["mkt", "smb", "hml", "dollar", "carry"]),
+    :jkp_usa_ffc6 => ("jkp_usa", ["mkt", "smb", "hml", "wml", "rmw", "cma"]),
+    :jkp_usa_ffc6_lrv => (
+        "jkp_usa",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "rx", "hml_fx"]
+    ),
+    :jkp_usa_ffc6_ver => (
+        "jkp_usa",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "dollar", "carry"]
+    ),
+    :jkp_dev_capm => ("jkp_dev", ["mkt"]),
+    :jkp_dev_capm_lrv => ("jkp_dev", ["mkt", "rx", "hml_fx"]),
+    :jkp_dev_capm_ver => ("jkp_dev", ["mkt", "dollar", "carry"]),
+    :jkp_dev_ff3 => ("jkp_dev", ["mkt", "smb", "hml"]),
+    :jkp_dev_ff3_lrv => ("jkp_dev", ["mkt", "smb", "hml", "rx", "hml_fx"]),
+    :jkp_dev_ff3_ver => ("jkp_dev", ["mkt", "smb", "hml", "dollar", "carry"]),
+    :jkp_dev_ffc6 => ("jkp_dev", ["mkt", "smb", "hml", "wml", "rmw", "cma"]),
+    :jkp_dev_ffc6_lrv => (
+        "jkp_dev",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "rx", "hml_fx"]
+    ),
+    :jkp_dev_ffc6_ver => (
+        "jkp_dev",
+        ["mkt", "smb", "hml", "wml", "rmw", "cma", "dollar", "carry"]
+    )
 )
 
 end # module CommonConstants
