@@ -25,6 +25,7 @@ export drop_allmissing!
 export filter_fundids
 export investment_target_is
 export bho_dates_only
+export post_bho_only
 export regression_table
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
@@ -312,6 +313,7 @@ function investment_target_is(data, target)
 end
 
 bho_dates_only(data) = (data.date .>= Date(1996,1,1)) .&& (data.date .<= Date(2011,11,1))
+post_bho_only(data) = data.date .> Date(2011,11,1)
 
 function regression_table(data, entity_col, date_col, column_args...)
     """

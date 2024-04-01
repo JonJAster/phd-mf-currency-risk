@@ -20,8 +20,21 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function analysis()
-    regress_fund_flows("usa_capm", filter_by=x->investment_target_is(x, :usa))
-    regress_fund_flows("usa_ff3", filter_by=x->investment_target_is(x, :usa))
+    regress_fund_flows("ff_usa_capm", filter_by=x->investment_target_is(x, :usa))
+    regress_fund_flows("jkp_usa_capm", filter_by=x->investment_target_is(x, :usa))
+
+    regress_fund_flows("ff_usa_ff3", filter_by=x->investment_target_is(x, :usa))
+    regress_fund_flows("jkp_usa_ff3", filter_by=x->investment_target_is(x, :usa))
+
+    regress_fund_flows("ff_usa_ffc6", filter_by=x->(investment_target_is(x, :usa) .&& bho_dates_only(x)))
+    regress_fund_flows("ff_usa_ffc6", filter_by=x->(investment_target_is(x, :usa) .&& post_bho_only(x)))
+
+    regress_fund_flows("ff_usa_ff3", filter_by=x->(investment_target_is(x, :usa) .&& bho_dates_only(x)))
+    regress_fund_flows("ff_usa_ff3", filter_by=x->(investment_target_is(x, :usa) .&& post_bho_only(x)))
+
+    regress_fund_flows("ff_usa_ff3_ver", filter_by=x->(investment_target_is(x, :usa) .&& bho_dates_only(x)))
+    regress_fund_flows("ff_usa_ff3_ver", filter_by=x->(investment_target_is(x, :usa) .&& post_bho_only(x)))
+    regress_fund_flows("ff_usa_ff3_ver", filter_by=x->investment_target_is(x, :usa))
 
     regress_fund_flows("dev_ff3_ver")
 end
