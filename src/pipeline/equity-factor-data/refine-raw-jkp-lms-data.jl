@@ -70,7 +70,7 @@ function _filter_to_desired_factors(lms_factors_full, factor_names_map)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    output_data = refine_raw_lms_data()
+    output_data = refine_raw_jkp_lms_data()
     output_filestring = makepath(DIRS.eq.factors, "jkp-lms.arrow")
     
     task_start = time()
