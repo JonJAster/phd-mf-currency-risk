@@ -93,4 +93,6 @@ function test()
         bestfit = lm(@formula(net_ret ~ gross_ret), fund_data)
 
         scatter(fund_data.year, fund_data.net_ret, label=fundid)
+
+    end
 end
