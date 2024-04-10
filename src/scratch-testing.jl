@@ -19,16 +19,6 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
-
-    for i in unique(info.fundid)
-        for j in [:global_category, :morningstar_category, :us_category_group, :investment_area]
-            if length(unique(info[info.fundid .== i, j])) > 1
-                println(i, " ", j)
-            end
-        end
-    end
-
     fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
     factor_data = loadarrow(joinpath(DIRS.combo.factors, "factors.arrow"))
     rf_data = loadarrow(joinpath(DIRS.eq.refined, "rf.arrow"))
@@ -38,15 +28,12 @@ function test()
     us_funds = filter_fundids(x->investment_target_is(x, :usa), fund_data)
     sort(us_funds, [:fundid, :date])
 
-    fund_data[fund_data.fundid .== test_funds[1], :]
     us_rf = innerjoin(us_funds, rf_data, on=:date)
     us_rf.gross_ret = us_rf.ex_ret .+ us_rf.rf
     
     dropmissing!(us_rf, [:gross_ret, :costs])
     us_rf.costs ./= 100
     us_rf.net_ret = (1 .+ us_rf.gross_ret)./(1 .+ us_rf.costs) .- 1
-
-    us_rf[us_rf.fundid .== test_funds[1], :]
     
     select!(us_rf, [:fundid, :date, :gross_ret, :net_ret])
     
