@@ -282,7 +282,7 @@ function filter_fundids(condition, data)
     select!(info, [:fundid, :global_category, :morningstar_category, :us_category_group, :investment_area])
 
     _assert_similar_fundids(info)
-    unique!(info, :fundid) 
+    unique!(info, :fundid)
 
     joined_data = innerjoin(data, info, on=:fundid)
     filtered_data = joined_data[condition(joined_data), propertynames(data)]
