@@ -281,6 +281,9 @@ function filter_fundids(condition, data)
     info = loadarrow(info_filename)
     select!(info, [:fundid, :global_category, :morningstar_category, :us_category_group, :investment_area])
 
+    _assert_similar_fundids(info)
+    unique!(info, :fundid) 
+
     joined_data = innerjoin(data, info, on=:fundid)
     filtered_data = joined_data[condition(joined_data), propertynames(data)]
 
@@ -516,6 +519,21 @@ function _null_empty_strings!(df)
             df[!, col] = replace(df[!, col], "" => missing)
         end
     end
+    return
+end
+
+function _assert_similar_fundids(info)
+    fundids = unique(info.fundid)
+    test_fields = setdiff(propertynames(info), [:fundid])
+
+    for fund in fundids
+        for field in test_fields
+            if length(unique(info[info.fundid .== fund, field])) > 1
+                error("Non-unique $field for fundid $fund.")
+            end
+        end
+    end
+    
     return
 end
 
