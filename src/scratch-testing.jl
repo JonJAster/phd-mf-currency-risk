@@ -26,11 +26,17 @@ function test()
     mkt_data = factor_data[factor_data.factor .== "mkt" .&& factor_data.source_id .== "ff_usa", :]
     
     us_funds = filter_fundids(x->investment_target_is(x, :usa), fund_data)
+    sort(us_funds, [:fundid, :date])
+
+    fund_data[fund_data.fundid .== test_funds[1], :]
     us_rf = innerjoin(us_funds, rf_data, on=:date)
     us_rf.gross_ret = us_rf.ex_ret .+ us_rf.rf
     
     dropmissing!(us_rf, [:gross_ret, :costs])
+    us_rf.costs ./= 100
     us_rf.net_ret = (1 .+ us_rf.gross_ret)./(1 .+ us_rf.costs) .- 1
+
+    us_rf[us_rf.fundid .== test_funds[1], :]
     
     select!(us_rf, [:fundid, :date, :gross_ret, :net_ret])
     
@@ -59,8 +65,9 @@ function test()
     us_rf_a = agg_to_annual(us_rf)
     mkt_rf_a = agg_to_annual(mkt_rf)
 
-
     data = innerjoin(us_rf_a, mkt_rf_a, on=:year)
+
+    describe(data)
 
     fund_tenure = combine(
         groupby(us_rf, :fundid),
