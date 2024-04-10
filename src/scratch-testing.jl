@@ -74,12 +74,23 @@ function test()
     sort!(fund_tenure, :tenure, rev=true)
     test_funds = fund_tenure.fundid[1:10]
 
-    for fundid in test_funds # fundid = test_funds[1]
+    for fundid in test_funds
         fund_data = data[data.fundid .== fundid, :]
 
-        bestfit = lm(@formula(net_ret ~ gross_ret), fund_data)
-
-        scatter(fund_data.year, fund_data.net_ret, label=fundid)
-
+        bestfit_model = lm(@formula(net_ret ~ gross_mkt), fund_data)
+        bestfit_line = DataFrame(gross_mkt = range(-0.5, 0.5, length=100))
+        bestfit_line.net_ret = predict(bestfit_model, bestfit_line)
+        corcoef = round(cor(fund_data.gross_mkt, fund_data.net_ret), digits=3)
+        beta = round(coef(bestfit_model)[2], digits=3)
+        scatter(
+            fund_data.gross_mkt,
+            fund_data.net_ret;
+            label="Fund: $fundid | Cor: $corcoef",
+            framestyle=:origin
+        )
+        plot!(
+            bestfit_line.gross_mkt, bestfit_line.net_ret;
+            label="Characteristic line | Beta: $beta"
+        )
     end
 end
