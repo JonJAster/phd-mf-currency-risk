@@ -19,171 +19,78 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-    factors_data = loadarrow(joinpath(DIRS.combo.factors, "factors.arrow"))
-    mf_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
 
-    function compare_betas(model_name_suffix, factor)
-        factor = Symbol(factor)
-        ff_model_name = "ff_$model_name_suffix"
-        jkp_model_name = "jkp_$model_name_suffix"
-        
-        ff_betas = loadarrow(joinpath(DIRS.combo.return_betas, "$ff_model_name.arrow"))
-        ff_factor = ff_betas[ff_betas.factor .== factor, :]
-        select!(ff_factor, [:fundid, :date, :coef])
-        dropmissing!(ff_factor)
-
-        jkp_betas = loadarrow(joinpath(DIRS.combo.return_betas, "$jkp_model_name.arrow"))
-        jkp_factor = jkp_betas[jkp_betas.factor .== factor, :]
-        select!(jkp_factor, [:fundid, :date, :coef])
-        dropmissing!(jkp_factor)
-
-        compare_df = innerjoin(
-            ff_factor,
-            jkp_factor;
-            on = [:fundid, :date],
-            renamecols = "_ff" => "_jkp"
-        )
-
-        compare_df = sort(compare_df[compare_df.date .>= Date(1990,1,1), :], [:fundid, :date])
-
-        println("Correlation between ff and jkp $factor betas: ", cor(compare_df.coef_ff, compare_df.coef_jkp))
-        println()
-        println("Summary statistics for $factor betas:")
-        println("FF")
-        describe(compare_df.coef_ff)
-        println()
-        println("JKP")
-        describe(compare_df.coef_jkp)
-        println()
-
-        plot(compare_df.coef_ff, compare_df.coef_jkp, seriestype = :scatter, title = factor, xlabel = "ff", ylabel = "jkp") |> display
-        # plot(
-        #     plot(compare_df.coef_ff, compare_df.coef_jkp, seriestype = :scatter, title = factor, xlabel = "ff", ylabel = "jkp"),
-        #     plot(compare_df.date, [compare_df.coef_ff compare_df.coef_jkp], label = ["ff" "jkp"], title = factor, xlabel = "Date", ylabel = "Betas"),
-        #     layout = (2, 1),
-        #     size = (800, 800)
-        # )
-
-        return compare_df
+    for i in unique(info.fundid)
+        for j in [:global_category, :morningstar_category, :us_category_group, :investment_area]
+            if length(unique(info[info.fundid .== i, j])) > 1
+                println(i, " ", j)
+            end
+        end
     end
 
-    compare_betas("dev_ffc6", "hml")
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    factor_data = loadarrow(joinpath(DIRS.combo.factors, "factors.arrow"))
+    rf_data = loadarrow(joinpath(DIRS.eq.refined, "rf.arrow"))
 
-    ###
+    mkt_data = factor_data[factor_data.factor .== "mkt" .&& factor_data.source_id .== "ff_usa", :]
+    
+    us_funds = filter_fundids(x->investment_target_is(x, :usa), fund_data)
+    sort(us_funds, [:fundid, :date])
 
-    ff_usa = factors_data[factors_data.source_id .== "ff_usa", :]
-    jkp_usa = factors_data[factors_data.source_id .== "jkp_usa", :]
+    fund_data[fund_data.fundid .== test_funds[1], :]
+    us_rf = innerjoin(us_funds, rf_data, on=:date)
+    us_rf.gross_ret = us_rf.ex_ret .+ us_rf.rf
+    
+    dropmissing!(us_rf, [:gross_ret, :costs])
+    us_rf.costs ./= 100
+    us_rf.net_ret = (1 .+ us_rf.gross_ret)./(1 .+ us_rf.costs) .- 1
 
-    ff_dev = factors_data[factors_data.source_id .== "ff_dev", :]
-    jkp_dev = factors_data[factors_data.source_id .== "jkp_dev", :]
+    us_rf[us_rf.fundid .== test_funds[1], :]
+    
+    select!(us_rf, [:fundid, :date, :gross_ret, :net_ret])
+    
+    rename!(mkt_data, :ret => :mkt)
+    mkt_rf = innerjoin(mkt_data, rf_data, on=:date)
+    mkt_rf.gross_mkt = round.(mkt_rf.mkt .+ mkt_rf.rf, digits=4)
+    select!(mkt_rf, [:date, :gross_mkt])
 
-    compare_mkt_usa = innerjoin(
-        ff_usa[ff_usa.factor .== "mkt", Not(:source_id, :factor)],
-        jkp_usa[jkp_usa.factor .== "mkt", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
+    function agg_to_annual(data)
+        "fundid" in names(data) ? group_cols = [:fundid, :year] : group_cols = [:year]
+        agg_cols = setdiff(propertynames(data), [:fundid, :date])
 
-    compare_smb_usa = innerjoin(
-        ff_usa[ff_usa.factor .== "smb", Not(:source_id, :factor)],
-        jkp_usa[jkp_usa.factor .== "smb", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
+        data.year = Dates.year.(data.date)
 
-    compare_hml_usa = innerjoin(
-        ff_usa[ff_usa.factor .== "hml", Not(:source_id, :factor)],
-        jkp_usa[jkp_usa.factor .== "hml", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_wml_usa = innerjoin(
-        ff_usa[ff_usa.factor .== "wml", Not(:source_id, :factor)],
-        jkp_usa[jkp_usa.factor .== "wml", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_cma_usa = innerjoin(
-        ff_usa[ff_usa.factor .== "cma", Not(:source_id, :factor)],
-        jkp_usa[jkp_usa.factor .== "cma", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_rmw_usa = innerjoin(
-        ff_usa[ff_usa.factor .== "rmw", Not(:source_id, :factor)],
-        jkp_usa[jkp_usa.factor .== "rmw", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_mkt_dev = innerjoin(
-        ff_dev[ff_dev.factor .== "mkt", Not(:source_id, :factor)],
-        jkp_dev[jkp_dev.factor .== "mkt", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_smb_dev = innerjoin(
-        ff_dev[ff_dev.factor .== "smb", Not(:source_id, :factor)],
-        jkp_dev[jkp_dev.factor .== "smb", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_hml_dev = innerjoin(
-        ff_dev[ff_dev.factor .== "hml", Not(:source_id, :factor)],
-        jkp_dev[jkp_dev.factor .== "hml", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_wml_dev = innerjoin(
-        ff_dev[ff_dev.factor .== "wml", Not(:source_id, :factor)],
-        jkp_dev[jkp_dev.factor .== "wml", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_cma_dev = innerjoin(
-        ff_dev[ff_dev.factor .== "cma", Not(:source_id, :factor)],
-        jkp_dev[jkp_dev.factor .== "cma", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    compare_rmw_dev = innerjoin(
-        ff_dev[ff_dev.factor .== "rmw", Not(:source_id, :factor)],
-        jkp_dev[jkp_dev.factor .== "rmw", Not(:source_id, :factor)];
-        on = :date,
-        renamecols = "_ff" => "_jkp"
-    )
-
-    function show_comparison(compare_df, factor_name)
-        compare_df = sort(compare_df[compare_df.date .>= Date(1990,1,1), :], :date)
-        println("Correlation between ff and jkp $factor_name: ", cor(compare_df.ret_ff, compare_df.ret_jkp))
-        
-        plot(
-            plot(compare_df.ret_ff, compare_df.ret_jkp, seriestype = :scatter, title = factor_name, xlabel = "ff", ylabel = "jkp"),
-            plot(compare_df.date, [compare_df.ret_ff compare_df.ret_jkp], label = ["ff" "jkp"], title = factor_name, xlabel = "Date", ylabel = "Returns"),
-            layout = (2, 1),
-            size = (800, 800)
+        annual_data = combine(
+            groupby(data, group_cols),
+            agg_cols .=> (x->(prod((1).+x).-1))
         )
+        
+        rename!(annual_data, [group_cols...; agg_cols...])
+        select!(annual_data, [group_cols...; agg_cols...])
+
+        return annual_data
     end
 
-    show_comparison(compare_mkt_usa, "mkt")
-    show_comparison(compare_smb_usa, "smb")
-    show_comparison(compare_hml_usa, "hml")
-    show_comparison(compare_wml_usa, "wml")
-    show_comparison(compare_cma_usa, "cma")
-    show_comparison(compare_rmw_usa, "rmw")
+    us_rf_a = agg_to_annual(us_rf)
+    mkt_rf_a = agg_to_annual(mkt_rf)
 
-    show_comparison(compare_mkt_dev, "mkt")
-    show_comparison(compare_smb_dev, "smb")
-    show_comparison(compare_hml_dev, "hml")
-    show_comparison(compare_wml_dev, "wml")
-    show_comparison(compare_cma_dev, "cma")
-    show_comparison(compare_rmw_dev, "rmw")
+    data = innerjoin(us_rf_a, mkt_rf_a, on=:year)
+
+    describe(data)
+
+    fund_tenure = combine(
+        groupby(us_rf, :fundid),
+        :year => length => :tenure
+    )
+
+    sort!(fund_tenure, :tenure, rev=true)
+    test_funds = fund_tenure.fundid[1:10]
+
+    for fundid in test_funds # fundid = test_funds[1]
+        fund_data = data[data.fundid .== fundid, :]
+
+        bestfit = lm(@formula(net_ret ~ gross_ret), fund_data)
+
+        scatter(fund_data.year, fund_data.net_ret, label=fundid)
 end
