@@ -11,31 +11,26 @@ using .CommonFunctions
 function combine_factors()
     task_start = time()
 
-    lms_filename = joinpath(DIRS.eq.factors, "lms.arrow")
-    mkt_filename = joinpath(DIRS.eq.factors, "mkt.arrow")
+    jkp_lms_filename = joinpath(DIRS.eq.factors, "jkp-lms.arrow")
+    jkp_mkt_filename = joinpath(DIRS.eq.factors, "jkp-mkt.arrow")
+    ff_filename = joinpath(DIRS.eq.factors, "ff.arrow")
     fx_filename = joinpath(DIRS.fx.factors, "currency_factors.arrow")
 
-    lms_data = loadarrow(lms_filename)
-    mkt_data = loadarrow(mkt_filename)
+    jkp_lms_data = loadarrow(jkp_lms_filename)
+    jkp_mkt_data = loadarrow(jkp_mkt_filename)
+    ff_data = loadarrow(ff_filename)
     fx_data = loadarrow(fx_filename)
 
-    _prep_mkt!(mkt_data)
     _prep_fx!(fx_data)
 
-    equity_factors = vcat(lms_data, mkt_data, fx_data)
+    equity_factors = vcat(jkp_lms_data, jkp_mkt_data, ff_data, fx_data)
 
     printtime("combining factors", task_start)
     return equity_factors
 end
 
-function _prep_mkt!(mkt_data)
-    rename!(mkt_data, :mkt_exc => :ret)
-    mkt_data.factor .= "mkt"
-    return mkt_data
-end
-
 function _prep_fx!(fx_data)
-    fx_data.region .= "FX"
+    fx_data.source_id .= "fx"
     return fx_data
 end
 

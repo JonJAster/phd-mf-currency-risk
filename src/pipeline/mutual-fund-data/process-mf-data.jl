@@ -16,11 +16,9 @@ function process_mf_data()
     task_start = time()
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
     info_filename = joinpath(DIRS.mf.raw, "info.csv")
-    market_filename = joinpath(DIRS.eq.raw, "country-mkt.csv")
 
     data = loadarrow(data_filename)
     info = init_raw(info_filename, info=true)
-    market_returns = CSV.read(market_filename, DataFrame, dateformat="yyyy-mm-dd")
 
     active_data = _filter_out_passive(data, info)
     sort!(active_data, [:fundid, :date])
@@ -31,19 +29,13 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    
-    riskfree = _calculate_riskfree(market_returns)
 
-    full_data = innerjoin(aggregate_data, riskfree, on=:date)
-
-    full_data[!, [:gross_returns, :costs]] .= (
-        full_data[!, [:gross_returns, :costs]] ./ 100
-    )
-    full_data.ex_ret = full_data.gross_returns - full_data.rf
+    rename!(aggregate_data, :gross_returns => :ret)
+    aggregate_data.ret ./= 100
 
     output = select(
-        full_data, 
-        [:fundid, :date, :flow, :ex_ret, :costs, :net_assets_m1]
+        aggregate_data, 
+        [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
     )
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
@@ -194,7 +186,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = process_mf_data()
-    output_filename = makepath(DIRS.mf.refined, "mf-data.arrow")
+    output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
 
     task_start = time()
     Arrow.write(output_filename, output_data)

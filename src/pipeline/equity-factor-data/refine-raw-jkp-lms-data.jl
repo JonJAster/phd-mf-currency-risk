@@ -26,8 +26,6 @@ function refine_raw_jkp_lms_data()
 
     lms_factors = _filter_to_desired_factors(lms_factors_full, EQUITY_LMS_FACTORS)
 
-    countmap(lms_factors.source_id)
-
     printtime("refining raw JKP equity data", task_start, minutes=false)
     return lms_factors
 end
@@ -70,8 +68,8 @@ function _filter_to_desired_factors(lms_factors_full, factor_names_map)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    output_data = refine_raw_lms_data()
-    output_filestring = makepath(DIRS.eq.factors, "lms.arrow")
+    output_data = refine_raw_jkp_lms_data()
+    output_filestring = makepath(DIRS.eq.factors, "jkp-lms.arrow")
     
     task_start = time()
     Arrow.write(output_filestring, output_data)

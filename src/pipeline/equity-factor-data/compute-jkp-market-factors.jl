@@ -42,6 +42,8 @@ function compute_jkp_market_factors()
 
     mkt_factors = reduce(vcat, [mkt_usa, mkt_wld, mkt_emg, mkt_dev])
 
+    mkt_factors = stack(mkt_factors, :mkt, variable_name=:factor, value_name=:ret)
+
     printtime("computing JKP market factors", task_start, minutes=false)
     return mkt_factors
 end
@@ -51,7 +53,7 @@ function _init_mkt_data!(mkt_data)
         mkt_data,
         :excntry => :country_code,
         :eom => :date,
-        :mkt_vw_exc => :mkt_exc
+        :mkt_vw_exc => :mkt
     )
 
     mkt_data.date = firstdayofmonth.(mkt_data.date)
@@ -60,7 +62,7 @@ end
 
 function _init_source_info!(region_data, source_id)
     region_data.source_id .= source_id
-    select!(region_data, [:source_id, :date, :mkt_exc])
+    select!(region_data, [:source_id, :date, :mkt])
     sort!(region_data, :date)
     return region_data
 end
@@ -73,18 +75,18 @@ function _weight_returns(data)
     me_totals[me_totals.date .== Date(2022,10,1),:]
     data_total = innerjoin(data, me_totals, on=:date)
 
-    data_total.weighted_return = data_total.mkt_exc .* data_total.me_lag1 ./ data_total.me_total
+    data_total.weighted_return = data_total.mkt .* data_total.me_lag1 ./ data_total.me_total
 
     weighted_returns = combine(
         groupby(data_total, :date),
-        :weighted_return => sum => :mkt_exc
+        :weighted_return => sum => :mkt
     )
     return weighted_returns
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    output_data = compute_market_factors()
-    output_filestring = makepath(DIRS.eq.factors, "mkt.arrow")
+    output_data = compute_jkp_market_factors()
+    output_filestring = makepath(DIRS.eq.factors, "jkp-mkt.arrow")
 
     task_start = time()
     Arrow.write(output_filestring, output_data)

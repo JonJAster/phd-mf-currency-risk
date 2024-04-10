@@ -93,13 +93,7 @@ function _drop_zero_cols!(data)
     for col in names(data)
         all(data[!, col] .== 0) && push!(zero_cols, col)
     end
-    
-    if length(zero_cols) != FLOW_CONTROL_LAGS
-        println(
-            "Warning: FLOW_CONTROL_LAGS is $FLOW_CONTROL_LAGS, but " *
-            "found $(length(zero_cols)) zero columns to drop."
-        )
-    end
+
     select!(data, Not(zero_cols))
 end
 

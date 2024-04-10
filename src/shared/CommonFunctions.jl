@@ -24,6 +24,8 @@ export rolling_std
 export drop_allmissing!
 export filter_fundids
 export investment_target_is
+export bho_dates_only
+export post_bho_only
 export regression_table
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
@@ -117,7 +119,7 @@ function loadarrow(filename)
 end
 
 function initialise_base_data(model)
-    mf_filename = joinpath(DIRS.mf.refined, "mf-data.arrow")
+    mf_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     factors_filename = joinpath(DIRS.combo.factors, "factors.arrow")
 
     mf_data = loadarrow(mf_filename)
@@ -130,7 +132,7 @@ function initialise_base_data(model)
 end
 
 function initialise_flow_data(model_name)
-    filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
+    filename_mf = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
 
@@ -166,19 +168,20 @@ function initialise_flow_data(model_name)
     return fund_full_data
 end
 
-function _prepare_factors(factors_data, model)
-    model_region = model[1]
+function _prepare_factors(factors_data, model) 
+    model_source = model[1]
     model_factors = model[2]
 
-    region_condition = (
-        factors_data.region .== model_region .||
-        factors_data.region .== "FX"
+    source_condition = (
+        factors_data.source_id .== model_source .||
+        factors_data.source_id .== "fx"
     )
 
     factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
 
-    regioned_factors = factors_data[region_condition .&& factor_condition, :]
-    wide_factors = unstack(regioned_factors, :date, :factor, :ret)
+    source_factors = factors_data[source_condition .&& factor_condition, :]
+
+    wide_factors = unstack(source_factors, :date, :factor, :ret)
     dropmissing!(wide_factors)
 
     return wide_factors
@@ -276,9 +279,10 @@ end
 function filter_fundids(condition, data)
     info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
     info = loadarrow(info_filename)
+    select!(info, [:fundid, :global_category, :morningstar_category, :us_category_group, :investment_area])
 
-    filtered_ids = info[condition(info),[:fundid]]
-    filtered_data = innerjoin(data, filtered_ids, on=:fundid)
+    joined_data = innerjoin(data, info, on=:fundid)
+    filtered_data = joined_data[condition(joined_data), propertynames(data)]
 
     return filtered_data
 end
@@ -307,6 +311,9 @@ function investment_target_is(data, target)
 
     return condition
 end
+
+bho_dates_only(data) = (data.date .>= Date(1996,1,1)) .&& (data.date .<= Date(2011,11,1))
+post_bho_only(data) = data.date .> Date(2011,11,1)
 
 function regression_table(data, entity_col, date_col, column_args...)
     """
