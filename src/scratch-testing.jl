@@ -74,7 +74,7 @@ function test()
     println(morningstar_category_returns)
     println(total_agg)
 
-    println(agg_returns(data[data.date .>= Date(2015, 12, 31), :], :morningstar_category))
+    println(agg_returns(data[data.date .<= Date(1995, 12, 31), :], :morningstar_category))
 
     data[startswith.(data.morningstar_category, Ref("EAA Fund")), :]
 
