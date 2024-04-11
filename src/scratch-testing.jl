@@ -10,6 +10,7 @@ using StatsBase
 using Base.Threads
 using LinearAlgebra
 using Plots
+using Distributions
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
@@ -19,78 +20,73 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    # Do funds of various subcategories earn average positive gross returns?
     fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
-    factor_data = loadarrow(joinpath(DIRS.combo.factors, "factors.arrow"))
-    rf_data = loadarrow(joinpath(DIRS.eq.refined, "rf.arrow"))
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
 
-    mkt_data = factor_data[factor_data.factor .== "mkt" .&& factor_data.source_id .== "ff_usa", :]
-    
-    us_funds = filter_fundids(x->investment_target_is(x, :usa), fund_data)
-    sort(us_funds, [:fundid, :date])
+    betas = loadarrow(joinpath(DIRS.combo.return_betas, "ff_usa_ff3.arrow"))
+    alphas = betas[betas.factor .== :const, [:fundid, :date, :coef]]
+    dropmissing!(alphas)
+    rename!(alphas, :coef => :usa_ff3_alpha)
 
-    us_rf = innerjoin(us_funds, rf_data, on=:date)
-    us_rf.gross_ret = us_rf.ex_ret .+ us_rf.rf
-    
-    dropmissing!(us_rf, [:gross_ret, :costs])
-    us_rf.costs ./= 100
-    us_rf.net_ret = (1 .+ us_rf.gross_ret)./(1 .+ us_rf.costs) .- 1
-    
-    select!(us_rf, [:fundid, :date, :gross_ret, :net_ret])
-    
-    rename!(mkt_data, :ret => :mkt)
-    mkt_rf = innerjoin(mkt_data, rf_data, on=:date)
-    mkt_rf.gross_mkt = round.(mkt_rf.mkt .+ mkt_rf.rf, digits=4)
-    select!(mkt_rf, [:date, :gross_mkt])
+    select!(info, [:fundid, :morningstar_category, :global_category])
+    info = unique(deepcopy(info), :fundid)
 
-    function agg_to_annual(data)
-        "fundid" in names(data) ? group_cols = [:fundid, :year] : group_cols = [:year]
-        agg_cols = setdiff(propertynames(data), [:fundid, :date])
+    data = innerjoin(fund_data, info, on=:fundid)
+    data = innerjoin(data, alphas, on=[:fundid, :date])
 
-        data.year = Dates.year.(data.date)
-
-        annual_data = combine(
-            groupby(data, group_cols),
-            agg_cols .=> (x->(prod((1).+x).-1))
-        )
+    function agg_returns(data, category=nothing)
+        if isnothing(category)
+            category = :category
+            data = copy(data)
+            data.category .= "All Funds"
+        end
         
-        rename!(annual_data, [group_cols...; agg_cols...])
-        select!(annual_data, [group_cols...; agg_cols...])
+        df_agg = combine(
+            groupby(data, category),
+            :ex_ret => (x->mean(skipmissing(x))) => :mean_gross_excess_return,
+            :ex_ret => (x->std(skipmissing(x))/sqrt(count(!ismissing,x))) => :se_gross_excess_return,
+            :usa_ff3_alpha => (x->mean(skipmissing(x))) => :mean_usa_ff3_alpha,
+            :usa_ff3_alpha => (x->std(skipmissing(x))/sqrt(count(!ismissing,x))) => :se_usa_ff3_alpha
+        )
 
-        return annual_data
+        df_agg.t_gross_excess_return = df_agg.mean_gross_excess_return ./ df_agg.se_gross_excess_return
+        df_agg.t_usa_ff3_alpha = df_agg.mean_usa_ff3_alpha ./ df_agg.se_usa_ff3_alpha
+
+        df_agg.p_gross_excess_return = 2 * (1 .- cdf(TDist(length(data.ex_ret) - 1), abs.(df_agg.t_gross_excess_return)))
+        df_agg.p_usa_ff3_alpha = 2 * (1 .- cdf(TDist(length(data.usa_ff3_alpha) - 1), abs.(df_agg.t_usa_ff3_alpha)))
+
+        df_agg[!, [:mean_gross_excess_return, :mean_usa_ff3_alpha]] = (
+            round.((((1).+df_agg[!, [:mean_gross_excess_return, :mean_usa_ff3_alpha]]) .^ 12 .- 1).*100, digits=2)
+        )
+        select!(df_agg, [category, :mean_gross_excess_return, :p_gross_excess_return, :mean_usa_ff3_alpha, :p_usa_ff3_alpha])
+
+        sort!(df_agg, :mean_usa_ff3_alpha, rev=true)
+
+        return df_agg
     end
 
-    us_rf_a = agg_to_annual(us_rf)
-    mkt_rf_a = agg_to_annual(mkt_rf)
+    morningstar_category_returns = agg_returns(data, :morningstar_category)
+    global_category_returns = agg_returns(data, :global_category)
+    total_agg = agg_returns(data)
 
-    data = innerjoin(us_rf_a, mkt_rf_a, on=:year)
+    println(global_category_returns)
+    println(morningstar_category_returns)
+    println(total_agg)
 
-    describe(data)
+    println(agg_returns(data[data.date .>= Date(2015, 12, 31), :], :morningstar_category))
 
-    fund_tenure = combine(
-        groupby(us_rf, :fundid),
-        :year => length => :tenure
+    data[startswith.(data.morningstar_category, Ref("EAA Fund")), :]
+
+    testcase = (
+        fundid = "FSUSA0BCMX",
+        date = Date(2015,12,1),
+        alpha = data[(data.fundid .== "FSUSA0BCMX") .&& data.date .== Date(2015,12,1), :usa_ff3_alpha][1]
     )
 
-    sort!(fund_tenure, :tenure, rev=true)
-    test_funds = fund_tenure.fundid[1:10]
+    qlookup(testcase.fundid)
 
-    for fundid in test_funds
-        fund_data = data[data.fundid .== fundid, :]
+    alphas[(alphas.fundid .== testcase.fundid) .&& (alphas.date .== testcase.date), :]
 
-        bestfit_model = lm(@formula(net_ret ~ gross_mkt), fund_data)
-        bestfit_line = DataFrame(gross_mkt = range(-0.5, 0.5, length=100))
-        bestfit_line.net_ret = predict(bestfit_model, bestfit_line)
-        corcoef = round(cor(fund_data.gross_mkt, fund_data.net_ret), digits=3)
-        beta = round(coef(bestfit_model)[2], digits=3)
-        scatter(
-            fund_data.gross_mkt,
-            fund_data.net_ret;
-            label="Fund: $fundid | Cor: $corcoef",
-            framestyle=:origin
-        )
-        plot!(
-            bestfit_line.gross_mkt, bestfit_line.net_ret;
-            label="Characteristic line | Beta: $beta"
-        )
-    end
+    fund_data[(fund_data.fundid .== testcase.fundid) .&& (fund_data.date .== (testcase.date-Month(1))), :]
 end
