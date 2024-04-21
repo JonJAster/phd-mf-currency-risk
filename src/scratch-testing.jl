@@ -20,6 +20,92 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    # Persistence of decomposed return components
+    decomposed_rets = loadarrow(joinpath(DIRS.combo.decomposed, "ff_dev_ffc6.arrow"))
+    ret_cols = names(decomposed_rets[!, Not([:fundid, :date])])
+    for i in ret_cols
+        decomposed_rets = transform(
+            groupby(decomposed_rets, :fundid),
+            i => (x->lag(x, 1)) => "$(i)_m1"#,
+            # i => (x->lag(x, 2)) => "$(i)_m2",
+            # i => (x->lag(x, 3)) => "$(i)_m3",
+            # i => (x->lag(x, 4)) => "$(i)_m4",
+            # i => (x->lag(x, 5)) => "$(i)_m5",
+            # i => (x->lag(x, 6)) => "$(i)_m6",
+        )
+    end
+
+    dropmissing!(decomposed_rets)
+
+    for i in ret_cols
+        println(i)
+        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m1"]))
+        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m2"]))
+        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m3"]))
+        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m4"]))
+        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m5"]))
+        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m6"]))
+    end
+
+    
+
+    for i in ret_cols
+        reg_formula = term(i) ~ sum([term("$(i)_m$j") for j in [1]])
+        model = lm(reg_formula, decomposed_rets)
+        display(model)
+    end
+
+    # Description of fund size
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    describe(fund_data)
+
+    monthly_flow_data = combine(
+        groupby(fund_data, :date),
+        :flow => (x->mean(skipmissing(x))) => :flow
+    )
+
+    sort!(monthly_flow_data, :date)
+    monthly_flow_data.flow .*= 100
+
+    plot(
+        monthly_flow_data.date,
+        monthly_flow_data.flow;
+        xlabel="Date",
+        ylabel="Flow (%)",
+        legend=false,
+        title="Monthly Flows of Mutual Funds",
+        color=:darkblue,
+        linewidth=1,
+    )
+    plot!(monthly_flow_data.date, fill(0, length(monthly_flow_data.date)), color=:red, alpha=0.2, linewidth=2)
+
+
+
+    yearly_flow_data = DataFrame(year=Int64[], annual_flow=Float64[])
+    for y in sort(unique(year.(fund_data.date)))
+        flow_y = fund_data[(fund_data.date .>= Date(y,1,1)) .& (fund_data.date .<= Date(y,12,1)), [:fundid, :flow]]
+        dropmissing!(flow_y)
+        annual_flows = combine(
+            groupby(flow_y, :fundid),
+            :flow => (x->mean((x))) => :annual_flow
+        )
+        maximum(annual_flows.annual_flow)
+        flow_output = round(((1+mean(annual_flows.annual_flow))^12-1)*100, digits=2)
+        push!(yearly_flow_data, (y, flow_output))
+    end
+
+    plot(
+        yearly_flow_data.year,
+        yearly_flow_data.annual_flow;
+        xlabel="Year",
+        ylabel="Annual Flow (%)",
+        legend=false,
+        title="Annual Flows of Mutual Funds",
+        color=:darkblue,
+        linewidth=2,
+    )
+    plot!(yearly_flow_data.year, fill(0, length(yearly_flow_data.year)), color=:red, alpha=0.2, linewidth=2)
+
     # Do funds of various subcategories earn average positive gross returns?
     fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
     info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
@@ -74,7 +160,7 @@ function test()
     println(morningstar_category_returns)
     println(total_agg)
 
-    println(agg_returns(data[data.date .<= Date(1995, 12, 31), :], :morningstar_category))
+    println(agg_returns(data, :morningstar_category))
 
     data[startswith.(data.morningstar_category, Ref("EAA Fund")), :]
 
@@ -89,4 +175,57 @@ function test()
     alphas[(alphas.fundid .== testcase.fundid) .&& (alphas.date .== testcase.date), :]
 
     fund_data[(fund_data.fundid .== testcase.fundid) .&& (fund_data.date .== (testcase.date-Month(1))), :]
+
+    # Do fund returns display an efficient frontier?
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    fund_data.year = year.(fund_data.date)
+
+    function annualise_returns(year_of_returns)
+        nonmissing_obs = count(!ismissing, year_of_returns)
+        if nonmissing_obs == 12
+            return (100).*(prod((1).+year_of_returns).-1)
+        else
+            return missing
+        end
+    end
+
+    mf_annual = combine(
+        groupby(fund_data, [:fundid, :year]),
+        :ex_ret => annualise_returns => :annual_ex_ret
+    )
+
+    dropmissing!(mf_annual)
+
+    mf_agg = combine(
+        groupby(mf_annual, :fundid),
+        :annual_ex_ret => mean => :mean_annual_ex_ret
+    )
+
+    mf_std = combine(
+        groupby(fund_data, :fundid),
+        :ex_ret => (x->std(x).*sqrt(12)) => :std_annual_ex_ret
+    )
+
+    mf_agg = innerjoin(mf_agg, mf_std, on=:fundid)
+    dropmissing!(mf_agg)
+
+    scatter(
+        mf_agg.std_annual_ex_ret,
+        mf_agg.mean_annual_ex_ret;
+        xlabel="Standard Deviation",
+        ylabel="Mean",
+        legend=false,
+        title="Efficient Frontier of Mutual Funds",
+        alpha=0.5,
+        markersize=2,
+        markershape=:cross,
+        color=:darkblue,
+        ylims=(-25,30),
+        xlims=(0,0.4),
+        framestyle=:origin
+    )
+
+
+
+
 end
