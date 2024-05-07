@@ -20,6 +20,98 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    # Testing
+    qlookup("FSUSA0099L")
+    # Testing for similar gross returns across fund odd_class_name_ids
+    init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+
+    cross_class_var = combine(
+        groupby(init_data, [:fundid, :date]),
+        :gross_returns => (x->(length(unique(skipmissing(x)))>1 ? var(skipmissing(x)) : 0)) => :cross_class_var
+    )
+
+    describe(cross_class_var)
+
+    sort!(cross_class_var, :cross_class_var, rev=true)
+
+    test_case = 6
+    test_fundid = cross_class_var.fundid[test_case]
+    test_date = cross_class_var.date[test_case]
+    test_data = init_data[(init_data.fundid .== test_fundid) .& (init_data.date .== test_date), :]
+    test_data_full = init_data[init_data.fundid .== test_fundid, :]
+
+    dropmissing!(test_data_full, :gross_returns)
+    describe(test_data_full)
+
+    sort!(test_data_full, [:secid, :date])
+
+    class_plot = plot(
+        xlabel="Date",
+        ylabel="Gross Returns",
+        title="Gross Returns of Funds in the Same Class"
+    )
+    for fund in unique(test_data_full.secid)
+        fund_data = test_data_full[test_data_full.secid .== fund, :]
+        plot!(
+            fund_data.date, fund_data.gross_returns, label=fund;
+            linewidth=5,
+            alpha=0.2
+        )
+        display(class_plot)
+    end
+
+    pprint(qlookup(test_fundid))
+
+    # pair-wise correlation table of all secid gross returns for test fund
+    wide_grets = unstack(test_data_full, :date, :secid, :gross_returns)
+    test_secids = unique(test_data_full.secid)
+    for i in test_secids
+        for j in test_secids
+            i == j && continue
+            test_cor = wide_grets[completecases(wide_grets[!, [i,j]]), [i,j]]
+            isempty(test_cor) && continue
+            println(i, " ", j, " ", cor(test_cor[!,i], test_cor[!,j]))
+        end
+    end
+    
+
+    # Selecting a fund today
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    current_funds = fund_data[fund_data.date .== maximum(fund_data.date), :]
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+    duplicate_values = combine(
+        groupby(info, :fundid),
+        propertynames(info)[2:end] .=> (x->length(unique(x)))
+    )
+    rename!(duplicate_values, propertynames(info))
+    for i in propertynames(duplicate_values[!, Not(:fundid, :secid)])
+        if sum(duplicate_values[!, i] .== duplicate_values.secid) == nrow(duplicate_values)
+            println("$i matches secid")
+        elseif sum(duplicate_values[!, i] .== 1) == nrow(duplicate_values)
+            println("$i is unique to fundid")
+        else
+            println("$i is odd")
+        end
+    end
+
+    odd_class_name_ids = (
+        duplicate_values[duplicate_values.fund_class_name .!= duplicate_values.secid, :fundid]
+    )
+
+    pprint(info[in.(info.fundid, Ref(odd_class_name_ids)), Not(:fund_class_name, :fund_standard_name, :management_approach_passive, :management_approach_active)])
+
+    odd_class_legal_name_ids = (
+        duplicate_values[duplicate_values.fund_class_legal_name .!= duplicate_values.secid, :fundid]
+    )
+
+    pprint(sort(info[in.(info.fundid, Ref(odd_class_legal_name_ids)), Not(:fund_standard_name, :management_approach_passive, :management_approach_active)], :fundid), rows=50)
+
+    duplicate_values[duplicate_values.fundid .== "FSUSA004K0", :]
+
+    displaysize(stdout)[2]
+
+    func
+
     # Persistence of decomposed return components
     decomposed_rets = loadarrow(joinpath(DIRS.combo.decomposed, "ff_dev_ffc6.arrow"))
     ret_cols = names(decomposed_rets[!, Not([:fundid, :date])])
@@ -40,17 +132,19 @@ function test()
     for i in ret_cols
         println(i)
         println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m1"]))
-        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m2"]))
-        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m3"]))
-        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m4"]))
-        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m5"]))
-        println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m6"]))
+        # println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m2"]))
+        # println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m3"]))
+        # println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m4"]))
+        # println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m5"]))
+        # println(cor(decomposed_rets[!, i], decomposed_rets[!, "$(i)_m6"]))
     end
 
-    
+    for d in unique(decomposed_rets.date)
+        decomposed_rets[!, Symbol(d)] .= decomposed_rets.date .== d
+    end
 
     for i in ret_cols
-        reg_formula = term(i) ~ sum([term("$(i)_m$j") for j in [1]])
+        reg_formula = term(i) ~ sum(term.(vcat([Symbol("$(i)_m1")], Symbol.(sort(unique(decomposed_rets.date)))[2:end])))
         model = lm(reg_formula, decomposed_rets)
         display(model)
     end
