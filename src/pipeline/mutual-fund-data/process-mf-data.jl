@@ -173,17 +173,6 @@ function _filter_out_low_obs_funds!(data)
     return
 end
 
-function _calculate_riskfree(market_returns)
-    usa_market = market_returns[market_returns.excntry .== "USA", :]
-    usa_market.rf = usa_market.mkt_vw - usa_market.mkt_vw_exc
-
-    rename!(usa_market, :eom => :date)
-    usa_market.date = firstdayofmonth.(usa_market.date)
-
-    select!(usa_market, [:date, :rf])
-    return usa_market
-end
-
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = process_mf_data()
     output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
