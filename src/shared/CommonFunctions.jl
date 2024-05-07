@@ -15,6 +15,7 @@ export makepath
 export qhead
 export qscan
 export qlookup
+export pprint
 export loadarrow
 export initialise_base_data
 export initialise_flow_data
@@ -110,6 +111,83 @@ function qlookup(id; data=false)
         return output
     end
 end
+
+function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, secondaryid=4:6, seuss=["Aunt Annie's Alligator", "Barber Baby Bubbles and a Bumblebee", "Camel on the Ceiling"]); rows=nothing; centre=false
+    isnothing(rows) && (rows = nrow(df))
+    terminal_width = displaysize(stdout)[2]
+    col_content_widths = Dict(
+        col_name => maximum(length.(string.(df[!, col_name])))
+        for col_name in propertynames(df)
+    )
+    col_total_widths = Dict(
+        col_name => maximum([length(string(col_name)), col_content_widths[col_name]])
+        for col_name in propertynames(df)
+    )
+
+    function printwidth(cols)
+        isempty(cols) && return 0
+        
+        print_width = sum(get.(Ref(col_total_widths), cols, 0)) + 2*(length(cols) - 1)
+        return print_width
+    end
+
+    print_sets = []
+    current_print_set = []
+    for col_name in propertynames(df) 
+        col_total_widths[col_name] > terminal_width && error("Column width exceeds terminal width.")
+        
+        if printwidth([current_print_set..., col_name]) > terminal_width
+            push!(print_sets, deepcopy(current_print_set))
+            current_print_set = [col_name]
+        else
+            push!(current_print_set, col_name)
+        end
+    end
+    isempty(current_print_set) || push!(print_sets, current_print_set)
+
+    function centre_text(text, width)
+        text_length = length(text)
+        padding = width - text_length
+        left_padding = div(padding, 2)
+        right_padding = padding - left_padding
+        return " "^left_padding * text * " "^right_padding
+    end
+
+    function pad_text(text, width)
+        text_length = length(text)
+        padding = width - text_length
+        return text * " "^padding
+    end
+
+    centre ? (align_text = centre_text) : (align_text = pad_text)
+    
+    
+    last_printed_row = 0
+    while(last_printed_row < rows)
+        for print_set in print_sets
+            printout = ""
+            for col_name in print_set
+                printout *= align_text(string(col_name), col_total_widths[col_name]) * "  "
+            end
+            println(printout[1:end-2])
+            println("-"^printwidth(print_set))
+            for i in last_printed_row+1:min(last_printed_row+10, rows)
+                printout = ""
+                for col_name in print_set
+                    printout *= align_text(string(df[i, col_name]), col_total_widths[col_name]) * "  "
+                end
+                println(printout)
+            end
+            println()
+        end
+        last_printed_row += 10
+        if last_printed_row < rows
+            println("*"^terminal_width)
+            println()
+        end
+    end
+end
+    
 
 function loadarrow(filename)
     arrow_table = Arrow.Table(filename)
