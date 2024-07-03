@@ -30,7 +30,7 @@ function process_mf_data()
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
 
-    rename!(aggregate_data, :gross_returns => :ret)
+    rename!(aggregate_data, :net_returns => :ret)
     aggregate_data[:, [:ret, :costs]] ./= 100
 
     output = select(
@@ -84,14 +84,12 @@ function _aggregate_to_fundid(data)
     )
     
     data_weighted.weighted_net_returns = data_weighted.weight .* data_weighted.net_returns
-    data_weighted.weighted_gross_returns = data_weighted.weight .* data_weighted.gross_returns
     data_weighted.weighted_costs = data_weighted.weight .* data_weighted.costs
 
     aggregate_data = combine(
         groupby(data_weighted, [:fundid, :date]),
         :net_assets => sum => :net_assets,
         :weighted_net_returns => sum => :net_returns,
-        :weighted_gross_returns => sum => :gross_returns,
         :weighted_costs => sum => :costs
     )
 
@@ -106,7 +104,7 @@ end
 function _null_out_small!(data)
     data[
         coalesce.(data.net_assets_m1, 0) .< 10_000_000,
-        [:net_assets_m1, :net_assets, :net_returns, :gross_returns, :costs]
+        [:net_assets_m1, :net_assets, :net_returns, :costs]
     ] .= missing
 
     return
@@ -157,7 +155,7 @@ function _clip_fund_flows!(data)
     data[
         coalesce.(data.flow .<= flow_lowerbound,false) .||
         coalesce.(data.flow .>= flow_upperbound,false),
-        [:net_assets, :net_returns, :gross_returns, :costs, :net_assets_m1, :flow]
+        [:net_assets, :net_returns, :costs, :net_assets_m1, :flow]
     ] .= missing
     return
 end
