@@ -20,6 +20,27 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    # Testing fees
+    init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    
+    fee_data = dropmissing(init_data, [:costs, :net_assets])
+    total_assets = combine(
+        groupby(fee_data, :date),
+        :net_assets => sum => :total_assets
+    )
+
+    merged_data = innerjoin(fee_data, total_assets, on=:date)
+
+    fee_data.weighted_fees = fee_data.costs .* fee_data.net_assets ./ merged_data.total_assets
+
+    weighted_fees = combine(
+        groupby(fee_data, :date),
+        :weighted_fees => sum => :weighted_fees
+    )
+
+    mean(weighted_fees.weighted_fees)
+
+    
     # Testing
     qlookup("FSUSA0099L")
     # Testing for similar gross returns across fund odd_class_name_ids
