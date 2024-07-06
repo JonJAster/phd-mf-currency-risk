@@ -3,6 +3,8 @@ module CommonFunctions
 using DataFrames
 using Arrow
 using CSV
+using LibPQ
+using Tables
 using Dates
 using StatsBase
 using ShiftedArrays: lead, lag
@@ -16,6 +18,9 @@ export qhead
 export qscan
 export qlookup
 export pprint
+export connect_wrds
+export scan_wrds
+export query_wrds
 export loadarrow
 export initialise_base_data
 export initialise_flow_data
@@ -187,7 +192,42 @@ function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, 
         end
     end
 end
-    
+
+function connect_wrds(username, password)
+    if isempty(username) || isempty(password)
+        credentials_file = joinpath(DIRS.map.raw, "wrds-credentials.csv")
+        credentials = CSV.read(credentials_file, DataFrame)
+        isempty(username) && (username = first(credentials.username))
+        isempty(password) && (password = first(credentials.password))
+    end
+    wrds = LibPQ.Connection(
+        """
+        host = wrds-pgdata.wharton.upenn.edu
+        port = 9737
+        user = '$username'
+        password = '$password'
+        sslmode = 'require' dbname = wrds
+        """
+    )
+    return wrds
+end
+
+function scan_wrds(wrds)
+    query = (
+        "select distinct table_schema
+        from information_schema.tables
+        where table_type ='VIEW'
+        or table_type ='FOREIGN TABLE'
+        order by table_schema"
+    )
+    output = query_wrds(wrds, query)
+    return output
+end
+
+function query_wrds(wrds, query)
+    output = LibPQ.execute(wrds, query) |> columntable |> DataFrame
+    return output
+end
 
 function loadarrow(filename)
     arrow_table = Arrow.Table(filename)
