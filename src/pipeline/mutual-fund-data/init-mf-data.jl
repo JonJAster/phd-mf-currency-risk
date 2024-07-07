@@ -98,16 +98,19 @@ function _read_mf_timeseries()
         )
     end
 
-    
+    data = reduce(
+        (x, y) -> outerjoin(x, y, on=[:crsp_fundno, :caldt]),
+        [mf_ret, mf_tna, uncompressed_timeseries...]
+    )
 
     return data
 end
 
-function _decompress_timeseries(short_data) # short_data = copy(compressed_timeseries[:mf_rearload])
+function _decompress_timeseries(short_data_in) # short_data_in = copy(compressed_timeseries[:mf_rearload])
 
-    data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
+    data_cols = propertynames(short_data_in[!, Not(:crsp_fundno, :begdt, :enddt)])
 
-    short_data = dropmissing(short_data, [:begdt, :enddt]) # TODO: Rushed it, handle this better
+    short_data = dropmissing(short_data_in, [:begdt, :enddt]) # TODO: Rushed it, handle this better
 
     short_data.date_domain = [row.begdt:Month(1):row.enddt for row in eachrow(short_data)]
     short_data.span_length = length.(short_data.date_domain)
@@ -115,7 +118,7 @@ function _decompress_timeseries(short_data) # short_data = copy(compressed_times
     total_rows = sum(short_data.span_length)
     long_data = DataFrame()
 
-    for col in propertynames(short_data)
+    for col in propertynames(short_data_in)
         coltype = eltype(short_data[!, col])
         col = (col == :begdt ? :caldt : col)
         col == :enddt && continue
@@ -145,22 +148,6 @@ function _decompress_timeseries(short_data) # short_data = copy(compressed_times
     end
 
     return long_data
-end
-
-function _drop_allmissing_funds!(data)
-    fund_level_missing_mask = combine(
-        groupby(data, :fundid),
-        [
-            col => (x->all(ismissing, x)) => col*"_mask"
-            for col in names(data[:, Not(:fundid, :secid, :date)])
-        ]...
-    )
-
-    all_missing_funds = fund_level_missing_mask[
-        all.(eachrow(fund_level_missing_mask[:, Not(:fundid)])), :fundid
-    ]
-
-    delete!(data, findall(in(all_missing_funds), data.fundid))
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
