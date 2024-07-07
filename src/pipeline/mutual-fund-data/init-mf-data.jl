@@ -2,6 +2,7 @@ using Revise
 using DataFrames
 using Arrow
 using Dates
+using DataStructures
 using Base.Threads
 
 includet("../../shared/CommonConstants.jl")
@@ -22,21 +23,44 @@ function init_mf_data()
 end
 
 function _read_mf_timeseries()
-    
+    process_start = time()
     mf_ret = loadarrow(joinpath(DIRS.mf.raw, "monthly_returns.arrow"))
     mf_tna = loadarrow(joinpath(DIRS.mf.raw, "monthly_tna.arrow"))
     
-    mf_fees = loadarrow(joinpath(DIRS.mf.raw, "fund_fees.arrow"))
-    select!(mf_fees, [:crsp_fundno, :begdt, :enddt, :exp_ratio])
-    mf_frontload = loadarrow(joinpath(DIRS.mf.raw, "front_load.arrow"))
-    select!(mf_frontload, [:crsp_fundno, :begdt, :enddt, :front_load])
-    mf_rearload = loadarrow(joinpath(DIRS.mf.raw, "rear_load.arrow"))
-    select!(mf_rearload, [:crsp_fundno, :begdt, :enddt, :time_period, :rear_load])
-    mf_style = loadarrow(joinpath(DIRS.mf.raw, "fund_style.arrow"))
-    select!(mf_style, [:crsp_fundno, :begdt, :enddt, :crsp_obj_cd])
-    mf_info_timeseries = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr_hist.arrow"))
+    compressed_timeseries = OrderedDict()
+    compressed_timeseries[:mf_fees] = (
+        loadarrow(joinpath(DIRS.mf.raw, "fund_fees.arrow"))
+    )
     select!(
-        mf_info_timeseries,
+        compressed_timeseries[:mf_fees],
+        [:crsp_fundno, :begdt, :enddt, :exp_ratio]
+    )
+    compressed_timeseries[:mf_frontload] = (
+        loadarrow(joinpath(DIRS.mf.raw, "front_load.arrow"))
+    )
+    select!(
+        compressed_timeseries[:mf_frontload],
+        [:crsp_fundno, :begdt, :enddt, :front_load]
+    )
+    compressed_timeseries[:mf_rearload] = (
+        loadarrow(joinpath(DIRS.mf.raw, "rear_load.arrow"))
+    )
+    select!(
+        compressed_timeseries[:mf_rearload],
+        [:crsp_fundno, :begdt, :enddt, :time_period, :rear_load]
+    )
+    compressed_timeseries[:mf_style] = (
+        loadarrow(joinpath(DIRS.mf.raw, "fund_style.arrow"))
+    )
+    select!(
+        compressed_timeseries[:mf_style],
+        [:crsp_fundno, :begdt, :enddt, :crsp_obj_cd]
+    )
+    compressed_timeseries[:mf_info_timeseries] = (
+        loadarrow(joinpath(DIRS.mf.raw, "fund_hdr_hist.arrow"))
+    )
+    select!(
+        compressed_timeseries[:mf_info_timeseries],
         [
             :crsp_fundno,
             :chgdt,
@@ -47,53 +71,76 @@ function _read_mf_timeseries()
             :retail_fund
         ]
     )
+    rename!(
+        # TODO: Rushed it, handle this better
+        compressed_timeseries[:mf_info_timeseries],
+        :chgdt => :begdt,
+        :chgenddt => :enddt
+    )
 
-    mf_fees_long = _decompress_timeseries(mf_fees)
+    printtime(
+        "reading mutual fund timeseries data", task_start;
+        process_start_time=process_start, minutes=false
+    )
+
+    uncompressed_timeseries = []
+    @threads for df_key in collect(keys(compressed_timeseries)) # df_key = first(keys(compressed_timeseries))
+        # TODO: Test if vcat reducing long groups is faster
+        process_start = time()
+        push!(
+            uncompressed_timeseries,
+            _decompress_timeseries(compressed_timeseries[df_key])
+        )
+
+        printtime(
+            "decompressing timeseries of $df_key", task_start;
+            process_start_time=process_start, minutes=true
+        )
+    end
+
+    
 
     return data
 end
 
-function _decompress_timeseries(short_data) # short_data = mf_fees
+function _decompress_timeseries(short_data) # short_data = copy(compressed_timeseries[:mf_rearload])
 
-    original_columns = propertynames(short_data)
+    data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
-    short_data.date_domain = map(eachrow(short_data)) do row
-        row.begdt:Month(1):row.enddt
-    end
+    short_data = dropmissing(short_data, [:begdt, :enddt]) # TODO: Rushed it, handle this better
 
+    short_data.date_domain = [row.begdt:Month(1):row.enddt for row in eachrow(short_data)]
     short_data.span_length = length.(short_data.date_domain)
 
     total_rows = sum(short_data.span_length)
-
     long_data = DataFrame()
 
-    for col in original_columns
+    for col in propertynames(short_data)
         coltype = eltype(short_data[!, col])
-        if col == :begdt
-            col = :caldt
-        elseif col == :enddt
-            continue
-        end
+        col = (col == :begdt ? :caldt : col)
+        col == :enddt && continue
 
         long_data[:, col] = Vector{Union{Missing, coltype}}(missing, total_rows)
     end
 
-    N = nrow(short_data)
-    i = 1
-    task_start = time()
-    for fundno in short_data.crsp_fundno
-        fund_span = short_data[short_data.crsp_fundno .== fundno, :]
+    start_idx = 1
+    for (fundno, fund_group) in pairs(groupby(short_data, :crsp_fundno)) # (fundno, fund_group) = first(pairs(groupby(short_data, :crsp_fundno))
 
-        for period in eachrow(fund_span)
-            start_idx = findfirst(ismissing, long_data.crsp_fundno)
+        for period in eachrow(fund_group) # period = first(fund_span)
+            n_rows = period.span_length
+            idx_range = start_idx:start_idx+n_rows-1
 
-            idx_range = start_idx:start_idx + period.span_length - 1
-
-            long_data[idx_range, :crsp_fundno] = fill(fundno, period.span_length)
+            try
+                long_data[idx_range, :crsp_fundno] .= period.crsp_fundno
+            catch e
+                println("Error at fundno: $fundno, period: $period, idx_range: $idx_range")
+                rethrow(e)
+            end
+            
             long_data[idx_range, :caldt] = period.date_domain
-            long_data[idx_range, :exp_ratio] .= period.exp_ratio
-            println("($(round(i/N*100, digits=2))%) -- $((round(time() - task_start, digits=2))s)")
-            i += 1
+            long_data[idx_range, data_cols] = repeat(DataFrame(period[data_cols]), n_rows)
+
+            start_idx += n_rows
         end
     end
 
