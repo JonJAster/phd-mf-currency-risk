@@ -14,9 +14,13 @@ using .CommonFunctions
 function init_mf_data()
     task_start = time()
     mf_data = _read_mf_timeseries()
-    mf_info = _read_mf_crosssection()
+
+    mf_data.crsp_fundno = Int.(mf_data.crsp_fundno)
+
 
     _drop_allmissing_funds!(mf_data, Not([:fundid, :secid, :date]); dims=:rows)
+    
+    mf_info = _read_mf_crosssection()
 
     printtime("initialising mutual fund data", task_start, minutes=false)
     return mf_data
@@ -84,8 +88,7 @@ function _read_mf_timeseries()
     )
 
     uncompressed_timeseries = []
-    @threads for df_key in collect(keys(compressed_timeseries)) # df_key = first(keys(compressed_timeseries))
-        # TODO: Test if vcat reducing long groups is faster
+    @threads for df_key in collect(keys(compressed_timeseries))
         process_start = time()
         push!(
             uncompressed_timeseries,
@@ -106,7 +109,7 @@ function _read_mf_timeseries()
     return data
 end
 
-function _decompress_timeseries(short_data_in) # short_data_in = copy(compressed_timeseries[:mf_rearload])
+function _decompress_timeseries(short_data_in)
 
     data_cols = propertynames(short_data_in[!, Not(:crsp_fundno, :begdt, :enddt)])
 
@@ -127,9 +130,9 @@ function _decompress_timeseries(short_data_in) # short_data_in = copy(compressed
     end
 
     start_idx = 1
-    for (fundno, fund_group) in pairs(groupby(short_data, :crsp_fundno)) # (fundno, fund_group) = first(pairs(groupby(short_data, :crsp_fundno))
+    for (fundno, fund_group) in pairs(groupby(short_data, :crsp_fundno))
 
-        for period in eachrow(fund_group) # period = first(fund_span)
+        for period in eachrow(fund_group)
             n_rows = period.span_length
             idx_range = start_idx:start_idx+n_rows-1
 
