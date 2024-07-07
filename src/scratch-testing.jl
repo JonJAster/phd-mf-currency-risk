@@ -23,9 +23,36 @@ function test()
     ## Start CRSP data era tests
     fund_header = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
 
+    fund_header_hist = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr_hist.arrow"))
+
+    nunique_crsp_cl_grp = combine(
+        groupby(fund_header_hist, :crsp_fundno),
+        :crsp_cl_grp => (x->length(unique(skipmissing(x)))) => :nunique_crsp_cl_grp
+    )
+
+
     nmissing = OrderedDict(
         col => count(ismissing, fund_header[!, col]) for col in propertynames(fund_header)
     )
+
+    list_nmissing = sort(collect(nmissing), by=x->x[2])
+    for (field, nmissing) in list_nmissing
+        println("$field: $nmissing")
+    end
+
+    function inspect_missing(field)
+        message = (
+            "$(round(nmissing[:crsp_portno]/1000; digits=1))k missing from " *
+            "$(round(nrow(fund_header)/1000; digits=1))k total records " *
+            "[$(round(nmissing[:crsp_portno]/nrow(fund_header)*100, digits=2))%]"
+        )
+
+        return message
+    end
+
+    inspect_missing(:fund_name)
+
+        
 
 
     ## Start Morningstar data era tests
