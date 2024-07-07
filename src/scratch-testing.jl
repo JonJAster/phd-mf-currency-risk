@@ -23,12 +23,47 @@ function test()
     ## Start CRSP data era tests
     fund_header = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
 
+    x = fund_header[coalesce.((fund_header.retail_fund .== "N"),false) .&& coalesce.((fund_header.inst_fund .== "N"),false), :]
+
+    pprint(x[1:5,:])
+
+    println(x[end-20:end, 1:7])
+
     fund_header_hist = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr_hist.arrow"))
+
+    class_counts = combine(
+        groupby(fund_header, :crsp_cl_grp),
+        :retail_fund => (x->count(==("Y"), skipmissing(x))) => :retail_fund_count,
+        :inst_fund => (x->count(==("Y"), skipmissing(x))) => :inst_fund_count
+    )
+
+    dropmissing!(class_counts)
+    class_counts.both_flag = (class_counts.retail_fund_count .* class_counts.inst_fund_count) .> 0
+
+    class_counts[class_counts.both_flag, :]
+
+    pprint(fund_header[coalesce.(fund_header.crsp_cl_grp .== 2000010,false), [:fund_name, :retail_fund, :inst_fund]])
 
     nunique_crsp_cl_grp = combine(
         groupby(fund_header_hist, :crsp_fundno),
         :crsp_cl_grp => (x->length(unique(skipmissing(x)))) => :nunique_crsp_cl_grp
     )
+
+    test_fundno = nunique_crsp_cl_grp[nunique_crsp_cl_grp.nunique_crsp_cl_grp .== maximum(nunique_crsp_cl_grp.nunique_crsp_cl_grp), :crsp_fundno][1]
+
+    fund_header[fund_header.crsp_fundno .== test_fundno, :]
+    fund_header_hist[fund_header_hist.crsp_fundno .== test_fundno, :]
+
+    test_hist = fund_header_hist[fund_header_hist.crsp_fundno .== test_fundno, 1:7]
+
+    println(test_hist)
+
+    grp_ids = Int.(unique(skipmissing(test_hist.crsp_cl_grp)))
+
+    for id in grp_ids
+        println(fund_header_hist[coalesce.(fund_header_hist.crsp_cl_grp .== id,false), 1:7])
+    end
+
 
 
     nmissing = OrderedDict(
