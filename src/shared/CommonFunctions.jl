@@ -19,7 +19,9 @@ export qscan
 export qlookup
 export pprint
 export connect_wrds
-export scan_wrds
+export scan_libraries_wrds
+export scan_sets_wrds
+export scan_vars_wrds
 export query_wrds
 export loadarrow
 export initialise_base_data
@@ -193,12 +195,12 @@ function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, 
     end
 end
 
-function connect_wrds(username, password)
-    if isempty(username) || isempty(password)
+function connect_wrds(username=nothing, password=nothing)
+    if isnothing(username) || isnothing(password)
         credentials_file = joinpath(DIRS.map.raw, "wrds-credentials.csv")
         credentials = CSV.read(credentials_file, DataFrame)
-        isempty(username) && (username = first(credentials.username))
-        isempty(password) && (password = first(credentials.password))
+        isnothing(username) && (username = first(credentials.username))
+        isnothing(password) && (password = first(credentials.password))
     end
     wrds = LibPQ.Connection(
         """
@@ -212,7 +214,7 @@ function connect_wrds(username, password)
     return wrds
 end
 
-function scan_wrds(wrds)
+function scan_libraries_wrds(wrds)
     query = (
         "select distinct table_schema
         from information_schema.tables
@@ -224,9 +226,54 @@ function scan_wrds(wrds)
     return output
 end
 
-function query_wrds(wrds, query)
-    output = LibPQ.execute(wrds, query) |> columntable |> DataFrame
+function scan_sets_wrds(wrds, library)
+    query = (
+        "select table_name
+        from information_schema.tables
+        where table_schema = '$library'
+        order by table_name"
+    )
+    output = query_wrds(wrds, query)
     return output
+end
+
+function scan_vars_wrds(wrds, library, dataset)
+    query = (
+        "select column_name
+        from information_schema.columns
+        where table_schema = '$library'
+        and table_name = '$dataset'
+        order by column_name"
+    )
+    output = query_wrds(wrds, query)
+    return output
+end
+
+function query_wrds(wrds, query; limit=nothing, save_to=nothing)
+    if !isnothing(limit) && !isnothing(save_to)
+        println(
+            "Warning: Attempted to saved limited file to disk. " *
+            "Filename appended with '_limit$limit'."
+        )
+
+        # TODO: Handle save_to sent as full dir or with extension
+        save_to *= "_limit$limit"
+    end
+
+    !isnothing(limit) && (query *= " limit $limit")
+
+    data = LibPQ.execute(wrds, query) |> columntable |> DataFrame
+
+    if !isnothing(save_to)
+        filepath = makepath(DIRS.mf.raw, save_to, ".arrow")
+        try
+            Arrow.write(filepath, data)
+        catch e # TODO: catch specific error
+            println("Not written to file due to error: ", e)
+        end
+    end
+
+    return data
 end
 
 function loadarrow(filename)
@@ -307,24 +354,20 @@ end
 
 function printtime(
         task, start_time;
-        process_subtask="", process_start_time=0, minutes=false
+        process_start_time=nothing, minutes=false
         )
-    if isempty(process_subtask) ⊻ iszero(process_start_time)
-        error("If any process parameters are supplied, all must be supplied")
-    end
-    timed_process = !isempty(process_subtask)
 
     duration_s = round(time() - start_time, digits=2)
     duration_m = round(duration_s / 60, digits=2)
     
-    if !timed_process
+    if isnothing(process_start_time)
         printout = "Finished $task in $duration_s seconds"
         minutes && (printout *= " ($duration_m minutes)")
     else
         process_duration_s = round(time() - process_start_time, digits=2)
         process_duration_m = round(process_duration_s / 60, digits=2)
 
-        printout = "Finished $task for $process_subtask in $process_duration_s seconds"
+        printout = "Finished $task in $process_duration_s seconds"
         minutes && (printout *= " ($process_duration_m minutes)")
         printout *= ", total running time $duration_s seconds ($duration_m minutes)"
     end
