@@ -22,11 +22,33 @@ end
 
 function _read_mf_timeseries()
     
-    mf_ret_tablename = "monthly_returns"
-    mf_tna = _read_mf_tna(wrds)
+    mf_ret = loadarrow(joinpath(DIRS.mf.raw, "monthly_returns.arrow"))
+    mf_tna = loadarrow(joinpath(DIRS.mf.raw, "monthly_tna.arrow"))
+    mf_fees = loadarrow(joinpath(DIRS.mf.raw, "fund_fees.arrow"))
+    select!(mf_fees, [:crsp_fundno, :begdt, :enddt, :exp_ratio])
+    mf_frontload = loadarrow(joinpath(DIRS.mf.raw, "front_load.arrow"))
+    select!(mf_frontload, [:crsp_fundno, :begdt, :enddt, :front_load])
+    mf_rearload = loadarrow(joinpath(DIRS.mf.raw, "rear_load.arrow"))
+    select!(mf_rearload, [:crsp_fundno, :begdt, :enddt, :time_period, :rear_load])
+    mf_style = loadarrow(joinpath(DIRS.mf.raw, "fund_style.arrow"))
+    select!(mf_style, [:crsp_fundno, :begdt, :enddt, :crsp_obj_cd])
+    mf_info_timeseries = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr_hist.arrow"))
+    select!(
+        mf_info_timeseries,
+        [
+            :crsp_fundno,
+            :chgdt,
+            :enddt,
+            :crsp_cl_grp,
+            :index_fund_flag,
+            :vau_fund,
+            :et_flag,
+            :dead_flag,
+            :delist_cd,
+            :merge_fundno
+        ]
+    )
     mf_fees = _read_mf_fees(wrds, force=true)
-
-    close(wrds)
     
     mf_data = outerjoin(mf_ret, mf_tna; on=[:crsp_fundno, :caldt])
     mf_data[!, :exp_ratio] = Array{Union{Missing, Float64}}(missing, nrow(mf_data))
