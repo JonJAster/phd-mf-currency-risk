@@ -94,7 +94,7 @@ function _read_mf_timeseries()
 
         printtime(
             "decompressing timeseries of $df_key", task_start;
-            process_start_time=process_start, minutes=true
+            process_start_time=process_start, minutes=false
         )
     end
 
