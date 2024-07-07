@@ -20,6 +20,15 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    ## Start CRSP data era tests
+    fund_header = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
+
+    nmissing = OrderedDict(
+        col => count(ismissing, fund_header[!, col]) for col in propertynames(fund_header)
+    )
+
+
+    ## Start Morningstar data era tests
     # Testing fees
     init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
     
