@@ -154,7 +154,17 @@ function _decompress_timeseries(short_data_in)
 end
 
 function _init_data!(mf_data)
-    # crsp_fundno to Int, 
+    # crsp_fundno to Int, crsp_obj_cd to CategoricalArray, index_fund_flag to CategoricalArray, et_flag to CategoricalArray, retail_fund to Boolean with missing
+    mf_data.crsp_fundno = convert.(Int, mf_data.crsp_fundno)
+    mf_data.crsp_cl_grp = CategoricalArray(mf_data.crsp_cl_grp)
+    mf_data.crsp_obj_cd = CategoricalArray(mf_data.crsp_obj_cd)
+    mf_data.index_fund_flag = CategoricalArray(mf_data.index_fund_flag)
+    mf_data.et_flag = CategoricalArray(mf_data.et_flag)
+    mf_data.retail_fund = coalesce.(mf_data.retail_fund .== "Y", missing)
+
+    # TODO: Make sure you know for sure what crsp_cl_grp is IDing before you do this
+    # select!(mf_data, :crsp_fundo, :crsp_cl_grp, Not(:crsp_fundno, :crsp_cl_grp))
+    return
 end
 
 function _read_mf_crosssection()
