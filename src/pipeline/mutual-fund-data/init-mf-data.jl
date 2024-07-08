@@ -15,9 +15,13 @@ using .CommonFunctions
 function init_mf_data()
     task_start = time()
     mf_data = _read_mf_timeseries()
-    _init_data!(mf_data)
     
+    # Retype, rename, and [reorder the columns (not this one yet)]
+    _init_data!(mf_data)
+
     mf_info = _read_mf_crosssection()
+
+    # Retype and rename the columns
     _init_info!(mf_info)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
@@ -162,8 +166,13 @@ function _init_data!(mf_data)
     mf_data.et_flag = CategoricalArray(mf_data.et_flag)
     mf_data.retail_fund = coalesce.(mf_data.retail_fund .== "Y", missing)
 
+    mf_data[coalesce.(mf_data.time_period .== -99, false), :time_period] .= missing
+
     # TODO: Make sure you know for sure what crsp_cl_grp is IDing before you do this
     # select!(mf_data, :crsp_fundo, :crsp_cl_grp, Not(:crsp_fundno, :crsp_cl_grp))
+
+    # println(first(mf_data, 5))
+    # TODO: Renaming
     return
 end
 
@@ -194,7 +203,9 @@ function _init_info!(mf_info)
     mf_info.crsp_fundno = convert.(Union{Missing,Int}, mf_info.crsp_fundno)
     mf_info.delist_cd = CategoricalArray(mf_info.delist_cd)
     mf_info.merge_fundno = convert.(Union{Missing,Int}, mf_info.merge_fundno)
-    
+
+    # println(first(mf_info, 5))
+    # TODO: Renaming
     return
 end
 
