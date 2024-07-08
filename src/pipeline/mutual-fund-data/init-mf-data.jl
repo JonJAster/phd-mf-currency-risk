@@ -3,6 +3,7 @@ using DataFrames
 using Arrow
 using Dates
 using DataStructures
+using CategoricalArrays
 using Base.Threads
 
 includet("../../shared/CommonConstants.jl")
@@ -16,6 +17,7 @@ function init_mf_data()
     mf_data = _read_mf_timeseries()
     
     mf_info = _read_mf_crosssection()
+    _retype_info!(mf_info)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
     return mf_data
@@ -149,6 +151,33 @@ function _decompress_timeseries(short_data_in)
 
     return long_data
 end
+
+function _read_mf_crosssection()
+    process_start = time()
+    mf_info = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
+    select!(
+        mf_info,
+        [
+            :crsp_fundno,
+            :fund_name,
+            :first_offer_dt,
+            :end_dt,
+            :delist_cd,
+            :merge_fundno
+        ]
+    )
+
+    printtime(
+        "reading mutual info data", task_start;
+        process_start_time=process_start, minutes=false
+    )
+
+    return mf_info
+end
+
+function _retype_info!(mf_info)
+    mf_info.crsp_fundno = convert.(Int, mf_info.crsp_fundno)
+    mf_info.delist_cd = convert.(String3)
 
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = init_mf_data()
