@@ -15,9 +15,10 @@ using .CommonFunctions
 function init_mf_data()
     task_start = time()
     mf_data = _read_mf_timeseries()
+    _init_data!(mf_data)
     
     mf_info = _read_mf_crosssection()
-    _retype_info!(mf_info)
+    _init_info!(mf_info)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
     return mf_data
@@ -152,6 +153,10 @@ function _decompress_timeseries(short_data_in)
     return long_data
 end
 
+function _init_data!(mf_data)
+    # crsp_fundno to Int, 
+end
+
 function _read_mf_crosssection()
     process_start = time()
     mf_info = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
@@ -175,9 +180,13 @@ function _read_mf_crosssection()
     return mf_info
 end
 
-function _retype_info!(mf_info)
-    mf_info.crsp_fundno = convert.(Int, mf_info.crsp_fundno)
-    mf_info.delist_cd = convert.(String3)
+function _init_info!(mf_info)
+    mf_info.crsp_fundno = convert.(Union{Missing,Int}, mf_info.crsp_fundno)
+    mf_info.delist_cd = CategoricalArray(mf_info.delist_cd)
+    mf_info.merge_fundno = convert.(Union{Missing,Int}, mf_info.merge_fundno)
+    
+    return
+end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = init_mf_data()
