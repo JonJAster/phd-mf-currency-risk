@@ -14,11 +14,6 @@ using .CommonFunctions
 function init_mf_data()
     task_start = time()
     mf_data = _read_mf_timeseries()
-
-    mf_data.crsp_fundno = Int.(mf_data.crsp_fundno)
-
-
-    _drop_allmissing_funds!(mf_data, Not([:fundid, :secid, :date]); dims=:rows)
     
     mf_info = _read_mf_crosssection()
 
@@ -81,6 +76,8 @@ function _read_mf_timeseries()
         :chgdt => :begdt,
         :chgenddt => :enddt
     )
+
+    # TODO: Make type adjustments here to save on memory
 
     printtime(
         "reading mutual fund timeseries data", task_start;
@@ -151,22 +148,6 @@ function _decompress_timeseries(short_data_in)
     end
 
     return long_data
-end
-
-function _drop_allmissing_funds!(data)
-    fund_level_missing_mask = combine(
-        groupby(data, :fundid),
-        [
-            col => (x->all(ismissing, x)) => col*"_mask"
-            for col in names(data[:, Not(:fundid, :secid, :date)])
-        ]...
-    )
-
-    all_missing_funds = fund_level_missing_mask[
-        all.(eachrow(fund_level_missing_mask[:, Not(:fundid)])), :fundid
-    ]
-
-    delete!(data, findall(in(all_missing_funds), data.fundid))
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
