@@ -18,6 +18,7 @@ export qhead
 export qscan
 export qlookup
 export pprint
+export inspect
 export connect_wrds
 export scan_libraries_wrds
 export scan_sets_wrds
@@ -119,29 +120,45 @@ function qlookup(id; data=false)
     end
 end
 
-function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, secondaryid=4:6, seuss=["Aunt Annie's Alligator", "Barber Baby Bubbles and a Bumblebee", "Camel on the Ceiling"]); rows=nothing; centre=false
+function pprint(df, id=nothing; rows=nothing, centre=false, header=true)
+    isnothing(id) && (id = first(propertynames(df)))
     isnothing(rows) && (rows = nrow(df))
     terminal_width = displaysize(stdout)[2]
-    col_content_widths = Dict(
-        col_name => maximum(length.(string.(df[!, col_name])))
-        for col_name in propertynames(df)
-    )
-    col_total_widths = Dict(
-        col_name => maximum([length(string(col_name)), col_content_widths[col_name]])
-        for col_name in propertynames(df)
-    )
+
+    content_width(col_name) = maximum(length.(string.(df[!, col_name])))
+    total_width(col_name) = maximum([length(string(col_name)), content_width[col_name]])
+    true_width(col_name) = header ? total_width(col_name) : content_width(col_name)
 
     function printwidth(cols)
+        # Returns the print width of an array of column names
         isempty(cols) && return 0
         
-        print_width = sum(get.(Ref(col_total_widths), cols, 0)) + 2*(length(cols) - 1)
+        combined_col_widths = sum(true_width.(cols))
+        n_cols_with_whitespace = length(cols) - 1
+        whitespace_width = 2*n_cols_with_whitespace
+        print_width = combined_col_widths + whitespace_width
         return print_width
     end
 
+    if true_width(id) > terminal_width
+        error("ID column width exceeds terminal width.")
+    end
+
+    non_id_cols = propertynames(df[!, Not(id)])
+    max_fittable_width = terminal_width - true_width(id) - 2
+    fit_check = [printwidth([id, x]) <= max_fittable_width for x in non_id_cols]
+    if any(!fit_check)
+        offending_cols = non_id_cols[.!fit_check]
+        error("Column width exceeds terminal width: $offending_cols")
+    end
+
     print_sets = []
-    current_print_set = []
-    for col_name in propertynames(df) 
-        col_total_widths[col_name] > terminal_width && error("Column width exceeds terminal width.")
+    current_print_set = [id]
+    for col_name in non_id_cols
+        if printwidth([id, col_name]) > terminal_width
+            # Column needs at minimum to fit alone beside the ID column
+            error("Column width exceeds terminal width.")
+        end
         
         if printwidth([current_print_set..., col_name]) > terminal_width
             push!(print_sets, deepcopy(current_print_set))
@@ -174,14 +191,14 @@ function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, 
         for print_set in print_sets
             printout = ""
             for col_name in print_set
-                printout *= align_text(string(col_name), col_total_widths[col_name]) * "  "
+                printout *= align_text(string(col_name), true_width[col_name]) * "  "
             end
             println(printout[1:end-2])
             println("-"^printwidth(print_set))
             for i in last_printed_row+1:min(last_printed_row+10, rows)
                 printout = ""
                 for col_name in print_set
-                    printout *= align_text(string(df[i, col_name]), col_total_widths[col_name]) * "  "
+                    printout *= align_text(string(df[i, col_name]), true_width[col_name]) * "  "
                 end
                 println(printout)
             end
@@ -192,6 +209,34 @@ function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, 
             println("*"^terminal_width)
             println()
         end
+    end
+end
+
+function inspect(data, id; limit=5, window=6)
+    id_list = unique(data[!,id])
+    final_inspect = minimum([limit, length(id_list)])
+
+    println("*******")
+    println("INSPECT")
+    println("*******")
+    println()
+
+    for i in id_list[1:final_inspect]
+        id_data = data[data[!,id] .== i, :]
+        slice_length = nrow(id_data)
+        if slice_length <= window
+            pprint(id_data)
+        else
+            full_upper_window = ceil(Int, window/2)
+            full_lower_window = floor(Int, window/2)
+            upper_window = minimum([ceil(Int, slice_length/2), full_upper_window])
+            lower_window = minimum([floor(Int, slice_length/2), full_lower_window])
+
+            pprint(first(id_data, upper_window))
+            println("...")
+            pprint(last(id_data, lower_window))
+        end
+        println()
     end
 end
 
