@@ -107,37 +107,6 @@ function _aggregate_to_fund_level(multi_class_funds)
     return aggregate_data
 end
 
-function _aggregate_to_fundid(data)
-    total_assets = combine(
-        groupby(data, [:fundid, :date]),
-        :net_assets => sum => :total_net_assets
-    )
-
-    data_total = innerjoin(data, total_assets, on=[:fundid, :date])
-    data_total.lead_weight = data_total.net_assets ./ data_total.total_net_assets
-    data_weighted = transform(
-        groupby(data_total, :secid),
-        :lead_weight => lag => :weight
-    )
-    
-    data_weighted.weighted_net_returns = data_weighted.weight .* data_weighted.net_returns
-    data_weighted.weighted_costs = data_weighted.weight .* data_weighted.costs
-
-    aggregate_data = combine(
-        groupby(data_weighted, [:fundid, :date]),
-        :net_assets => sum => :net_assets,
-        :weighted_net_returns => sum => :net_returns,
-        :weighted_costs => sum => :costs
-    )
-
-    lagged_assets_aggregate_data = transform(
-        groupby(aggregate_data, :fundid),
-        :net_assets => lag => :net_assets_m1
-    )
-
-    return lagged_assets_aggregate_data
-end
-
 function _null_out_small!(data)
     data[
         coalesce.(data.net_assets_m1, 0) .< 10_000_000,
