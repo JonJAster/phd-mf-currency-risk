@@ -43,35 +43,6 @@ function process_mf_data()
     return
 end
 
-function _filter_out_passive(data, info)
-    passive_keywords = [
-        "index",
-        "idx",
-        "etf",
-        "s&p",
-        "nasdaq",
-        "dow",
-        "russell"
-    ]
-
-    function matches_keywords(name, keywords)
-        for kw in keywords
-            if occursin(kw, lowercase(name)) && !startswith(lowercase(name), kw)
-                return true
-            end
-        end
-        return false
-    end
-
-    passive_fundids = info[
-        matches_keywords.(info.fund_legal_name, Ref(passive_keywords)),
-        :fundid
-    ] |> Set
-
-    active_data = data[.!in.(data.fundid, Ref(passive_fundids)), :]
-    return active_data
-end
-
 function _aggregate_to_fundid(data)
     total_assets = combine(
         groupby(data, [:fundid, :date]),
