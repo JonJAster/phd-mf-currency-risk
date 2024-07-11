@@ -14,21 +14,26 @@ using .CommonFunctions
 
 function init_mf_data()
     task_start = time()
-    mf_data = _read_mf_timeseries()
+    mf_data = _read_mf_timeseries(task_start)
     
     # Retype, rename, and [reorder the columns (not this one yet)]
     _init_data!(mf_data)
 
-    mf_info = _read_mf_crosssection()
+    mf_info = _read_mf_crosssection(task_start)
 
     # Retype and rename the columns
     _init_info!(mf_info)
+
+    save_filename_data = makepath(DIRS.mf.init, "mf-data.arrow")
+    save_filename_info = makepath(DIRS.mf.init, "mf-info.arrow")
+    Arrow.write(save_filename_data, mf_data)
+    Arrow.write(save_filename_info, mf_info)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
     return mf_data
 end
 
-function _read_mf_timeseries()
+function _read_mf_timeseries(task_start)
     process_start = time()
     mf_ret = loadarrow(joinpath(DIRS.mf.raw, "monthly_returns.arrow"))
     mf_tna = loadarrow(joinpath(DIRS.mf.raw, "monthly_tna.arrow"))
@@ -158,25 +163,32 @@ function _decompress_timeseries(short_data_in)
 end
 
 function _init_data!(mf_data)
-    # crsp_fundno to Int, crsp_obj_cd to CategoricalArray, index_fund_flag to CategoricalArray, et_flag to CategoricalArray, retail_fund to Boolean with missing
     mf_data.crsp_fundno = convert.(Int, mf_data.crsp_fundno)
-    mf_data.crsp_cl_grp = CategoricalArray(mf_data.crsp_cl_grp)
+    mf_data.crsp_cl_grp = convert.(Union{Missing,Int}, mf_data.crsp_cl_grp)
     mf_data.crsp_obj_cd = CategoricalArray(mf_data.crsp_obj_cd)
     mf_data.index_fund_flag = CategoricalArray(mf_data.index_fund_flag)
     mf_data.et_flag = CategoricalArray(mf_data.et_flag)
     mf_data.retail_fund = coalesce.(mf_data.retail_fund .== "Y", missing)
 
     mf_data[coalesce.(mf_data.time_period .== -99, false), :time_period] .= missing
+    
+    select!(mf_data, :crsp_cl_grp, :crsp_fundno, Not(:crsp_fundno, :crsp_cl_grp))
 
-    # TODO: Make sure you know for sure what crsp_cl_grp is IDing before you do this
-    # select!(mf_data, :crsp_fundo, :crsp_cl_grp, Not(:crsp_fundno, :crsp_cl_grp))
-
-    # println(first(mf_data, 5))
-    # TODO: Renaming
+    rename!(
+        mf_data,
+        :crsp_fundno => :fund_class_id,
+        :crsp_cl_grp => :class_group_id,
+        :caldt => :date,
+        :mret => :ret,
+        :mtna => :net_assets,
+        :exp_ratio => :costs,
+        :time_period => :rear_load_period,
+        :crsp_obj_cd => :investment_objective
+    )
     return
 end
 
-function _read_mf_crosssection()
+function _read_mf_crosssection(task_start)
     process_start = time()
     mf_info = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
     select!(
@@ -204,8 +216,14 @@ function _init_info!(mf_info)
     mf_info.delist_cd = CategoricalArray(mf_info.delist_cd)
     mf_info.merge_fundno = convert.(Union{Missing,Int}, mf_info.merge_fundno)
 
-    # println(first(mf_info, 5))
-    # TODO: Renaming
+    rename!(
+        mf_info,
+        :crsp_fundno => :fund_class_id,
+        :first_offer_dt => :inception_date,
+        :end_dt => :end_date,
+        :delist_cd => :delist_code,
+        :merge_fundno => :merge_fund_class_id
+    )
     return
 end
 
