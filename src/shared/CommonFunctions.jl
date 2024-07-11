@@ -121,13 +121,15 @@ function qlookup(id; data=false)
     end
 end
 
-# df = first(loadarrow(joinpath(DIRS.mf.raw, "fund_fees.arrow")), 50)
-# id_cols = [:crsp_fundno, :begdt, :enddt]
-# pprint(df, id_cols)
 function pprint(
         df, id_cols=nothing;
         rows=nothing, centre=false, header=true, cluster_size=10
         )
+
+    MAKE_TEXT_WHITE = Crayon(foreground=(255,255,255))
+    MAKE_TEXT_PURPLE = Crayon(foreground=(127,25,195))
+    MAKE_TEXT_LIGHT_GREY = Crayon(foreground=(200,200,200))
+    MAKE_TEXT_DARK_GREY = Crayon(foreground=(10,10,10))
 
     isnothing(id_cols) && (id_cols = [first(propertynames(df))])
     typeof(id_cols) <: AbstractArray || (id_cols = [id_cols])
@@ -202,18 +204,22 @@ function pprint(
             )
             printout *= "  "
         end
+        print(MAKE_TEXT_LIGHT_GREY)
         println(printout[1:end-TRAILING_WHITESPACE])
         println("-"^printwidth(cols))
+        print(MAKE_TEXT_WHITE)
     end
 
     function print_row(row, cols)
         TRAILING_WHITESPACE = 2
         printout = ""
         for col_name in cols
+            ismissing(row[col_name]) && (printout *= string(MAKE_TEXT_DARK_GREY))
             printout *= align_text(
                 string(row[col_name]),
                 stored_true_widths[col_name]
             )
+            ismissing(row[col_name]) && (printout *= string(MAKE_TEXT_WHITE))
             printout *= "  "
         end
         println(printout[1:end-TRAILING_WHITESPACE])
@@ -233,8 +239,10 @@ function pprint(
 
         last_printed_row += cluster_size
         if last_printed_row < rows
+            print(MAKE_TEXT_PURPLE)
             println("*"^maximum(printwidth.(print_sets)))
             println()
+            print(MAKE_TEXT_WHITE)
         end
     end
 end
