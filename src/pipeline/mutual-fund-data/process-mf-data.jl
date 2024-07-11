@@ -26,18 +26,31 @@ function process_mf_data()
     data.no_load = (data.front_load .== 0)
     data.equity_fund = startswith.(coalesce.(data.investment_objective, ""), "E")
     data.foreign_fund = startswith.(coalesce.(data.investment_objective, ""), "EF")
+    data.index_fund = coalesce.(data.index_fund_flag .== "D", false)
+    
+    index_date_conflicts = combine(
+        groupby(data, :fund_class_id),
+        :index_fund => (x->count(!ismissing, unique(x))) => :nunique
+    )
 
-    equity_conflict = test_for_class_conflict(data, :equity_fund);
+    true_index_date_conflicts = index_date_conflicts[index_date_conflicts.nunique .> 1, :]
 
-    data[(data.fund_id .== equity_conflict.fund_id[1]) .&& (data.date .== equity_conflict.date[1]), :]
+    n_funds_conflicts = length(true_index_date_conflicts.fund_class_id)
+    test_fund_id = true_index_date_conflicts.fund_class_id[1]
+    test_fund = data[data.fund_class_id .== test_fund_id, :]
+    sort!(test_fund, :date)
 
-    describe(data.no_load)
+    println(test_fund[!, [:fund_id, :date, :ret, :net_assets, :costs, :investment_objective, :index_fund_flag]])
+    println(test_fund)
+    N_funds = length(unique(data.fund_class_id))
+    println("There are $n_funds_conflicts funds ($(n_funds_conflicts / N_funds * 100)%) with index fund flags that CHANGE OVER TIME")
+    n_funds_conflicts = length(unique(data[in.(data.fund_class_id, Ref(index_date_conflicts[index_date_conflicts.nunique .> 1, :fund_class_id]))]))
 
-    countmap(data.index_fund_flag)
-    function test_for_class_conflict(data, field)
+    function test_for_class_conflict(data, field; group_on=[:fund_id, :date])
         potential_conflicts = data[.!ismissing.(data.class_group_id), :]
+        dropmissing!(potential_conflicts, field)
         conflicts = combine(
-            groupby(potential_conflicts, [:fund_id, :date]),
+            groupby(potential_conflicts, group_on),
             field => (x->length(unique(x))) => :nunique
         )
         n_obs_conflicts = sum(conflicts.nunique .> 1)
@@ -94,6 +107,10 @@ function process_mf_data()
 end
 
 function _identify_funds!(data)
+    # TODO: This causes some funds to have IDs that change over time which is not
+    #       appropriate for grouping on. Need to look into the CRSP definition process for
+    #       codes as well.
+
     # Class group IDs are supposed all be 2_xxx_xxx, but some are smaller integers.
     # In the original dataset it is verified that adding 2_000_000 to the smaller integers
     # does not result in any collisions with the larger integers, but it is checked
