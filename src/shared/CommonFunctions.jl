@@ -120,6 +120,7 @@ function qlookup(id; data=false)
     end
 end
 
+# df = loadarrow(joinpath(DIRS.mf.raw, "fund_fees.arrow"))
 function pprint(df, id=nothing; rows=nothing, centre=false, header=true)
     isnothing(id) && (id = first(propertynames(df)))
     isnothing(rows) && (rows = nrow(df))
