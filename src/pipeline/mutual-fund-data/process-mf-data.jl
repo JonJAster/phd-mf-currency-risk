@@ -66,10 +66,17 @@ function _identify_funds!(data)
     )
     
     if !isempty(shift_collisions)
-        error("Class group IDs collide after shifting by 2_000_000")
+        # TODO: Reinstate this error once fixed
+        # error("Class group IDs collide after shifting by 2_000_000")
     end
 
-    data[coalesce.(data.class_group_id .< 2_000_000, false), :class_group_id] .+= 2_000_000
+    # TODO: Clean this up by finding a better unique identifier
+    data[coalesce.(data.class_group_id .< 2_000_000, false), :class_group_id] .= (
+            -1 .* (
+                data[coalesce.(data.class_group_id .< 2_000_000, false), :class_group_id] 
+                .+ 2_000_000
+            )
+    )
 
     # Use the class group ID if it exists, otherwise use the only class's fund class ID
     data.fund_id = coalesce.(data.class_group_id, data.fund_class_id)
