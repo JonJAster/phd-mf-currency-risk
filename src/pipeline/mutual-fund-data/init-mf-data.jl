@@ -16,7 +16,7 @@ function init_mf_data()
     task_start = time()
     mf_data = _read_mf_timeseries(task_start)
     
-    # Retype, rename, and [reorder the columns (not this one yet)]
+    # Retype, rename, and reorder the columns
     _init_data!(mf_data)
 
     mf_info = _read_mf_crosssection(task_start)
@@ -111,7 +111,7 @@ function _read_mf_timeseries(task_start)
     return data
 end
 
-function _decompress_timeseries(short_data) # short_data_in = compressed_timeseries[:mf_fees]
+function _decompress_timeseries(short_data) # short_data = compressed_timeseries[:mf_fees]
     data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
     if ismissing.(short_data.begdt) .⊻ ismissing.(short_data.enddt)
@@ -120,10 +120,12 @@ function _decompress_timeseries(short_data) # short_data_in = compressed_timeser
     
     # Align dates with days of 15 or lower to the end of the previous month, else
     # to the end of the current month
+    pprint(short_data[1:3,:]; header=false)
+    println("a")
     inspect(short_data, :crsp_fundno)
-    zeros(Bool,1)
+        #zeros(Bool,1)
 
-    short_data.begdt = day.(short_data.begdt) .<= 15 ? lastdayshort_data.begdt, short_data.begdt)
+        #short_data.begdt = day.(short_data.begdt) .<= 15 ? lastdayshort_data.begdt, short_data.begdt)
 
     short_data.date_domain = [row.begdt:Month(1):row.enddt for row in eachrow(short_data)]
     short_data.span_length = length.(short_data.date_domain)
