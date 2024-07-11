@@ -24,7 +24,11 @@ function process_mf_data()
     _identify_funds!(data)
 
     aggregate_data = _aggregate_to_fund_level(data)
-    _calculate_fund_flows!(aggregate_data)
+    _calculate_fund_flows!(aggregate_data) # TODO: Verify calculation
+    _clip_fund_flows!(aggregate_data) # TODO: Verify the accuracy and necessity of this step
+
+    # TODO: There are only 161 rows with all non-missing values - what happened?
+    dropmissing(aggregate_data)
 
 
     #sort!(data, [:class_group_id, :fund_class_id, :date])
@@ -97,8 +101,13 @@ function _aggregate_to_fund_level(multi_class_funds)
     aggregate_data = combine(
         groupby(data_weighted, [:fund_id, :date]),
         :net_assets => sum => :net_assets,
-        :weighted_ret => sum => :net_returns,
+        :weighted_ret => sum => :ret,
         :weighted_costs => sum => :costs
+    )
+
+    transform!(
+        groupby(aggregate_data, :fund_id),
+        :net_assets => lag => :net_assets_m1
     )
 
     # Aggregate is already date sorted
@@ -150,7 +159,7 @@ function _trim_missing_tails!(data)
 end
 
 function _calculate_fund_flows!(data)
-    data.flow = (data.net_assets ./ data.net_assets_m1) .- (1 .+ (data.net_returns ./ 100))
+    data.flow = (data.net_assets ./ data.net_assets_m1) .- (1 .+ (data.ret ./ 100))
     return
 end
 
@@ -161,7 +170,7 @@ function _clip_fund_flows!(data)
     data[
         coalesce.(data.flow .<= flow_lowerbound,false) .||
         coalesce.(data.flow .>= flow_upperbound,false),
-        [:net_assets, :net_returns, :costs, :net_assets_m1, :flow]
+        [:net_assets, :ret, :costs, :net_assets_m1, :flow]
     ] .= missing
     return
 end
