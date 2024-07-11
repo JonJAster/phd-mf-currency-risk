@@ -92,7 +92,14 @@ function _add_load_dummies!(data)
         coalesce.(data.rear_load .== 0, true)
     )
 
-    data[.!data.pure_no_load,:]
+    data.morningstar_no_load = data.pure_no_load .&& (
+        coalesce.(
+            coalesce.(data.actual_12b1 .<= 0.0025, data.max_12b1 .<= 0.0025),
+            true
+        )
+    )
+
+    return data[!, [:pure_no_load, :morningstar_no_load]]
 end
 
 function _aggregate_to_fund_level(multi_class_funds)
