@@ -24,24 +24,32 @@ function process_mf_data()
     _identify_funds!(data)
 
     data.no_load = (data.front_load .== 0)
-    data.equity = startswith.(data.objective, "E")
-    data.foreign = startswith.(data.objective, "EF")
+    data.equity_fund = startswith.(coalesce.(data.investment_objective, ""), "E")
+    data.foreign_fund = startswith.(coalesce.(data.investment_objective, ""), "EF")
+
+    equity_conflict = test_for_class_conflict(data, :equity_fund);
+
+    data[(data.fund_id .== equity_conflict.fund_id[1]) .&& (data.date .== equity_conflict.date[1]), :]
 
     describe(data.no_load)
 
     countmap(data.index_fund_flag)
     function test_for_class_conflict(data, field)
+        potential_conflicts = data[.!ismissing.(data.class_group_id), :]
         conflicts = combine(
-            groupby(data, [:fund_id, :date]),
+            groupby(potential_conflicts, [:fund_id, :date]),
             field => (x->length(unique(x))) => :nunique
         )
         n_obs_conflicts = sum(conflicts.nunique .> 1)
         n_funds_conflicts = length(unique(conflicts.fund_id[conflicts.nunique .> 1]))
         if n_obs_conflicts > 0
             println(
-                "There are $n_obs_conflicts observations across $n_funds_conflicts " *
-                "funds with conflicting $field values"
+                "There are $n_obs_conflicts observations " *
+                "($(n_obs_conflicts / nrow(data) * 100)%) across $n_funds_conflicts " *
+                "funds ($(n_funds_conflicts / length(unique(data.fund_id)) * 100)%) " *
+                "with conflicting $field values"
             )
+            println()
         end
 
         true_conflicts = conflicts[conflicts.nunique .> 1, :]
