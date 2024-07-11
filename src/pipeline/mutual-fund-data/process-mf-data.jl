@@ -172,10 +172,5 @@ function _filter_out_low_obs_funds!(data)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    output_data = process_mf_data()
-    output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
-
-    task_start = time()
-    Arrow.write(output_filename, output_data)
-    printtime("writing processed mutual fund data", task_start, minutes=false)
+    process_mf_data()
 end
