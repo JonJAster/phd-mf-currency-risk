@@ -23,22 +23,27 @@ function process_mf_data()
     # Combine fund class and fund class group ids into a unique identifier at the fund level
     _identify_funds!(data)
 
-    sort!(data, [:class_group_id, :fund_class_id, :date])
-    # aggregate_data = _aggregate_to_fundid(active_data)
+    aggregate_data = _aggregate_to_fund_level(data)
+    _calculate_fund_flows!(aggregate_data)
 
-    # _null_out_small!(aggregate_data)
-    # _trim_missing_tails!(aggregate_data)
-    # _calculate_fund_flows!(aggregate_data)
-    # _clip_fund_flows!(aggregate_data)
-    # _filter_out_low_obs_funds!(aggregate_data)
 
-    # rename!(aggregate_data, :net_returns => :ret)
-    # aggregate_data[:, [:ret, :costs]] ./= 100
+    #sort!(data, [:class_group_id, :fund_class_id, :date])
 
-    # output = select(
-    #     aggregate_data, 
-    #     [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
-    # )
+        # aggregate_data = _aggregate_to_fundid(active_data)
+
+        # _null_out_small!(aggregate_data)
+        # _trim_missing_tails!(aggregate_data)
+        # _calculate_fund_flows!(aggregate_data)
+        # _clip_fund_flows!(aggregate_data)
+        # _filter_out_low_obs_funds!(aggregate_data)
+
+        # rename!(aggregate_data, :net_returns => :ret)
+        # aggregate_data[:, [:ret, :costs]] ./= 100
+
+        # output = select(
+        #     aggregate_data, 
+        #     [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
+        # )
 
     printtime("processing mutual fund data", task_start, minutes=false)
     return
@@ -64,6 +69,42 @@ function _identify_funds!(data)
     data.fund_id = coalesce.(data.class_group_id, data.fund_class_id)
 
     return data.fund_id
+end
+
+function _aggregate_to_fund_level(multi_class_funds)
+    # TODO: Test if this aggregates properly, especially the weight lagging
+    single_class_funds = multi_class_funds[ismissing.(multi_class_funds.class_group_id), :]
+    multi_class_funds = multi_class_funds[.!ismissing.(multi_class_funds.class_group_id), :]
+
+    # Sorting by date is sufficient to ensure correct lagging within groups
+    sort!(multi_class_funds, :date)
+
+    total_assets = combine(
+        groupby(multi_class_funds, [:fund_id, :date]),
+        :net_assets => sum => :total_net_assets
+    )
+
+    data_total = innerjoin(multi_class_funds, total_assets, on=[:fund_id, :date])
+    data_total.lead_weight = data_total.net_assets ./ data_total.total_net_assets
+    data_weighted = transform(
+        groupby(data_total, :fund_class_id),
+        :lead_weight => lag => :weight
+    )
+    
+    data_weighted.weighted_ret = data_weighted.weight .* data_weighted.ret
+    data_weighted.weighted_costs = data_weighted.weight .* data_weighted.costs
+
+    aggregate_data = combine(
+        groupby(data_weighted, [:fund_id, :date]),
+        :net_assets => sum => :net_assets,
+        :weighted_ret => sum => :net_returns,
+        :weighted_costs => sum => :costs
+    )
+
+    # Aggregate is already date sorted
+    sort!(aggregate_data, :fund_id)
+
+    return aggregate_data
 end
 
 function _aggregate_to_fundid(data)
