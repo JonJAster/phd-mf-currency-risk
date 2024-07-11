@@ -24,7 +24,9 @@ function process_mf_data()
     _identify_funds!(data)
 
     data.no_load = (data.front_load .== 0)
-    
+    data.equity = startswith.(data.objective, "E")
+    data.foreign = startswith.(data.objective, "EF")
+
     describe(data.no_load)
 
     countmap(data.index_fund_flag)
