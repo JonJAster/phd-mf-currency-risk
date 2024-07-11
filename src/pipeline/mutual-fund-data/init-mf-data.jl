@@ -29,7 +29,7 @@ function init_mf_data()
     Arrow.write(save_filename_info, mf_info)
 
     printtime("initialising mutual fund data", task_start, minutes=false)
-    return mf_data
+    return
 end
 
 function _read_mf_timeseries(task_start)
@@ -227,10 +227,5 @@ function _init_info!(mf_info)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    output_data = init_mf_data()
-    output_filename = makepath(DIRS.mf.init, "mf-data.arrow")
-
-    task_start = time()
-    Arrow.write(output_filename, output_data)
-    printtime("writing mutual fund data", task_start, minutes=false)
+    init_mf_data()
 end
