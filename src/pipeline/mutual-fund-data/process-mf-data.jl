@@ -23,6 +23,8 @@ function process_mf_data()
     # Combine fund class and fund class group ids into a unique identifier at the fund level
     _identify_funds!(data)
 
+    _add_load_dummies!(data)
+
     aggregate_data = _aggregate_to_fund_level(data)
     _calculate_fund_flows!(aggregate_data) # TODO: Verify calculation
     _clip_fund_flows!(aggregate_data) # TODO: Verify the accuracy and necessity of this step
@@ -74,6 +76,18 @@ function _identify_funds!(data)
 
     return data.fund_id
 end
+
+function _add_load_dummies!(data)
+    data.pure_no_load = (
+        coalesce.(data.front_load .== 0, true) .&&
+        coalesce.(data.rear_load .== 0, true)
+    )
+
+    data[.!data.pure_no_load,:]
+end
+
+using StatsBase
+countmap(data[coalesce.(data.rear_load_period .<= 10, false), :rear_load_period])
 
 function _aggregate_to_fund_level(multi_class_funds)
     # TODO: Test if this aggregates properly, especially the weight lagging
