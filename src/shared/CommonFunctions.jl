@@ -123,7 +123,7 @@ end
 
 function pprint(
         df, id_cols=nothing;
-        rows=nothing, centre=false, header=true, cluster_size=10
+        rows=nothing, centre=false, header=true, spacer=false, cluster_size=10
         )
 
     MAKE_TEXT_WHITE = Crayon(foreground=(255,255,255))
@@ -138,9 +138,8 @@ function pprint(
 
     content_width(col_name) = maximum(length.(string.(df[!, col_name])))
     total_width(col_name) = maximum([length(string(col_name)), content_width(col_name)])
-    true_width(col_name) = header ? total_width(col_name) : content_width(col_name)
 
-    stored_true_widths = Dict(col => true_width(col) for col in propertynames(df))
+    stored_true_widths = Dict(col => total_width(col) for col in propertynames(df))
 
     function printwidth(cols) # cols = id_cols
         # Returns the print width of an array of column names
@@ -233,17 +232,18 @@ function pprint(
             for i in last_printed_row+1:min(last_printed_row+cluster_size, rows)
                 print_row(df[i, :], print_set)
             end
-
-            println()
         end
 
         last_printed_row += cluster_size
         if last_printed_row < rows
             print(MAKE_TEXT_PURPLE)
+            println()
             println("*"^maximum(printwidth.(print_sets)))
             println()
             print(MAKE_TEXT_WHITE)
         end
+
+        spacer && print(centre_text("...", maximum(printwidth.(print_sets))))
     end
 end
 
@@ -267,9 +267,9 @@ function inspect(data, id; limit=5, window=6)
             upper_window = minimum([ceil(Int, slice_length/2), full_upper_window])
             lower_window = minimum([floor(Int, slice_length/2), full_lower_window])
 
-            pprint(first(id_data, upper_window))
-            println("...")
-            pprint(last(id_data, lower_window))
+            pprint(first(id_data, upper_window), id; spacer=true)
+            println()
+            pprint(last(id_data, lower_window), id; header=false)
         end
         println()
     end
