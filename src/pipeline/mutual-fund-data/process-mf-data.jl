@@ -81,7 +81,7 @@ function _identify_funds!(data)
     # Use the class group ID if it exists, otherwise use the only class's fund class ID
     data.fund_id = coalesce.(data.class_group_id, data.fund_class_id)
 
-    select!(data, :fund_id, Not(:class_group_id, :fund_class_id))
+    select!(data, :fund_id, Not(:fund_id))
 
     return data.fund_id
 end
