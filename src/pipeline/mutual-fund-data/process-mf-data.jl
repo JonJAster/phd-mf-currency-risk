@@ -14,31 +14,33 @@ using .CommonFunctions
 
 function process_mf_data()
     task_start = time()
+
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
-    info_filename = joinpath(DIRS.mf.raw, "info.csv")
+    info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
 
-    data = loadarrow(data_filename)
-    info = init_raw(info_filename, info=true)
+    # data = loadarrow(data_filename)
+    # info = init_raw(info_filename, info=true)
 
-    active_data = _filter_out_passive(data, info)
-    sort!(active_data, [:fundid, :date])
-    aggregate_data = _aggregate_to_fundid(active_data)
+    # active_data = _filter_out_passive(data, info)
+    # sort!(active_data, [:fundid, :date])
+    # aggregate_data = _aggregate_to_fundid(active_data)
 
-    _null_out_small!(aggregate_data)
-    _trim_missing_tails!(aggregate_data)
-    _calculate_fund_flows!(aggregate_data)
-    _clip_fund_flows!(aggregate_data)
-    _filter_out_low_obs_funds!(aggregate_data)
+    # _null_out_small!(aggregate_data)
+    # _trim_missing_tails!(aggregate_data)
+    # _calculate_fund_flows!(aggregate_data)
+    # _clip_fund_flows!(aggregate_data)
+    # _filter_out_low_obs_funds!(aggregate_data)
 
-    rename!(aggregate_data, :net_returns => :ret)
-    aggregate_data[:, [:ret, :costs]] ./= 100
+    # rename!(aggregate_data, :net_returns => :ret)
+    # aggregate_data[:, [:ret, :costs]] ./= 100
 
-    output = select(
-        aggregate_data, 
-        [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
-    )
+    # output = select(
+    #     aggregate_data, 
+    #     [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
+    # )
+
     printtime("processing mutual fund data", task_start, minutes=false)
-    return output
+    return
 end
 
 function _filter_out_passive(data, info)
