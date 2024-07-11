@@ -7,6 +7,7 @@ using LibPQ
 using Tables
 using Dates
 using StatsBase
+using Crayons
 using ShiftedArrays: lead, lag
 
 include("CommonConstants.jl")
@@ -120,9 +121,16 @@ function qlookup(id; data=false)
     end
 end
 
-# df = loadarrow(joinpath(DIRS.mf.raw, "fund_fees.arrow"))
-function pprint(df, id=nothing; rows=nothing, centre=false, header=true)
-    isnothing(id) && (id = first(propertynames(df)))
+# df = first(loadarrow(joinpath(DIRS.mf.raw, "fund_fees.arrow")), 50)
+# id_cols = [:crsp_fundno, :begdt, :enddt]
+# pprint(df, id_cols)
+function pprint(
+        df, id_cols=nothing;
+        rows=nothing, centre=false, header=true, cluster_size=10
+        )
+
+    isnothing(id_cols) && (id_cols = [first(propertynames(df))])
+    typeof(id_cols) <: AbstractArray || (id_cols = [id_cols])
     isnothing(rows) && (rows = nrow(df))
     terminal_width = displaysize(stdout)[2]
 
@@ -130,40 +138,38 @@ function pprint(df, id=nothing; rows=nothing, centre=false, header=true)
     total_width(col_name) = maximum([length(string(col_name)), content_width(col_name)])
     true_width(col_name) = header ? total_width(col_name) : content_width(col_name)
 
-    function printwidth(cols)
+    stored_true_widths = Dict(col => true_width(col) for col in propertynames(df))
+
+    function printwidth(cols) # cols = id_cols
         # Returns the print width of an array of column names
         isempty(cols) && return 0
         
-        combined_col_widths = sum(true_width.(cols))
+        combined_col_widths = sum([stored_true_widths[col] for col in cols])
         n_cols_with_whitespace = length(cols) - 1
         whitespace_width = 2*n_cols_with_whitespace
         print_width = combined_col_widths + whitespace_width
         return print_width
     end
 
-    if true_width(id) > terminal_width
-        error("ID column width exceeds terminal width.")
+    if printwidth(id_cols) > terminal_width
+        error("ID column width(s) exceed terminal width.")
     end
 
-    non_id_cols = propertynames(df[!, Not(id)])
-    max_fittable_width = terminal_width - true_width(id) - 2
-    fit_check = [printwidth([id, x]) <= max_fittable_width for x in non_id_cols]
+    non_id_cols = propertynames(df[!, Not(id_cols)])
+    max_fittable_width = terminal_width - printwidth(id_cols) - 2
+    fit_check = [printwidth([id_cols..., x]) <= max_fittable_width for x in non_id_cols]
     if any(.!fit_check)
+        # Each column needs to at minimum fit next to the ID columns
         offending_cols = non_id_cols[.!fit_check]
         error("Column width exceeds terminal width: $offending_cols")
     end
 
     print_sets = []
-    current_print_set = [id]
-    for col_name in non_id_cols
-        if printwidth([id, col_name]) > terminal_width
-            # Column needs at minimum to fit alone beside the ID column
-            error("Column width exceeds terminal width.")
-        end
-        
+    current_print_set = copy(id_cols)
+    for col_name in non_id_cols # col_name = non_id_cols[1]
         if printwidth([current_print_set..., col_name]) > terminal_width
             push!(print_sets, deepcopy(current_print_set))
-            current_print_set = [col_name]
+            current_print_set = [id_cols..., col_name]
         else
             push!(current_print_set, col_name)
         end
@@ -186,28 +192,48 @@ function pprint(df, id=nothing; rows=nothing, centre=false, header=true)
 
     centre ? (align_text = centre_text) : (align_text = pad_text)
     
-    
+    function print_header(cols)
+        TRAILING_WHITESPACE = 2
+        printout = ""
+        for col_name in cols
+            printout *= align_text(
+                string(col_name),
+                stored_true_widths[col_name]
+            )
+            printout *= "  "
+        end
+        println(printout[1:end-TRAILING_WHITESPACE])
+        println("-"^printwidth(cols))
+    end
+
+    function print_row(row, cols)
+        TRAILING_WHITESPACE = 2
+        printout = ""
+        for col_name in cols
+            printout *= align_text(
+                string(row[col_name]),
+                stored_true_widths[col_name]
+            )
+            printout *= "  "
+        end
+        println(printout[1:end-TRAILING_WHITESPACE])
+    end
+
     last_printed_row = 0
     while(last_printed_row < rows)
         for print_set in print_sets
-            printout = ""
-            for col_name in print_set
-                printout *= align_text(string(col_name), true_width[col_name]) * "  "
+            header && print_header(print_set)
+            
+            for i in last_printed_row+1:min(last_printed_row+cluster_size, rows)
+                print_row(df[i, :], print_set)
             end
-            println(printout[1:end-2])
-            println("-"^printwidth(print_set))
-            for i in last_printed_row+1:min(last_printed_row+10, rows)
-                printout = ""
-                for col_name in print_set
-                    printout *= align_text(string(df[i, col_name]), true_width[col_name]) * "  "
-                end
-                println(printout)
-            end
+
             println()
         end
-        last_printed_row += 10
+
+        last_printed_row += cluster_size
         if last_printed_row < rows
-            println("*"^terminal_width)
+            println("*"^maximum(printwidth.(print_sets)))
             println()
         end
     end
