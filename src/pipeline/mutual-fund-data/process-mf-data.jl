@@ -17,12 +17,12 @@ function process_mf_data()
 
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
     info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
+    data = loadarrow(data_filename)
+    info = loadarrow(info_filename)
 
-    # data = loadarrow(data_filename)
-    # info = init_raw(info_filename, info=true)
-
-    # active_data = _filter_out_passive(data, info)
-    # sort!(active_data, [:fundid, :date])
+    # Combine fund class and fund class group ids into a unique identifier at the fund level
+    _identify_funds!(data)
+    sort!(data, [:class_group_id, :fund_class_id, :date])
     # aggregate_data = _aggregate_to_fundid(active_data)
 
     # _null_out_small!(aggregate_data)
