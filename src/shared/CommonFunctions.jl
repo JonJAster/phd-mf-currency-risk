@@ -126,7 +126,7 @@ function pprint(df, id=nothing; rows=nothing, centre=false, header=true)
     terminal_width = displaysize(stdout)[2]
 
     content_width(col_name) = maximum(length.(string.(df[!, col_name])))
-    total_width(col_name) = maximum([length(string(col_name)), content_width[col_name]])
+    total_width(col_name) = maximum([length(string(col_name)), content_width(col_name)])
     true_width(col_name) = header ? total_width(col_name) : content_width(col_name)
 
     function printwidth(cols)
