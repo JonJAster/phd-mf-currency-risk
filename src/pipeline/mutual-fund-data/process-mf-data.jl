@@ -23,7 +23,8 @@ function process_mf_data()
     # Combine fund class and fund class group ids into a unique identifier at the fund level
     _identify_funds!(data)
 
-    _add_load_dummies!(data)
+    data.no_load = (data.front_load .== 0)
+    describe(data.no_load)
 
     aggregate_data = _aggregate_to_fund_level(data)
     _calculate_fund_flows!(aggregate_data) # TODO: Verify calculation
@@ -84,16 +85,6 @@ function _identify_funds!(data)
     select!(data, :fund_id, Not(:fund_id))
 
     return data.fund_id
-end
-
-function _add_load_dummies!(data)
-    data.pure_no_load = (data.front_load .== 0) .& (data.rear_load .== 0)
-    data.morningstar_no_load = data.pure_no_load .& coalesce.(
-            data.actual_12b1 .<= 0.0025,
-            data.max_12b1 .<= 0.0025
-    )
-
-    return data[!, [:pure_no_load, :morningstar_no_load]]
 end
 
 function _aggregate_to_fund_level(multi_class_funds)
