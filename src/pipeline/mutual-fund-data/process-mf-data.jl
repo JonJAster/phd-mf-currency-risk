@@ -24,7 +24,34 @@ function process_mf_data()
     _identify_funds!(data)
 
     data.no_load = (data.front_load .== 0)
+    
     describe(data.no_load)
+
+    countmap(data.index_fund_flag)
+    function test_for_class_conflict(data, field)
+        conflicts = combine(
+            groupby(data, [:fund_id, :date]),
+            field => (x->length(unique(x))) => :nunique
+        )
+        n_obs_conflicts = sum(conflicts.nunique .> 1)
+        n_funds_conflicts = length(unique(conflicts.fund_id[conflicts.nunique .> 1]))
+        if n_obs_conflicts > 0
+            println(
+                "There are $n_obs_conflicts observations across $n_funds_conflicts " *
+                "funds with conflicting $field values"
+            )
+        end
+
+        true_conflicts = conflicts[conflicts.nunique .> 1, :]
+
+        return true_conflicts
+    end
+
+    conflict_index_flag = test_for_class_conflict(data, :index_fund_flag)
+    conflict_index_flag[conflict_index_flag.nunique .> 1, :]
+
+    class_ids = data[data.fund_id .== 2_000_779, :]
+    info[info.fund_]
 
     aggregate_data = _aggregate_to_fund_level(data)
     _calculate_fund_flows!(aggregate_data) # TODO: Verify calculation
