@@ -24,7 +24,6 @@ function process_mf_data()
     _identify_funds!(data)
 
     _add_load_dummies!(data)
-    _
 
     aggregate_data = _aggregate_to_fund_level(data)
     _calculate_fund_flows!(aggregate_data) # TODO: Verify calculation
@@ -88,12 +87,12 @@ function _identify_funds!(data)
 end
 
 function _add_load_dummies!(data)
-    data.pure_no_load = (data.front_load .== 0) .&& (data.rear_load .== 0)
-    data.morningstar_no_load = data.pure_no_load .&& coalesce.(
+    data.pure_no_load = (data.front_load .== 0) .& (data.rear_load .== 0)
+    data.morningstar_no_load = data.pure_no_load .& coalesce.(
             data.actual_12b1 .<= 0.0025,
             data.max_12b1 .<= 0.0025
     )
-    
+
     return data[!, [:pure_no_load, :morningstar_no_load]]
 end
 
