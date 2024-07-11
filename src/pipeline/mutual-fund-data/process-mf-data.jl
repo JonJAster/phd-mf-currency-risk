@@ -86,9 +86,6 @@ function _add_load_dummies!(data)
     data[.!data.pure_no_load,:]
 end
 
-using StatsBase
-countmap(data[coalesce.(data.rear_load_period .<= 10, false), :rear_load_period])
-
 function _aggregate_to_fund_level(multi_class_funds)
     # TODO: Test if this aggregates properly, especially the weight lagging
     single_class_funds = multi_class_funds[ismissing.(multi_class_funds.class_group_id), :]
