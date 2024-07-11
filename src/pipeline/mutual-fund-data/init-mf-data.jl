@@ -53,13 +53,6 @@ function _read_mf_timeseries(task_start)
         compressed_timeseries[:mf_frontload],
         [:crsp_fundno, :begdt, :enddt, :front_load]
     )
-    compressed_timeseries[:mf_rearload] = (
-        loadarrow(joinpath(DIRS.mf.raw, "rear_load.arrow"))
-    )
-    select!(
-        compressed_timeseries[:mf_rearload],
-        [:crsp_fundno, :begdt, :enddt, :time_period, :rear_load]
-    )
     compressed_timeseries[:mf_style] = (
         loadarrow(joinpath(DIRS.mf.raw, "fund_style.arrow"))
     )
@@ -118,11 +111,19 @@ function _read_mf_timeseries(task_start)
     return data
 end
 
-function _decompress_timeseries(short_data_in)
+function _decompress_timeseries(short_data) # short_data_in = compressed_timeseries[:mf_fees]
+    data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
-    data_cols = propertynames(short_data_in[!, Not(:crsp_fundno, :begdt, :enddt)])
+    if ismissing.(short_data.begdt) .⊻ ismissing.(short_data.enddt)
+        error("Some rows have a single one of beginning or ending date")
+    end
+    
+    # Align dates with days of 15 or lower to the end of the previous month, else
+    # to the end of the current month
+    inspect(short_data, :crsp_fundno)
+    zeros(Bool,1)
 
-    short_data = dropmissing(short_data_in, [:begdt, :enddt]) # TODO: Rushed it, handle this better
+    short_data.begdt = day.(short_data.begdt) .<= 15 ? lastdayshort_data.begdt, short_data.begdt)
 
     short_data.date_domain = [row.begdt:Month(1):row.enddt for row in eachrow(short_data)]
     short_data.span_length = length.(short_data.date_domain)
@@ -130,7 +131,7 @@ function _decompress_timeseries(short_data_in)
     total_rows = sum(short_data.span_length)
     long_data = DataFrame()
 
-    for col in propertynames(short_data_in)
+    for col in propertynames(short_data)
         coltype = eltype(short_data[!, col])
         col = (col == :begdt ? :caldt : col)
         col == :enddt && continue
