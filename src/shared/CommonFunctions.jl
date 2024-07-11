@@ -147,7 +147,7 @@ function pprint(df, id=nothing; rows=nothing, centre=false, header=true)
     non_id_cols = propertynames(df[!, Not(id)])
     max_fittable_width = terminal_width - true_width(id) - 2
     fit_check = [printwidth([id, x]) <= max_fittable_width for x in non_id_cols]
-    if any(!fit_check)
+    if any(.!fit_check)
         offending_cols = non_id_cols[.!fit_check]
         error("Column width exceeds terminal width: $offending_cols")
     end
