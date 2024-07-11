@@ -43,7 +43,7 @@ function _read_mf_timeseries(task_start)
     )
     select!(
         compressed_timeseries[:mf_fees],
-        [:crsp_fundno, :begdt, :enddt, :exp_ratio]
+        [:crsp_fundno, :begdt, :enddt, :exp_ratio, :actual_12b1, :max_12b1]
     )
     compressed_timeseries[:mf_frontload] = (
         loadarrow(joinpath(DIRS.mf.raw, "front_load.arrow"))
