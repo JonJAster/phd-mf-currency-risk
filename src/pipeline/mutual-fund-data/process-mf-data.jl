@@ -22,6 +22,7 @@ function process_mf_data()
 
     # Combine fund class and fund class group ids into a unique identifier at the fund level
     _identify_funds!(data)
+
     sort!(data, [:class_group_id, :fund_class_id, :date])
     # aggregate_data = _aggregate_to_fundid(active_data)
 
@@ -41,6 +42,28 @@ function process_mf_data()
 
     printtime("processing mutual fund data", task_start, minutes=false)
     return
+end
+
+function _identify_funds!(data)
+    # Class group IDs are supposed all be 2_xxx_xxx, but some are smaller integers.
+    # In the original dataset it is verified that adding 2_000_000 to the smaller integers
+    # does not result in any collisions with the larger integers, but it is checked
+    # here for safety of future data updates.
+    shift_collisions = intersect(
+        Set(skipmissing(data.class_group_id)).+ 2_000_000,
+        skipmissing(data.class_group_id)
+    )
+    
+    if !isempty(shift_collisions)
+        error("Class group IDs collide after shifting by 2_000_000")
+    end
+
+    data[coalesce.(data.class_group_id .< 2_000_000, false), :class_group_id] .+= 2_000_000
+
+    # Use the class group ID if it exists, otherwise use the only class's fund class ID
+    data.fund_id = coalesce.(data.class_group_id, data.fund_class_id)
+
+    return data.fund_id
 end
 
 function _aggregate_to_fundid(data)
