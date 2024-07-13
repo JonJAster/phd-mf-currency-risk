@@ -16,7 +16,7 @@ function init_mf_data()
     task_start = time()
     mf_data = _read_mf_timeseries(task_start)
     
-    # Retype, rename, and reorder the columns
+    # Retype, rename, and reorder the columns, and sort the rows
     _init_data!(mf_data)
 
     mf_info = _read_mf_crosssection(task_start)
@@ -189,6 +189,8 @@ function _init_data!(mf_data)
         :exp_ratio => :costs,
         :crsp_obj_cd => :investment_objective
     )
+
+    sort!(mf_data, [:fund_class_id, :date])
     return
 end
 

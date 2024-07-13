@@ -21,7 +21,21 @@ function process_mf_data()
     info = loadarrow(info_filename)
 
     # Combine fund class and fund class group ids into a unique identifier at the fund level
-    _identify_funds!(data)
+    _identify_funds!(data)\
+
+    ###
+    # List class_id's that have a fund_id that changes over time
+    n_unique_ids = combine(
+        groupby(data, :fund_class_id),
+        :fund_id => (x->count(!ismissing, unique(x))) => :nunique
+    )
+
+    changing_ids = Set(n_unique_ids[n_unique_ids.nunique .> 1, :fund_class_id])
+    changing_id_data = data[in.(data.fund_class_id, Ref(changing_ids)), :]
+
+    inspect(changing_id_data, :fund_class_id)
+    pprint(data[data.fund_class_id .== 3,:])
+    ###
 
     data.no_load = (data.front_load .== 0)
     data.equity_fund = startswith.(coalesce.(data.investment_objective, ""), "E")
