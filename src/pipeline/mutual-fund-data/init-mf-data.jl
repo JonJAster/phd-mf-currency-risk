@@ -121,7 +121,7 @@ function _decompress_timeseries(short_data)
         error("Some rows have a single one of beginning or ending date")
     end
     
-    short_data = copy(short_data) # Can't sort an arrow table with missing values
+    short_data = dropmissing(short_data, [:begdt, :enddt])
     sort!(short_data, [:crsp_fundno, :begdt])
 
     # Align dates with days of 15 or lower to the end of the previous month, else
