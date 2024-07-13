@@ -176,8 +176,6 @@ function _init_data!(mf_data)
     mf_data.index_fund_flag = CategoricalArray(mf_data.index_fund_flag)
     mf_data.et_flag = CategoricalArray(mf_data.et_flag)
     mf_data.retail_fund = coalesce.(mf_data.retail_fund .== "Y", missing)
-
-    mf_data[coalesce.(mf_data.time_period .== -99, false), :time_period] .= missing
     
     select!(mf_data, :crsp_cl_grp, :crsp_fundno, Not(:crsp_fundno, :crsp_cl_grp))
 
@@ -189,7 +187,6 @@ function _init_data!(mf_data)
         :mret => :ret,
         :mtna => :net_assets,
         :exp_ratio => :costs,
-        :time_period => :rear_load_period,
         :crsp_obj_cd => :investment_objective
     )
     return
