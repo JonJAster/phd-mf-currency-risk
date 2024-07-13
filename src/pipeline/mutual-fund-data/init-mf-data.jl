@@ -121,6 +121,8 @@ function _decompress_timeseries(short_data)
         error("Some rows have a single one of beginning or ending date")
     end
     
+    sort!(short_data, [:crsp_fundno, :begdt])
+
     # Align dates with days of 15 or lower to the end of the previous month, else
     # to the end of the current month
     align(date) = (day(date) .<= 15 ? lastdayofmonth(date-Month(1)) : lastdayofmonth(date))
@@ -165,11 +167,14 @@ function _decompress_timeseries(short_data)
         end
     end
 
-    println(short_data[short_data.crsp_fundno .== 236,:])
+    matching_rows = ((long_data.crsp_fundno .== coalesce.(lag(long_data.crsp_fundno),0)) .&& (long_data.caldt <= coalesce.(lag(long_data.caldt),Date(1,1,1))))
+    sum(long_data.caldt .!= lastdayofmonth.(long_data.caldt))
 
-    matching_rows = ((long_data.crsp_fundno .== coalesce.(lag(long_data.crsp_fundno),0)) .&& (long_data.caldt .!= lastdayofmonth.(coalesce.(lag(long_data.caldt),Date(1,1,1)).+Month(1))))
-    findfirst(==(1), matching_rows)
-    long_data[16238-5:16238+5,:]
+    sum(matching_rows)
+
+    long_data[matching_rows,:]
+    
+    println(long_data[long_data.crsp_fundno .== 255,:])
     long_data
 
     return long_data
