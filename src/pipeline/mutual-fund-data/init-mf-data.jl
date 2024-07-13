@@ -112,7 +112,8 @@ function _read_mf_timeseries(task_start)
     return data
 end
 
-function _decompress_timeseries(short_data) # short_data = compressed_timeseries[:mf_fees]
+function _decompress_timeseries(short_data)
+    # short_data = compressed_timeseries[df_key]
     data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
     if any(ismissing.(short_data.begdt) .⊻ ismissing.(short_data.enddt))
@@ -121,7 +122,9 @@ function _decompress_timeseries(short_data) # short_data = compressed_timeseries
     
     # Align dates with days of 15 or lower to the end of the previous month, else
     # to the end of the current month
-    inspect(short_data, :crsp_fundno)
+    inspect(short_data, :crsp_fundno, skip_ids=20)
+
+    proportion((a,b)->a==b, short_data, [:begdt, :enddt])
 
         #short_data.begdt = day.(short_data.begdt) .<= 15 ? lastdayshort_data.begdt, short_data.begdt)
 

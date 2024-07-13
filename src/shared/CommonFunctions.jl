@@ -13,31 +13,31 @@ using ShiftedArrays: lead, lag
 include("CommonConstants.jl")
 using .CommonConstants
 
-export dirslist
-export makepath
-export qhead
-export qscan
-export qlookup
-export pprint
-export proportion
-export inspect
+export bho_dates_only
 export connect_wrds
+export dirslist
+export drop_allmissing!
+export filter_fundids
+export init_raw
+export initialise_base_data
+export initialise_flow_data
+export inspect
+export investment_target_is
+export loadarrow
+export makepath
+export post_bho_only
+export pprint
+export printtime
+export proportion
+export qhead
+export qlookup
+export qscan
+export query_wrds
+export regression_table
+export rolling_std
 export scan_libraries_wrds
 export scan_sets_wrds
 export scan_vars_wrds
-export query_wrds
-export loadarrow
-export initialise_base_data
-export initialise_flow_data
-export printtime
-export init_raw
-export rolling_std
-export drop_allmissing!
-export filter_fundids
-export investment_target_is
-export bho_dates_only
-export post_bho_only
-export regression_table
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
 
@@ -248,8 +248,7 @@ function pprint(
     end
 end
 
-proportion(f, data, of) = proportion(f, data, of; id=first(propertynames(data)))
-function proportion(f, data, of; id)
+function proportion(f, data, of; id=first(propertynames(data)))
     """
     Prints the proportion of values for which f(data[!, of]) is true both overall and by id.
 
