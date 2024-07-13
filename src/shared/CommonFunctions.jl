@@ -19,6 +19,7 @@ export qhead
 export qscan
 export qlookup
 export pprint
+export proportion
 export inspect
 export connect_wrds
 export scan_libraries_wrds
@@ -245,6 +246,41 @@ function pprint(
 
         spacer && print(centre_text("...", maximum(printwidth.(print_sets))))
     end
+end
+
+proportion(f, data, of) = proportion(f, data, of; id=first(propertynames(data)))
+function proportion(f, data, of; id)
+    """
+    Prints the proportion of values for which f(data[!, of]) is true both overall and by id.
+
+    Parameters
+    ----------
+    f : Function
+        The function to be applied to the data.
+    data : DataFrame
+        The DataFrame containing the data.
+    of : DataFrame column selector (Symbol, String, Vector, ALL, Not, Between, In, Regex)
+        The column name in the data DataFrame to which the function is applied.
+    id : DataFrame column selector (Symbol, String, Vector, ALL, Not, Between, In, Regex)
+        The column name in the data DataFrame containing the entity identifiers.
+
+    Returns
+    -------
+    None
+    """
+
+    matches = data[f(data[!, of]), :]
+    f_count = nrow(matches)
+    total_count = nrow(data)
+    n_ids = length(unique(data[!, id]))
+    n_f_ids = length(unique(matches[!, id]))
+
+    println(
+        "Condition matches $f_count ($(round(f_count/total_count*100, digits=2))%) " *
+        "observations and $n_f_ids ($(round(n_f_ids/n_ids*100, digits=2))%) entities"
+    )
+
+    return
 end
 
 function inspect(data, id; id_limit=5, window=6, skip_ids=0)
