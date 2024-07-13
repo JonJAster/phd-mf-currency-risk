@@ -249,10 +249,6 @@ function pprint(
 end
 
 function proportion(f, data, of; id=first(propertynames(data)))
-    # f = (a,b)->a==b
-    # data = DataFrame(a=[1,2,3], b=["a", "a", "b"], c=[1.0, 4.0, 3.0])
-    # of = [:a, :c]
-    # id = :b
     """
     Prints the proportion of values for which f(data[!, of]) is true both overall and by id.
 
@@ -272,7 +268,8 @@ function proportion(f, data, of; id=first(propertynames(data)))
     -------
     None
     """
-    if length(of) != length(methods(f)[1].sig.parameters)
+    n_parameters_in_f = length(methods(f)[1].sig.parameters) - 1
+    if length(of) != n_parameters_in_f
         error("Number of columns in 'of' does not match the number of arguments in 'f'.")
     end
 
