@@ -91,6 +91,7 @@ function _read_mf_timeseries(task_start)
 
     uncompressed_timeseries = []
     @threads for df_key in collect(keys(compressed_timeseries))
+        # df_key = first(collect(keys(compressed_timeseries)))
         process_start = time()
         push!(
             uncompressed_timeseries,
@@ -114,7 +115,7 @@ end
 function _decompress_timeseries(short_data) # short_data = compressed_timeseries[:mf_fees]
     data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
-    if ismissing.(short_data.begdt) .⊻ ismissing.(short_data.enddt)
+    if any(ismissing.(short_data.begdt) .⊻ ismissing.(short_data.enddt))
         error("Some rows have a single one of beginning or ending date")
     end
     
