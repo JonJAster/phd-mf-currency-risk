@@ -122,16 +122,14 @@ function _decompress_timeseries(short_data)
     
     # Align dates with days of 15 or lower to the end of the previous month, else
     # to the end of the current month
-    inspect(short_data, :crsp_fundno, skip_ids=15)
-    inspect(short_data, :crsp_fundno, skip_ids=20)
-
-    short_data[short_data.crsp_fundno .== 26,:]
-
     align(date) = (day(date) .<= 15 ? lastdayofmonth(date-Month(1)) : lastdayofmonth(date))
     short_data.begdt = align.(short_data.begdt)
     short_data.enddt = align.(short_data.enddt)
 
-    short_data.date_domain = [row.begdt:Month(1):row.enddt for row in eachrow(short_data)]
+    short_data.date_domain = [
+        # Beginning date is exclusive
+        row.begdt+Month(1):Month(1):row.enddt for row in eachrow(short_data)
+    ]
     short_data.span_length = length.(short_data.date_domain)
 
     total_rows = sum(short_data.span_length)
