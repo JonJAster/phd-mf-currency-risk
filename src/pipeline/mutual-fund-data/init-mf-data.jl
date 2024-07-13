@@ -114,6 +114,7 @@ end
 
 function _decompress_timeseries(short_data)
     # short_data = copy(compressed_timeseries[df_key])
+    col_names = propertynames(short_data)
     data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
     if any(ismissing.(short_data.begdt) .⊻ ismissing.(short_data.enddt))
@@ -135,7 +136,7 @@ function _decompress_timeseries(short_data)
     total_rows = sum(short_data.span_length)
     long_data = DataFrame()
 
-    for col in propertynames(short_data)
+    for col in col_names
         coltype = eltype(short_data[!, col])
         col = (col == :begdt ? :caldt : col)
         col == :enddt && continue
