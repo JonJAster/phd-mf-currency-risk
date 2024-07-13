@@ -247,16 +247,16 @@ function pprint(
     end
 end
 
-function inspect(data, id; limit=5, window=6)
+function inspect(data, id; id_limit=5, window=6, skip_ids=0)
     id_list = unique(data[!,id])
-    final_inspect = minimum([limit, length(id_list)])
+    final_inspect = minimum([id_limit, length(id_list)])
 
     println("*******")
     println("INSPECT")
     println("*******")
     println()
 
-    for i in id_list[1:final_inspect]
+    for i in id_list[1+skip_ids:final_inspect+skip_ids]
         id_data = data[data[!,id] .== i, :]
         slice_length = nrow(id_data)
         if slice_length <= window
