@@ -158,12 +158,19 @@ function _decompress_timeseries(short_data)
                 rethrow(e)
             end
             
-            long_data[idx_range, :caldt] = period.date_domain
+            long_data[idx_range, :caldt] = lastdayofmonth.(period.date_domain)
             long_data[idx_range, data_cols] = repeat(DataFrame(period[data_cols]), n_rows)
 
             start_idx += n_rows
         end
     end
+
+    println(short_data[short_data.crsp_fundno .== 236,:])
+
+    matching_rows = ((long_data.crsp_fundno .== coalesce.(lag(long_data.crsp_fundno),0)) .&& (long_data.caldt .!= lastdayofmonth.(coalesce.(lag(long_data.caldt),Date(1,1,1)).+Month(1))))
+    findfirst(==(1), matching_rows)
+    long_data[16238-5:16238+5,:]
+    long_data
 
     return long_data
 end
