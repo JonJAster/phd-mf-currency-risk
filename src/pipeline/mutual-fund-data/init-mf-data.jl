@@ -91,7 +91,7 @@ function _read_mf_timeseries(task_start)
 
     uncompressed_timeseries = []
     @threads for df_key in collect(keys(compressed_timeseries))
-        # df_key = first(collect(keys(compressed_timeseries)))
+        # df_key = collect(keys(compressed_timeseries))[4]
         process_start = time()
         push!(
             uncompressed_timeseries,
@@ -113,7 +113,7 @@ function _read_mf_timeseries(task_start)
 end
 
 function _decompress_timeseries(short_data)
-    # short_data = copy(compressed_timeseries[df_key])
+    # short_data = compressed_timeseries[df_key]
     col_names = propertynames(short_data)
     data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
@@ -121,6 +121,7 @@ function _decompress_timeseries(short_data)
         error("Some rows have a single one of beginning or ending date")
     end
     
+    short_data = copy(short_data) # Can't sort an arrow table with missing values
     sort!(short_data, [:crsp_fundno, :begdt])
 
     # Align dates with days of 15 or lower to the end of the previous month, else
@@ -168,14 +169,8 @@ function _decompress_timeseries(short_data)
     end
 
     matching_rows = ((long_data.crsp_fundno .== coalesce.(lag(long_data.crsp_fundno),0)) .&& (long_data.caldt <= coalesce.(lag(long_data.caldt),Date(1,1,1))))
-    sum(long_data.caldt .!= lastdayofmonth.(long_data.caldt))
-
-    sum(matching_rows)
-
-    long_data[matching_rows,:]
-    
-    println(long_data[long_data.crsp_fundno .== 255,:])
-    long_data
+    sum(matching_rows) == 0 || error("Some rows are not ordered correctly")
+    sum(long_data.caldt .!= lastdayofmonth.(long_data.caldt)) == 0 || error("Some dates are not the last day of the month")
 
     return long_data
 end
