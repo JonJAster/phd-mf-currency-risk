@@ -280,7 +280,7 @@ function proportion(f, data, of; id)
         "observations and $n_f_ids ($(round(n_f_ids/n_ids*100, digits=2))%) entities"
     )
 
-    return
+    return nothing
 end
 
 function inspect(data, id; id_limit=5, window=6, skip_ids=0)
