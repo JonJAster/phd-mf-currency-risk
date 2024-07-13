@@ -44,7 +44,7 @@ function _read_mf_timeseries(task_start)
     )
     select!(
         compressed_timeseries[:mf_fees],
-        [:crsp_fundno, :begdt, :enddt, :exp_ratio, :actual_12b1, :max_12b1]
+        [:crsp_fundno, :begdt, :enddt, :exp_ratio]
     )
     compressed_timeseries[:mf_frontload] = (
         loadarrow(joinpath(DIRS.mf.raw, "front_load.arrow"))
@@ -121,10 +121,7 @@ function _decompress_timeseries(short_data) # short_data = compressed_timeseries
     
     # Align dates with days of 15 or lower to the end of the previous month, else
     # to the end of the current month
-    pprint(short_data[1:3,:]; header=false)
-    println("a")
     inspect(short_data, :crsp_fundno)
-        #zeros(Bool,1)
 
         #short_data.begdt = day.(short_data.begdt) .<= 15 ? lastdayshort_data.begdt, short_data.begdt)
 
