@@ -21,7 +21,7 @@ function process_mf_data()
     info = loadarrow(info_filename)
 
     # Combine fund class and fund class group ids into a unique identifier at the fund level
-    _identify_funds!(data)\
+    _identify_funds!(data)
 
     ###
     # List class_id's that have a fund_id that changes over time
@@ -120,7 +120,7 @@ function process_mf_data()
     return
 end
 
-function _identify_funds!(data)
+function _identify_funds!(data) 
     # TODO: This causes some funds to have IDs that change over time which is not
     #       appropriate for grouping on. Need to look into the CRSP definition process for
     #       codes as well.
