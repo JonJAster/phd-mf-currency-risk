@@ -507,7 +507,7 @@ function _add_lags!(data, col; nlags, skip_to=false)
     typeof(nlags) <: Integer || error("Number of lags must be an integer.")
     gb = groupby(data, :entity)
 
-    start_i = skip_to ? nlags-1 : 1
+    start_i = skip_to ? nlags : 1
 
     for i in start_i:nlags
         transform!(gb, col => (col->lag(col, i)) => "$(col)_lag$i")
