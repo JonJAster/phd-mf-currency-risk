@@ -24,10 +24,10 @@ function regress_fund_flows(model_name; filter_by=nothing)
     regression_data = regression_packet.regression_data
     return_component_cols = regression_packet.return_component_cols
 
-    flow_betas = _flow_regression(regression_data, return_component_cols)
+    flow_output = _flow_regression(regression_data, return_component_cols)
 
     printtime("regressing flow betas on $model_name", task_start)
-    return flow_betas
+    return flow_output
 end
 
 function flow_regression_table(model_name; filter_by=nothing) # model_name = "ff_usa_ffc6"
@@ -86,7 +86,12 @@ function _flow_regression(regression_data, return_component_cols)
     flow_betas.tstat = flow_betas.coef ./ flow_betas.se
     flow_betas.pval = 2 * cdf(TDist(df), -abs.(flow_betas.tstat))
 
-    return flow_betas
+    output = (
+        summary = flow_betas,
+        regfit = regfit
+    )
+
+    return output
 end
 
 function _drop_zero_cols!(data)
@@ -100,7 +105,7 @@ end
 
 function main()
     for model_name in keys(MODELS)
-        output_data = regress_fund_flows(model_name)
+        output_data = regress_fund_flows(model_name).summary
         output_filename = makepath(DIRS.combo.flow_betas, "$model_name.arrow")
 
         Arrow.write(output_filename, output_data)
