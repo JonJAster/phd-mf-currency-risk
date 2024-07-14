@@ -43,9 +43,10 @@ function flow_regression_table(model_name; filter_by=nothing)
 
     regression_data = regression_table(
         flow_data, :fundid, :date,
-        :flow, :plus_lag, FLOW_CONTROL_LAGS,
+        :flow,
+        :flow, :nth_lag, FLOW_CONTROL_LAGS,
         return_component_cols...,
-        :costs, :lag, FLOW_CONTROL_LAGS,
+        :costs, :lag
         :true_no_load,
         :std_return_12m,
         :log_size_m1,
