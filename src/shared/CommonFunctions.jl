@@ -32,11 +32,11 @@ export regression_table
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
 
 const REGRESSION_ARGS = [
-    :plus_lags, :plus_lag, :lags, :lag, :categories, :cat, :time_fixed_effects, :tfe,
-    :entity_fixed_effects, :efe
+    :plus_lags, :plus_lag, :nth_lags, :nth_lag, :lags, :lag, :categories, :cat,
+    :time_fixed_effects, :tfe, :entity_fixed_effects, :efe
 ]
 const PARAMETER_REGRESSION_ARGS = [
-    :plus_lags, :plus_lag, :lags, :lag, :time_fixed_effects, :tfe
+    :plus_lags, :plus_lag, :nth_lags, :nth_lag, :lags, :lag, :time_fixed_effects, :tfe
 ]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
 
@@ -491,6 +491,8 @@ function _do_arg_call!(arg, data, col; parameter=nothing)
         select!(data, Not(col))
     elseif arg == :plus_lags || arg == :plus_lag
         _add_lags!(data, col, nlags=parameter)
+    elseif arg == :nth_lag || arg == :nth_lags
+        _add_lags!(data, col, nlags=parameter, skip_to=true)
     elseif arg == :categories || arg == :cat
         _convert_to_category_dummies!(data, col)
     elseif arg == :time_fixed_effects || arg == :tfe
@@ -500,12 +502,14 @@ function _do_arg_call!(arg, data, col; parameter=nothing)
     end
 end
 
-function _add_lags!(data, col; nlags)
+function _add_lags!(data, col; nlags, skip_to=false)
     isnothing(nlags) && (nlags = 1)
     typeof(nlags) <: Integer || error("Number of lags must be an integer.")
     gb = groupby(data, :entity)
 
-    for i in 1:nlags
+    start_i = skip_to ? nlags-1 : 1
+
+    for i in start_i:nlags
         transform!(gb, col => (col->lag(col, i)) => "$(col)_lag$i")
     end
 end
