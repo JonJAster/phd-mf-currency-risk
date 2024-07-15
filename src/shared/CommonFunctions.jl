@@ -711,13 +711,16 @@ function regression_table(data, entity_col, date_col, column_args...)
     return regression_table
 end
 
-function waitkey(prompt="Press any key to continue... [q]uit")
+function waitkey(prompt=nothing)
+    isnothing(prompt) && (prompt = "Press any key to continue... [q]uit")
     t = REPL.TerminalMenus.terminal
 
-    print(prompt)
-    REPL.Terminals.raw!(t, true)
+    println(prompt)
+    REPL.Terminals.raw!(t, true) || error("Failed to set terminal to raw mode.")
+    println("a")
     keypress = read(stdin, Char)
-    REPL.Terminals.raw!(t, false)
+    println("b")
+    REPL.Terminals.raw!(t, false) || error("Failed to exit raw mode.")
 
     return keypress
 end
