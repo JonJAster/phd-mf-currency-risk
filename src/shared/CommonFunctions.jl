@@ -14,14 +14,11 @@ include("CommonConstants.jl")
 using .CommonConstants
 
 export bho_dates_only
-export connect_wrds
 export dirslist
 export drop_allmissing!
 export fclass, fgroup, fund
 export filter_fundids
-export init_raw
-export initialise_base_data
-export initialise_flow_data
+export init_raw, initialise_base_data, initialise_flow_data
 export inspect
 export investment_target_is
 export loadarrow
@@ -32,12 +29,9 @@ export pprint
 export printtime
 export proportion
 export qhead, qlookup, qscan
-export query_wrds
 export regression_table
 export rolling_std
-export scan_libraries_wrds
-export scan_sets_wrds
-export scan_vars_wrds
+export connect_wrds, query_wrds, scan_libraries_wrds, scan_sets_wrds, scan_vars_wrds
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
 
@@ -564,20 +558,6 @@ function drop_allmissing!(df, cols; dims=1)
         all_missing = mask_matrix' * one_vector .== zero(size(mask_matrix,2))
         select!(df, Not(cols[all_missing]))
     end
-end
-
-function filter_fundids(condition, data)
-    info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
-    info = loadarrow(info_filename)
-    select!(info, [:fundid, :global_category, :morningstar_category, :us_category_group, :investment_area])
-
-    _assert_similar_fundids(info)
-    info = unique(info, :fundid)
-
-    joined_data = innerjoin(data, info, on=:fundid)
-    filtered_data = joined_data[condition(joined_data), propertynames(data)]
-
-    return filtered_data
 end
 
 function investment_target_is(data, target)
