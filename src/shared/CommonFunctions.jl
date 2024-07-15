@@ -25,6 +25,7 @@ export inspect
 export investment_target_is
 export loadarrow
 export makepath
+export nonmissing, withmissing
 export post_bho_only
 export pprint
 export printtime
@@ -83,6 +84,9 @@ function makepath(paths...)
 
     return pathstring
 end
+
+nonmissing(f) = x -> coalesce.(f(x), false)
+withmissing(f) = x -> coalesce.(f(x), true)
 
 function qhead(filename)
     data = Arrow.Table(filename)
