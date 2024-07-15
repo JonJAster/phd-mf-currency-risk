@@ -65,8 +65,8 @@ function dirslist()
     end
 end
 
-fclass(data, id) = data[nonmissing(data.fund_class_id .== id), :]
-fgroup(data, id) = data[nonmissing(data.fund_class_group_id .== id), :]
+fundclass(data, id) = data[nonmissing(data.fund_class_id .== id), :]
+fundgroup(data, id) = data[nonmissing(data.fund_class_group_id .== id), :]
 fund(data, id) = data[nonmissing(data.fund_id .== id), :]
 
 function makepath(paths...)
