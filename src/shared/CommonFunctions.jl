@@ -17,6 +17,7 @@ export bho_dates_only
 export connect_wrds
 export dirslist
 export drop_allmissing!
+export fclass, fgroup, fund
 export filter_fundids
 export init_raw
 export initialise_base_data
@@ -68,6 +69,10 @@ function dirslist()
         println("----")
     end
 end
+
+fclass(data, id) = data[nonmissing(data.fund_class_id .== id), :]
+fgroup(data, id) = data[nonmissing(data.fund_class_group_id .== id), :]
+fund(data, id) = data[nonmissing(data.fund_id .== id), :]
 
 function makepath(paths...)
     pathstring = joinpath(paths...)
