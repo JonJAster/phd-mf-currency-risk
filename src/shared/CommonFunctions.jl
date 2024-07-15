@@ -560,6 +560,20 @@ function drop_allmissing!(df, cols; dims=1)
     end
 end
 
+function filter_fundids(condition, data)
+    info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
+    info = loadarrow(info_filename)
+    select!(info, [:fundid, :global_category, :morningstar_category, :us_category_group, :investment_area])
+
+    _assert_similar_fundids(info)
+    info = unique(info, :fundid)
+
+    joined_data = innerjoin(data, info, on=:fundid)
+    filtered_data = joined_data[condition(joined_data), propertynames(data)]
+
+    return filtered_data
+end
+
 function investment_target_is(data, target)
     if target ∉ [:usa, :wld, :emg]
         error("Invalid target: $target. Must be :usa, :wld, or :emg.")
