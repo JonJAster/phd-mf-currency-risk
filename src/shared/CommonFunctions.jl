@@ -16,6 +16,8 @@ using .CommonConstants
 
 export bho_dates_only
 export connect_wrds, query_wrds, scan_libraries_wrds, scan_sets_wrds, scan_vars_wrds
+export datastep, datastepper, stepclass, stepgroup, stepfund
+export waitkey
 export dirslist
 export drop_allmissing!
 export fundclass, fundgroup, fund
@@ -33,8 +35,6 @@ export proportion
 export qhead, qlookup, qscan
 export regression_table
 export rolling_std
-export stepclass, stepgroup, stepfund
-export waitkey
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
 
@@ -228,6 +228,8 @@ function pprint(
         end
         println(printout[1:end-TRAILING_WHITESPACE])
     end
+
+    cluster_size = (length(print_sets) == 1) ? rows : cluster_size
 
     last_printed_row = 0
     while(last_printed_row < rows)
@@ -540,22 +542,28 @@ function rolling_std(data, col, window; lagged)
     return rolling_std
 end
 
-function step(data, field, values; limit=200)
-    value_itr = Iterators.Stateful(values)
-    while !isempty(value_itr)
-        value_i = iterate(value_itr)
-        value_data = data[nonmissing(data[:, field] .== value_i), :]
-        pprint(first(value_data,limit))
-        println()
-        keypress = waitkey("$(value_itr.taken) of $(length(values))...")
-        keypress == 'q' && break
-    end
-    return nothing
+function datastep(stepper)
+    isempty(stepper) && return nothing
+
+    value_i = iterate(stepper.itr)[1]
+    value_data = stepper.data[nonmissing(stepper.data[:, stepper.field] .== value_i), :]
+
+    return value_data
 end
 
-stepclass(data, ids; limit=200) = step(data, :fund_class_id, ids; limit=limit)
-stepgroup(data, ids; limit=200) = step(data, :fund_class_group_id, ids; limit=limit)
-stepfund(data, ids; limit=200) = step(data, :fund_id, ids; limit=limit)
+function datastepper(data, field, values)
+    stepper = (
+        itr = Iterators.Stateful(values),
+        data = data,
+        field = field
+    )
+
+    return stepper
+end
+
+stepclass(data, ids) = datastepper(data, :fund_class_id, ids)
+stepgroup(data, ids) = datastepper(data, :class_group_id, ids)
+stepfund(data, ids) = datastepper(data, :fund_id, ids)
 
 drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
 function drop_allmissing!(df, cols; dims=1)
@@ -709,20 +717,6 @@ function regression_table(data, entity_col, date_col, column_args...)
     rename!(regression_table, reverse.(temporary_column_names))
 
     return regression_table
-end
-
-function waitkey(prompt=nothing)
-    isnothing(prompt) && (prompt = "Press any key to continue... [q]uit")
-    t = REPL.TerminalMenus.terminal
-
-    println(prompt)
-    REPL.Terminals.raw!(t, true) || error("Failed to set terminal to raw mode.")
-    println("a")
-    keypress = read(stdin, Char)
-    println("b")
-    REPL.Terminals.raw!(t, false) || error("Failed to exit raw mode.")
-
-    return keypress
 end
 
 function _do_arg_call!(arg, data, col; parameter=nothing)
