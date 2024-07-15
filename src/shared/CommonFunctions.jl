@@ -31,9 +31,7 @@ export post_bho_only
 export pprint
 export printtime
 export proportion
-export qhead
-export qlookup
-export qscan
+export qhead, qlookup, qscan
 export query_wrds
 export regression_table
 export rolling_std
