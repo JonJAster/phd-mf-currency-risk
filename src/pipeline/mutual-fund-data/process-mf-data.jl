@@ -124,6 +124,16 @@ function _identify_funds!(data)
     # TODO: This causes some funds to have IDs that change over time which is not
     #       appropriate for grouping on. Need to look into the CRSP definition process for
     #       codes as well.
+ 
+    # Some group IDs only map to a single fund so are not needed
+    n_classes = combine(
+        groupby(data, :class_group_id),
+        :fund_class_id => (x->count(!ismissing, unique(x))) => :nunique
+    ) |> dropmissing
+
+    single_class_groups = n_classes[n_classes.nunique .== 1, :class_group_id] |> Set
+
+    data[data.class_group_id .∈ Ref(single_class_groups), :class_group_id] .= missing
 
     # Class group IDs are supposed all be 2_xxx_xxx, but some are smaller integers.
     # In the original dataset it is verified that adding 2_000_000 to the smaller integers
