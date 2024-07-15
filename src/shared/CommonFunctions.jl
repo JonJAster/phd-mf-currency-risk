@@ -85,8 +85,8 @@ function makepath(paths...)
     return pathstring
 end
 
-nonmissing(f) = x -> coalesce.(f(x), false)
-withmissing(f) = x -> coalesce.(f(x), true)
+nonmissing(condition) = coalesce.(condition, false)
+withmissing(condition) = coalesce.(condition, true)
 
 function qhead(filename)
     data = Arrow.Table(filename)

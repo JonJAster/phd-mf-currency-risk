@@ -63,6 +63,10 @@ function test()
     total_funds = length(unique(init_data.fund_class_id))
     println(n_singletons, " out of ", total_funds, " ($(round(n_singletons/total_funds*100,digits=2))%) class groups are singletons")
 
+    funds2 = n_funds[n_funds.n_funds .== 2, :]
+
+    pprint(data[nonmissing(data.class_group_id .== funds2.class_group_id[1]),:])
+
     ## Start CRSP data era tests
     fund_header = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
 
