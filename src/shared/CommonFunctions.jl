@@ -65,8 +65,11 @@ function dirslist()
     end
 end
 
+fundclass(data, id::AbstractVector) = data[nonmissing(in.(data.fund_class_id, Ref(id))), :]
 fundclass(data, id) = data[nonmissing(data.fund_class_id .== id), :]
+fundgroup(data, id::AbstractVector) = data[nonmissing(in.(data.fund_class_group_id, Ref(id))), :]
 fundgroup(data, id) = data[nonmissing(data.fund_class_group_id .== id), :]
+fund(data, id::AbstractVector) = data[nonmissing(in.(data.fund_id, Ref(id))), :]
 fund(data, id) = data[nonmissing(data.fund_id .== id), :]
 
 function makepath(paths...)

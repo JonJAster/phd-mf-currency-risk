@@ -21,6 +21,30 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    # Test IDs
+    init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    init_info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+
+    n_funds = combine(
+        groupby(init_data, :class_group_id),
+        :fund_class_id => (x->length(unique(skipmissing(x)))) => :n_funds
+    )
+
+    dropmissing!(n_funds)
+
+    init_data = sort(init_data, :date)
+
+    funds2 = n_funds[n_funds.n_funds .== 2, :class_group_id]
+    funds2_stepper = stepgroup(init_data, funds2)
+
+    pprint(datastep(funds2_stepper))
+
+    backids = [38239, 95245]
+    pprint(fundclass(init_data, backids))
+
+    value_i = iterate(funds2_stepper.itr)
+    x = funds2_stepper.data[nonmissing(funds2_stepper.data.class_group_id .== funds2[1]),:]
+    
     # Test iterators
     x = (1,3,5,7)
     a = iterate(x)
