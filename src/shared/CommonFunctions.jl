@@ -3,6 +3,7 @@ module CommonFunctions
 using DataFrames
 using Arrow
 using CSV
+using REPL
 using LibPQ
 using Tables
 using Dates
@@ -14,9 +15,10 @@ include("CommonConstants.jl")
 using .CommonConstants
 
 export bho_dates_only
+export connect_wrds, query_wrds, scan_libraries_wrds, scan_sets_wrds, scan_vars_wrds
 export dirslist
 export drop_allmissing!
-export fclass, fgroup, fund
+export fundclass, fundgroup, fund
 export filter_fundids
 export init_raw, initialise_base_data, initialise_flow_data
 export inspect
@@ -31,7 +33,8 @@ export proportion
 export qhead, qlookup, qscan
 export regression_table
 export rolling_std
-export connect_wrds, query_wrds, scan_libraries_wrds, scan_sets_wrds, scan_vars_wrds
+export stepclass, stepgroup, stepfund
+export waitkey
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
 
@@ -537,6 +540,23 @@ function rolling_std(data, col, window; lagged)
     return rolling_std
 end
 
+function step(data, field, values; limit=200)
+    value_itr = Iterators.Stateful(values)
+    while !isempty(value_itr)
+        value_i = iterate(value_itr)
+        value_data = data[nonmissing(data[:, field] .== value_i), :]
+        pprint(first(value_data,limit))
+        println()
+        keypress = waitkey("$(value_itr.taken) of $(length(values))...")
+        keypress == 'q' && break
+    end
+    return nothing
+end
+
+stepclass(data, ids; limit=200) = step(data, :fund_class_id, ids; limit=limit)
+stepgroup(data, ids; limit=200) = step(data, :fund_class_group_id, ids; limit=limit)
+stepfund(data, ids; limit=200) = step(data, :fund_id, ids; limit=limit)
+
 drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
 function drop_allmissing!(df, cols; dims=1)
     if dims ∉ [1, 2, :row, :rows, :col, :cols]
@@ -689,6 +709,17 @@ function regression_table(data, entity_col, date_col, column_args...)
     rename!(regression_table, reverse.(temporary_column_names))
 
     return regression_table
+end
+
+function waitkey(prompt="Press any key to continue... [q]uit")
+    t = REPL.TerminalMenus.terminal
+
+    print(prompt)
+    REPL.Terminals.raw!(t, true)
+    keypress = read(stdin, Char)
+    REPL.Terminals.raw!(t, false)
+
+    return keypress
 end
 
 function _do_arg_call!(arg, data, col; parameter=nothing)

@@ -2,6 +2,7 @@ using Revise
 using BenchmarkTools
 using DataFrames
 using CSV
+using REPL
 using Arrow
 using GLM
 using Dates
@@ -20,6 +21,17 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    # Test iterators
+    x = (1,3,5,7)
+    a = iterate(x)
+
+    it = Iterators.Stateful(["a", "b", "c"])
+    isempty(it)
+    iterate(it)
+    iterate(it, ans[2])
+
+    keypress = waitkey()
+
     # Test IDs
     init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
     init_info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
