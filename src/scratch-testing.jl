@@ -20,52 +20,48 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-    	# Test IDs
-        init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
-        init_info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
-    
-        # How many class groups are associated with each class over its whole time series?
-        n_groups = combine(
-            groupby(init_data, :fund_class_id),
-            :class_group_id => (x->length(unique(skipmissing(x)))) => :n_groups
-        )
-    
-        describe(n_groups)
-    
-        max_n = 12
-        test_id = n_groups.fund_class_id[n_groups.n_groups .== max_n][1]
-    
-        test_data = init_data[init_data.fund_class_id .== test_id, :]
-        test_info = init_info[init_info.fund_class_id .== test_id, :]
-        test_name = test_info.fund_name[1]
-    
-        group_list = unique(skipmissing(test_data.class_group_id))
-    
-        for group in group_list
-            # group = group_list[1]
-            group_data = test_data[coalesce.(test_data.class_group_id .== group, false), :]
-            println(group, " ", length(unique(group_data.fund_class_id)))
-        end
-    
-        pprint(test_data)
-    
-        # How many class groups are only ever associated with exactly one fund?
-        n_funds = combine(
-            groupby(init_data, :class_group_id),
-            :fund_class_id => (x->length(unique(skipmissing(x)))) => :n_funds
-        )
-    
-        dropmissing!(n_funds)
-        describe(n_funds)
-        singletons = n_funds[n_funds.n_funds .== 1, :]
-    
-        n_singletons = nrow(singletons)
-        total_funds = length(unique(init_data.fund_class_id))
-        println(n_singletons, " out of ", total_funds, " ($(round(n_singletons/total_funds*100,digits=2))%) class groups are singletons")
-    
-    
-    
-    
+    # Test IDs
+    init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    init_info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+
+    # How many class groups are associated with each class over its whole time series?
+    n_groups = combine(
+        groupby(init_data, :fund_class_id),
+        :class_group_id => (x->length(unique(skipmissing(x)))) => :n_groups
+    )
+
+    describe(n_groups)
+
+    max_n = 12
+    test_id = n_groups.fund_class_id[n_groups.n_groups .== max_n][1]
+
+    test_data = init_data[init_data.fund_class_id .== test_id, :]
+    test_info = init_info[init_info.fund_class_id .== test_id, :]
+    test_name = test_info.fund_name[1]
+
+    group_list = unique(skipmissing(test_data.class_group_id))
+
+    for group in group_list
+        # group = group_list[1]
+        group_data = test_data[coalesce.(test_data.class_group_id .== group, false), :]
+        println(group, " ", length(unique(group_data.fund_class_id)))
+    end
+
+    pprint(test_data)
+
+    # How many class groups are only ever associated with exactly one fund?
+    n_funds = combine(
+        groupby(init_data, :class_group_id),
+        :fund_class_id => (x->length(unique(skipmissing(x)))) => :n_funds
+    )
+
+    dropmissing!(n_funds)
+    describe(n_funds)
+    singletons = n_funds[n_funds.n_funds .== 1, :]
+
+    n_singletons = nrow(singletons)
+    total_funds = length(unique(init_data.fund_class_id))
+    println(n_singletons, " out of ", total_funds, " ($(round(n_singletons/total_funds*100,digits=2))%) class groups are singletons")
 
     ## Start CRSP data era tests
     fund_header = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
