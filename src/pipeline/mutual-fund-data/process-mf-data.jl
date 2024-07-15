@@ -151,10 +151,10 @@ function _identify_funds!(data)
 
     # TODO: Clean this up by finding a better unique identifier
     data[coalesce.(data.class_group_id .< 2_000_000, false), :class_group_id] .= (
-            -1 .* (
-                data[coalesce.(data.class_group_id .< 2_000_000, false), :class_group_id] 
-                .+ 2_000_000
-            )
+        -1 .* (
+            data[coalesce.(data.class_group_id .< 2_000_000, false), :class_group_id] 
+            .+ 2_000_000
+        )
     )
 
     # Use the class group ID if it exists, otherwise use the only class's fund class ID
