@@ -34,7 +34,6 @@ function test()
     dropmissing!(n_shared_classes)
 
     share_classes_counts = countmap(n_shared_classes.n_shared_classes) |> collect |> sort
-    [println(x) for x in share_classes_counts];
 
     shared2 = n_shared_classes[n_shared_classes.n_shared_classes .== 2, :]
     shared5 = n_shared_classes[n_shared_classes.n_shared_classes .== 5, :]
@@ -90,13 +89,10 @@ function test()
         :ret,
         :net_assets,
         :costs,
-        :investment_objective
+        :investment_objective,
+        :fund_name
     ]
-    inspected_data = leftjoin(
-        testdata[:, interested_cols],
-        info[!, [:fund_class_id, :fund_name]],
-        on=:fund_class_id
-    )
+    inspected_data = testdata[:, interested_cols]
     sort!(inspected_data, :date)
     pprint(inspected_data, color_by=:fund_class_id)
 
