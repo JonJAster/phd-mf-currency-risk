@@ -169,12 +169,11 @@ function pprint(
     round_to : Int
         The number of decimal places to which floating values are rounded before printing.
     """
-
+    # df_in = first(loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow")),100)
     MAKE_TEXT_WHITE = Crayon(foreground=(255,255,255))
     MAKE_TEXT_PURPLE = Crayon(foreground=(127,25,195))
     MAKE_TEXT_LIGHT_GREY = Crayon(foreground=(200,200,200))
     MAKE_TEXT_DARK_GREY = Crayon(foreground=(10,10,10))
-    ITR_VALUE = 1
 
     isnothing(id_cols) && (id_cols = [first(propertynames(df_in))])
     typeof(id_cols) <: AbstractArray || (id_cols = [id_cols])
@@ -185,7 +184,7 @@ function pprint(
     if !isnothing(color_by)
         row_colorwheel = Iterators.cycle(ColorSchemes.tab20.colors) |> Iterators.Stateful
         unique_color_ids = unique(df[!, color_by])
-        color_index_map = Dict(id => iterate(row_colorwheel)[ITR_VALUE] for id in unique_color_ids)
+        color_map = Dict(id => iterate(row_colorwheel)[1] for id in unique_color_ids)
     end
 
     floating_cols = [
@@ -269,8 +268,8 @@ function pprint(
     end
 
     function print_row(row, cols)
-        if !isnothing(row_colorwheel)
-            row_color =  row_colorwheel[row[color_by]]
+        if !isnothing(color_by)
+            row_color = color_map[row[color_by]]
 			(row_r, row_g, row_b) = Int.(floor.(255 .* (row_color.r, row_color.g, row_color.b)))
     		print(Crayon(foreground=(row_r, row_g, row_b)))
         end
