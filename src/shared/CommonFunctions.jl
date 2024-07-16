@@ -277,7 +277,7 @@ function pprint(
         end
 
         TRAILING_WHITESPACE = 2
-        printout = ""
+        printout = string(row_crayon)
         for col_name in cols
             ismissing(row[col_name]) && (printout *= string(MAKE_TEXT_DARK_GREY))
             printout *= align_text(
