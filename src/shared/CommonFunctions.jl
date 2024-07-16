@@ -471,7 +471,7 @@ function query_wrds(wrds, query; limit=nothing, save_to=nothing)
 end
 
 # Dates.lastdayofmonth doesn't handle missing values
-function lastdayofmonth(dt::Missing) = missing
+lastdayofmonth(dt::Missing) = missing
 
 function loadarrow(filename)
     arrow_table = Arrow.Table(filename)
