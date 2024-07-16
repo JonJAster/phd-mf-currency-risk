@@ -26,6 +26,7 @@ export filter_fundids
 export init_raw, initialise_base_data, initialise_flow_data
 export inspect
 export investment_target_is
+export lastdayofmonth
 export loadarrow
 export makepath
 export nonmissing, withmissing
@@ -468,6 +469,9 @@ function query_wrds(wrds, query; limit=nothing, save_to=nothing)
 
     return data
 end
+
+# Dates.lastdayofmonth doesn't handle missing values
+function lastdayofmonth(dt::Missing) = missing
 
 function loadarrow(filename)
     arrow_table = Arrow.Table(filename)
