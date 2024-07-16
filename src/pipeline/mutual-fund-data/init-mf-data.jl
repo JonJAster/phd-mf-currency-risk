@@ -205,6 +205,7 @@ function _read_mf_crosssection(task_start)
         mf_info,
         [
             :crsp_fundno,
+            :fund_name,
             :first_offer_dt,
             :end_dt,
             :delist_cd,
@@ -230,6 +231,7 @@ function _init_info!(mf_info)
     rename!(
         mf_info,
         :crsp_fundno => :fund_class_id,
+        :fund_name => :recent_fund_name,
         :first_offer_dt => :inception_date,
         :end_dt => :end_date,
         :delist_cd => :delist_code,
