@@ -20,6 +20,11 @@ function process_mf_data()
     data = loadarrow(data_filename)
     info = loadarrow(info_filename)
 
+    # Filter out non-equity funds prior to aggregating, since a partial aggregate should
+    # still provide valuable and unbiased data on the flow-performance relationship of 
+    # equity fund shares, and the only alternative is to delete those funds completely.
+    filter!(row -> startswith(row.investment_objective, "E"), data)
+
     # Combine fund class and fund class group ids into a unique identifier at the fund level
     _identify_funds!(data)
 
