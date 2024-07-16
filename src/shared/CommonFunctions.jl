@@ -169,7 +169,7 @@ function pprint(
     round_to : Int
         The number of decimal places to which floating values are rounded before printing.
     """
-    # df_in = first(loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow")),100)
+    # df_in = first(loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow")),100); id_cols = [:class_group_id, :fund_class_id, :date]; color_by=:fund_class_id; rows=nothing; centre=false; header=true; spacer=false; cluster_size=10; round_to=5
     MAKE_TEXT_WHITE = Crayon(foreground=(255,255,255))
     MAKE_TEXT_PURPLE = Crayon(foreground=(127,25,195))
     MAKE_TEXT_LIGHT_GREY = Crayon(foreground=(200,200,200))
@@ -188,8 +188,10 @@ function pprint(
     end
 
     floating_cols = [
-        col for col in propertynames(df) if eltype(df[!, col]) <: AbstractFloat
+        col for col in propertynames(df)
+        if eltype(df[!, col]) <: Union{Missing,AbstractFloat}
     ]
+    
     for col in floating_cols
         df[!, col] = round.(df[!, col], digits=round_to)
     end
