@@ -22,6 +22,84 @@ using .CommonConstants
 using .CommonFunctions
 Dates.lastdayofmonth
 function test()
+    # Crawl a group-class there
+    data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    eq_data = data[nonmissing(passmissing(startswith).(data.investment_objective, "E")), :]
+    sort!(eq_data, :date)
+
+    n_shared_classes = combine(
+        groupby(eq_data, :class_group_id),
+        :fund_class_id => (x->length(unique(skipmissing(x)))) => :n_shared_classes
+    )
+    dropmissing!(n_shared_classes)
+
+    share_classes_counts = countmap(n_shared_classes.n_shared_classes) |> collect |> sort
+    [println(x) for x in share_classes_counts];
+
+    shared2 = n_shared_classes[n_shared_classes.n_shared_classes .== 2, :]
+    shared5 = n_shared_classes[n_shared_classes.n_shared_classes .== 5, :]
+
+    function crawl_fund_set(data, group_ids_0)
+        group_iterations = OrderedDict{Int32, Union{Int64, Vector{Int64}}}(0 => group_ids_0)
+        class_iterations = OrderedDict(
+            0 => unique(fundgroup(data, group_ids_0).fund_class_id)
+        )
+
+        group_i = 0
+        class_j = 0
+        function grown(group_i, class_j)
+            # class_j is 0 on entry into the loop and never again
+            class_j == 0 && return true
+    
+            groups_grown = (
+                length(group_iterations[group_i]) > length(group_iterations[group_i-1])
+            )
+            classes_grown = (
+                length(class_iterations[class_j]) > length(class_iterations[class_j-1])
+            )
+            return groups_grown && classes_grown
+        end
+        while grown(group_i, class_j)
+            subdata = fundclass(data, class_iterations[class_j])
+            group_iterations[group_i+1] = unique(skipmissing(subdata.class_group_id))
+
+            subdata = fundgroup(data, group_iterations[group_i+1])
+            class_iterations[class_j+1] = unique(subdata.fund_class_id)
+
+            group_i += 1
+            class_j += 1
+        end
+        return group_iterations, class_iterations
+    end
+
+    testgroup = shared2.class_group_id[4]
+    test_output = crawl_fund_set(eq_data, testgroup)
+    max_itr_group = maximum(keys(test_output[1]))
+    max_itr_class = maximum(keys(test_output[2]))
+    testgroups = test_output[1][max_itr_group]
+    testclasses = test_output[2][max_itr_class]
+    testdata = eq_data[
+            nonmissing(eq_data.class_group_id .∈ Ref(testgroups)) .||
+            (eq_data.fund_class_id .∈ Ref(testclasses)),
+            propertynames(eq_data)
+    ]
+    interested_cols = [
+        :date,
+        :class_group_id,
+        :fund_class_id,
+        :ret,
+        :net_assets,
+        :costs,
+        :investment_objective
+    ]
+    inspected_data = leftjoin(
+        testdata[:, interested_cols],
+        info[!, [:fund_class_id, :fund_name]],
+        on=:fund_class_id
+    )
+    sort!(inspected_data, :date)
+    pprint(inspected_data, color_by=:fund_class_id)
+
     # Return data quality test
     test_id = 38239
     data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
@@ -30,7 +108,7 @@ function test()
     test_info = info[info.fund_class_id .== test_id, :]
     test_name = test_info.fund_name[1]
 
-    length(unique(data.fund_class_id))
+    length(unique(eq_data.fund_class_id))
 
     pprint(test_data)
 
