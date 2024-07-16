@@ -70,6 +70,7 @@ function _read_mf_timeseries(task_start)
             :chgdt,
             :chgenddt,
             :crsp_cl_grp,
+            :fund_name,
             :index_fund_flag,
             :et_flag,
             :retail_fund
@@ -204,7 +205,6 @@ function _read_mf_crosssection(task_start)
         mf_info,
         [
             :crsp_fundno,
-            :fund_name,
             :first_offer_dt,
             :end_dt,
             :delist_cd,
