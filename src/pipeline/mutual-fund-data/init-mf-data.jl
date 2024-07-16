@@ -96,10 +96,17 @@ function _read_mf_timeseries(task_start)
     uncompressed_timeseries = []
     @threads for df_key in collect(keys(compressed_timeseries))
         process_start = time()
-        push!(
-            uncompressed_timeseries,
-            _decompress_timeseries(compressed_timeseries[df_key])
-        )
+        if df_key == :mf_frontload
+            push!(
+                uncompressed_timeseries,
+                _decompress_timeseries(compressed_timeseries[df_key]; combine_by=maximum)
+            )
+        else
+            push!(
+                uncompressed_timeseries,
+                _decompress_timeseries(compressed_timeseries[df_key])
+            )
+        end
 
         printtime(
             "decompressing timeseries of $df_key", task_start;
@@ -115,7 +122,8 @@ function _read_mf_timeseries(task_start)
     return data
 end
 
-function _decompress_timeseries(short_data)
+function _decompress_timeseries(short_data; combine_by=nothing) 
+    # short_data = compressed_timeseries[:mf_frontload]; combine_by=maximum
     col_names = propertynames(short_data)
     data_cols = propertynames(short_data[!, Not(:crsp_fundno, :begdt, :enddt)])
 
@@ -170,6 +178,15 @@ function _decompress_timeseries(short_data)
         end
     end
 
+    if !isnothing(combine_by)
+        long_data = combine(
+            groupby(long_data, [:crsp_fundno, :caldt]),
+            data_cols .=> combine_by
+        )
+    end
+
+    @assert allunique(long_data[:, [:crsp_fundno, :caldt]]) "Duplicate rows over $data_cols"
+
     return long_data
 end
 
@@ -191,6 +208,7 @@ function _init_data!(mf_data)
         :mret => :ret,
         :mtna => :net_assets,
         :exp_ratio => :costs,
+        :front_load_maximum => :max_front_load,
         :crsp_obj_cd => :investment_objective
     )
 

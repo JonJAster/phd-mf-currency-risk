@@ -24,6 +24,7 @@ Dates.lastdayofmonth
 function test()
     # Crawl a group-class there
     data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
     eq_data = data[nonmissing(passmissing(startswith).(data.investment_objective, "E")), :]
     sort!(eq_data, :date)
 
@@ -71,7 +72,7 @@ function test()
         return group_iterations, class_iterations
     end
 
-    testgroup = shared2.class_group_id[4]
+    testgroup = shared2.class_group_id[5]
     test_output = crawl_fund_set(eq_data, testgroup)
     max_itr_group = maximum(keys(test_output[1]))
     max_itr_class = maximum(keys(test_output[2]))
@@ -99,6 +100,8 @@ function test()
     )
     sort!(inspected_data, :date)
     pprint(inspected_data, color_by=:fund_class_id)
+
+    init_data[(init_data.fund_class_id .== 30566) .&& (init_data.date .== Date(2001,11,30)),:]
 
     # Return data quality test
     test_id = 38239
