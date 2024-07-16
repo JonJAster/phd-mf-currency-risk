@@ -183,7 +183,7 @@ function pprint(
     
     df = deepcopy(df_in[1:rows,:])
     if !isnothing(color_by)
-        row_colorwheel = Iterators.cycle(colorschemes[:tab20]) |> Iterators.Stateful
+        row_colorwheel = Iterators.cycle(ColorSchemes.tab20.colors) |> Iterators.Stateful
         unique_color_ids = unique(df[!, color_by])
         color_index_map = Dict(id => iterate(row_colorwheel)[ITR_VALUE] for id in unique_color_ids)
     end

@@ -12,6 +12,7 @@ using Base.Threads
 using LinearAlgebra
 using Plots
 using Distributions
+using ColorSchemes
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
