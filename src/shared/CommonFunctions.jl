@@ -133,6 +133,30 @@ function pprint(
         df, id_cols=nothing;
         rows=nothing, centre=false, header=true, spacer=false, cluster_size=10
         )
+    """
+    Pretty prints a DataFrame in the terminal. The DataFrame is printed in clusters of rows
+    with the columns split into sets that fit within the terminal width. The ID columns are
+    printed first and the remaining columns are split into sets that fit within the terminal
+    width. The sets are printed in sequence with a spacer line between each set.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The DataFrame to be printed.
+    id_cols : DataFrame column selector (Symbol, String, Vector, ALL, Not, Between, In, Regex)
+        The column name in the data DataFrame containing the entity identifiers.
+    rows : Int
+        The number of rows to be printed. If not specified, all rows are printed.
+    centre : Bool
+        If true, the text is centred within the column width. If false, the text is left
+        aligned within the column width.
+    header : Bool
+        If true, the column names are printed as a header for each set of columns.
+    spacer : Bool
+        If true, a spacer elipsis line is printed at the end of the printed rows.
+    cluster_size : Int
+        The number of rows to be printed in each cluster.
+    """
 
     MAKE_TEXT_WHITE = Crayon(foreground=(255,255,255))
     MAKE_TEXT_PURPLE = Crayon(foreground=(127,25,195))
@@ -545,10 +569,36 @@ function rolling_std(data, col, window; lagged)
     return rolling_std
 end
 
-function datastep(stepper)
-    isempty(stepper) && return nothing
 
-    value_i = iterate(stepper.itr)[1]
+function datastep(stepper; reset=false, freeze=false)
+    """
+    datastep(stepper; reset=false, freeze=false)
+
+    Returns the next value in the stepper iterator and the corresponding data from the stepper
+    data. If the stepper is empty, nothing is returned.
+
+    Parameters
+    ----------
+    stepper : NamedTuple
+        The stepper object containing the iterator and data.
+    reset : Bool
+        If true, the stepper iterator is reset to the first value.
+    freeze : Bool
+        If true, the stepper iterator is not advanced to the next value.
+    """
+
+    if reset
+        Iterators.reset!(stepper.itr)
+    end
+    if freeze
+        next_state_following_index = stepper.itr.nextvalstate[2]
+        current_state_prev_index = next_state_following_index - 2
+        current_state_prev_index <= 1 && error("Cannot freeze stepper at first value.")
+        value_i = stepper.itr.itr[current_state_prev_index]
+    else
+        value_i = iterate(stepper.itr)[1]
+    end
+    
     value_data = stepper.data[nonmissing(stepper.data[:, stepper.field] .== value_i), :]
 
     return value_data

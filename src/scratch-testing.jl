@@ -37,7 +37,7 @@ function test()
     funds2 = n_funds[n_funds.n_funds .== 2, :class_group_id]
     funds2_stepper = stepgroup(init_data, funds2)
 
-    pprint(datastep(funds2_stepper))
+    pprint(datastep(funds2_stepper), centre=true)
 
     backids = [38239, 95245]
     pprint(fundclass(init_data, backids))
@@ -50,6 +50,9 @@ function test()
     a = iterate(x)
 
     it = Iterators.Stateful(["a", "b", "c"])
+    propertynames(it)
+    it.itr[it.nextvalstate[2]-2]
+
     isempty(it)
     iterate(it)
     iterate(it, ans[2])
