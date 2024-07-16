@@ -89,8 +89,8 @@ function _read_mf_timeseries(task_start)
         process_start_time=process_start, minutes=false
     )
 
-    mf_ret.caldt = lastdayofmonth.(mf_ret.caldt)
-    mf_tna.caldt = lastdayofmonth.(mf_tna.caldt)
+    mf_ret.caldt = passmissing(lastdayofmonth, mf_ret.caldt)
+    mf_tna.caldt = passmissing(lastdayofmonth, mf_tna.caldt)
 
     uncompressed_timeseries = []
     @threads for df_key in collect(keys(compressed_timeseries))
