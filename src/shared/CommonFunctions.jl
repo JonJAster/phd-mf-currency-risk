@@ -28,7 +28,7 @@ export inspect
 export investment_target_is
 export loadarrow
 export makepath
-export nonmissing, passmissing, withmissing
+export nonmissing, withmissing
 export post_bho_only
 export pprint
 export printtime
@@ -91,13 +91,6 @@ end
 
 nonmissing(condition) = coalesce.(condition, false)
 withmissing(condition) = coalesce.(condition, true)
-
-function passmissing(f, arg::AbstractArray)
-    output = copy(arg)
-    output[.!ismissing.(arg)] = f(arg[.!ismissing.(arg)])
-
-    return output
-end
 
 function qhead(filename)
     data = Arrow.Table(filename)
