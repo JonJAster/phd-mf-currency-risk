@@ -9,6 +9,7 @@ using Tables
 using Dates
 using StatsBase
 using Crayons
+using ColorSchemes
 using ShiftedArrays: lead, lag
 
 include("CommonConstants.jl")
@@ -130,8 +131,15 @@ function qlookup(id; data=false)
 end
 
 function pprint(
-        df, id_cols=nothing;
-        rows=nothing, centre=false, header=true, spacer=false, cluster_size=10
+        df_in,
+        id_cols=nothing;
+        color_by=nothing,
+        rows=nothing,
+        centre=false,
+        header=true,
+        spacer=false, 
+        cluster_size=10,
+        round_to=5
         )
     """
     Pretty prints a DataFrame in the terminal. The DataFrame is printed in clusters of rows
@@ -141,10 +149,12 @@ function pprint(
 
     Parameters
     ----------
-    df : DataFrame
+    df_in : DataFrame
         The DataFrame to be printed.
     id_cols : DataFrame column selector (Symbol, String, Vector, ALL, Not, Between, In, Regex)
         The column name in the data DataFrame containing the entity identifiers.
+    color_by : DataFrame column selector (Symbol, String, Vector, ALL, Not, Between, In, Regex)
+        If not nothing, rows are coloured on the basis of the values in this column.
     rows : Int
         The number of rows to be printed. If not specified, all rows are printed.
     centre : Bool
@@ -156,17 +166,38 @@ function pprint(
         If true, a spacer elipsis line is printed at the end of the printed rows.
     cluster_size : Int
         The number of rows to be printed in each cluster.
+    round_to : Int
+        The number of decimal places to which floating values are rounded before printing.
     """
 
     MAKE_TEXT_WHITE = Crayon(foreground=(255,255,255))
     MAKE_TEXT_PURPLE = Crayon(foreground=(127,25,195))
     MAKE_TEXT_LIGHT_GREY = Crayon(foreground=(200,200,200))
     MAKE_TEXT_DARK_GREY = Crayon(foreground=(10,10,10))
+    ITR_VALUE = 1
+    ITR_NEXT_INDEX = 2
 
     isnothing(id_cols) && (id_cols = [first(propertynames(df))])
     typeof(id_cols) <: AbstractArray || (id_cols = [id_cols])
     isnothing(rows) && (rows = nrow(df))
     terminal_width = displaysize(stdout)[2]
+    
+    df = deepcopy(df_in[1:rows,:])
+    if !isnothing(color_by)
+        row_colorwheel = Iterators.cycle(ColorSchemes.tab20.colors) |> Iterators.Stateful
+        # row_color = iterate(row_colorwheel)[ITR_VALUE]
+        # (row_r, row_g, row_b) = Int.(floor.(255 .* (row_color.r, row_color.g, row_color.b)))
+        # Crayon(foreground=(row_r, row_g, row_b))
+    else
+        row_colorwheel = nothing
+    end
+
+    floating_cols = [
+        col for col in propertynames(df) if eltype(df[!, col]) <: AbstractFloat
+    ]
+    for col in floating_cols
+        df[!, col] = round.(df[!, col], digits=round_to)
+    end
 
     content_width(col_name) = maximum(length.(string.(df[!, col_name])))
     total_width(col_name) = maximum([length(string(col_name)), content_width(col_name)])
@@ -591,12 +622,12 @@ function datastep(stepper; reset=false, freeze=false)
         Iterators.reset!(stepper.itr)
     end
     if freeze
-        next_state_following_index = stepper.itr.nextvalstate[2]
+        next_state_following_index = stepper.itr.nextvalstate[ITR_NEXT_INDEX]
         current_state_prev_index = next_state_following_index - 2
         current_state_prev_index == 0 && error("Cannot freeze stepper at first value.")
         value_i = stepper.itr.itr[current_state_prev_index]
     else
-        value_i = iterate(stepper.itr)[1]
+        value_i = iterate(stepper.itr)[ITR_VALUE]
     end
 
     value_data = stepper.data[nonmissing(stepper.data[:, stepper.field] .== value_i), :]
