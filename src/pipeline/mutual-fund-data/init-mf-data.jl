@@ -222,8 +222,8 @@ end
 
 function _init_info!(mf_info)
     mf_info.crsp_fundno = convert.(Union{Missing,Int}, mf_info.crsp_fundno)
-    mf_info.first_offer_dt = lastdayofmonth.(mf_info.first_offer_dt)
-    mf_info.end_dt = lastdayofmonth.(mf_info.end_dt)
+    mf_info.first_offer_dt = passmissing(lastdayofmonth).(mf_info.first_offer_dt)
+    mf_info.end_dt = passmissing(lastdayofmonth).(mf_info.end_dt)
     mf_info.delist_cd = CategoricalArray(mf_info.delist_cd)
     mf_info.merge_fundno = convert.(Union{Missing,Int}, mf_info.merge_fundno)
 
