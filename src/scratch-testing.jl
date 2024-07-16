@@ -92,7 +92,11 @@ function test()
         :investment_objective,
         :fund_name
     ]
-    inspected_data = testdata[:, interested_cols]
+    inspected_data = leftjoin(
+        testdata[:, interested_cols],
+        info[!, [:fund_class_id, :recent_fund_name]],
+        on=:fund_class_id
+    )
     sort!(inspected_data, :date)
     pprint(inspected_data, color_by=:fund_class_id)
 
