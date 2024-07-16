@@ -179,9 +179,14 @@ function _decompress_timeseries(short_data; combine_by=nothing)
     end
 
     if !isnothing(combine_by)
+        function combined(x)
+            all(ismissing.(x)) && return missing
+            return combine_by(skipmissing(x))
+        end
+
         long_data = combine(
             groupby(long_data, [:crsp_fundno, :caldt]),
-            data_cols .=> combine_by
+            data_cols .=> combined
         )
     end
 
@@ -208,7 +213,7 @@ function _init_data!(mf_data)
         :mret => :ret,
         :mtna => :net_assets,
         :exp_ratio => :costs,
-        :front_load_maximum => :max_front_load,
+        :front_load_combined => :max_front_load,
         :crsp_obj_cd => :investment_objective
     )
 

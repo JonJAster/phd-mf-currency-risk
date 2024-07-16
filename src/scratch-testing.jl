@@ -101,15 +101,22 @@ function test()
     sort!(inspected_data, :date)
     pprint(inspected_data, color_by=:fund_class_id)
 
-    init_data[(init_data.fund_class_id .== 30566) .&& (init_data.date .== Date(2001,11,30)),:]
+    data[(data.fund_class_id .== 30566) .&& (data.date .== Date(2001,11,30)),:]
 
     # Return data quality test
-    test_id = 38239
     data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
-    test_data = data[data.fund_class_id .== test_id, :]
+    eq_data = data[nonmissing(passmissing(startswith).(data.investment_objective, "E")), :]
     info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
-    test_info = info[info.fund_class_id .== test_id, :]
-    test_name = test_info.fund_name[1]
+
+    testidx = findfirst(x->!ismissing(x) && 0.00001<x<0.0001, eq_data.ret)
+
+    eq_data[testidx-5:testidx+5, :]
+
+    minimum(skipmissing(eq_data.ret))
+
+    testid = eq_data[nonmissing(eq_data.ret .== -1),:fund_class_id]
+    eq_data[eq_data.fund_class_id .== testid[1], :]
+
 
     length(unique(eq_data.fund_class_id))
 
