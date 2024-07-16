@@ -593,12 +593,12 @@ function datastep(stepper; reset=false, freeze=false)
     if freeze
         next_state_following_index = stepper.itr.nextvalstate[2]
         current_state_prev_index = next_state_following_index - 2
-        current_state_prev_index <= 1 && error("Cannot freeze stepper at first value.")
+        current_state_prev_index == 0 && error("Cannot freeze stepper at first value.")
         value_i = stepper.itr.itr[current_state_prev_index]
     else
         value_i = iterate(stepper.itr)[1]
     end
-    
+
     value_data = stepper.data[nonmissing(stepper.data[:, stepper.field] .== value_i), :]
 
     return value_data

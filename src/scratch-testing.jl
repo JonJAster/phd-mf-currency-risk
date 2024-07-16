@@ -37,7 +37,7 @@ function test()
     funds2 = n_funds[n_funds.n_funds .== 2, :class_group_id]
     funds2_stepper = stepgroup(init_data, funds2)
 
-    pprint(datastep(funds2_stepper), centre=true)
+    pprint(datastep(funds2_stepper; freeze=true), centre=true)
 
     backids = [38239, 95245]
     pprint(fundclass(init_data, backids))
@@ -56,8 +56,6 @@ function test()
     isempty(it)
     iterate(it)
     iterate(it, ans[2])
-
-    keypress = waitkey()
 
     # Test IDs
     init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
