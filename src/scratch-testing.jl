@@ -22,6 +22,18 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
+    # Return data quality test
+    test_id = 38239
+    data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    test_data = data[data.fund_class_id .== test_id, :]
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+    test_info = info[info.fund_class_id .== test_id, :]
+    test_name = test_info.fund_name[1]
+
+    length(unique(data.fund_class_id))
+
+    pprint(test_data)
+
     # Test IDs
     init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
     init_info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
