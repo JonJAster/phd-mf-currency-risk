@@ -271,7 +271,9 @@ function pprint(
         if !isnothing(color_by)
             row_color = color_map[row[color_by]]
 			(row_r, row_g, row_b) = Int.(floor.(255 .* (row_color.r, row_color.g, row_color.b)))
-    		print(Crayon(foreground=(row_r, row_g, row_b)))
+    		row_crayon = Crayon(foreground=(row_r, row_g, row_b))
+        else
+            row_crayon = MAKE_TEXT_WHITE
         end
 
         TRAILING_WHITESPACE = 2
@@ -282,12 +284,11 @@ function pprint(
                 string(row[col_name]),
                 stored_true_widths[col_name]
             )
-            ismissing(row[col_name]) && (printout *= string(MAKE_TEXT_WHITE))
+            ismissing(row[col_name]) && (printout *= string(row_crayon))
             printout *= "  "
         end
 
         println(printout[1:end-TRAILING_WHITESPACE])
-        !isnothing(row_colorwheel) && print(MAKE_TEXT_WHITE)
     end
 
     cluster_size = (length(print_sets) == 1) ? rows : cluster_size
@@ -313,6 +314,7 @@ function pprint(
 
         spacer && print(centre_text("...", maximum(printwidth.(print_sets))))
     end
+    print(MAKE_TEXT_WHITE)
 end
 
 function proportion(f, data, of; id=first(propertynames(data)))
