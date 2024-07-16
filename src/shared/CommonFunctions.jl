@@ -175,21 +175,17 @@ function pprint(
     MAKE_TEXT_LIGHT_GREY = Crayon(foreground=(200,200,200))
     MAKE_TEXT_DARK_GREY = Crayon(foreground=(10,10,10))
     ITR_VALUE = 1
-    ITR_NEXT_INDEX = 2
 
-    isnothing(id_cols) && (id_cols = [first(propertynames(df))])
+    isnothing(id_cols) && (id_cols = [first(propertynames(df_in))])
     typeof(id_cols) <: AbstractArray || (id_cols = [id_cols])
-    isnothing(rows) && (rows = nrow(df))
+    isnothing(rows) && (rows = nrow(df_in))
     terminal_width = displaysize(stdout)[2]
     
     df = deepcopy(df_in[1:rows,:])
     if !isnothing(color_by)
-        row_colorwheel = Iterators.cycle(ColorSchemes.tab20.colors) |> Iterators.Stateful
-        # row_color = iterate(row_colorwheel)[ITR_VALUE]
-        # (row_r, row_g, row_b) = Int.(floor.(255 .* (row_color.r, row_color.g, row_color.b)))
-        # Crayon(foreground=(row_r, row_g, row_b))
-    else
-        row_colorwheel = nothing
+        row_colorwheel = Iterators.cycle(colorschemes[:tab20]) |> Iterators.Stateful
+        unique_color_ids = unique(df[!, color_by])
+        color_index_map = Dict(id => iterate(row_colorwheel)[ITR_VALUE] for id in unique_color_ids)
     end
 
     floating_cols = [
@@ -273,6 +269,12 @@ function pprint(
     end
 
     function print_row(row, cols)
+        if !isnothing(row_colorwheel)
+            row_color =  row_colorwheel[row[color_by]]
+			(row_r, row_g, row_b) = Int.(floor.(255 .* (row_color.r, row_color.g, row_color.b)))
+    		print(Crayon(foreground=(row_r, row_g, row_b)))
+        end
+
         TRAILING_WHITESPACE = 2
         printout = ""
         for col_name in cols
@@ -284,7 +286,9 @@ function pprint(
             ismissing(row[col_name]) && (printout *= string(MAKE_TEXT_WHITE))
             printout *= "  "
         end
+
         println(printout[1:end-TRAILING_WHITESPACE])
+        !isnothing(row_colorwheel) && print(MAKE_TEXT_WHITE)
     end
 
     cluster_size = (length(print_sets) == 1) ? rows : cluster_size
@@ -622,12 +626,12 @@ function datastep(stepper; reset=false, freeze=false)
         Iterators.reset!(stepper.itr)
     end
     if freeze
-        next_state_following_index = stepper.itr.nextvalstate[ITR_NEXT_INDEX]
+        next_state_following_index = stepper.itr.nextvalstate[2]
         current_state_prev_index = next_state_following_index - 2
         current_state_prev_index == 0 && error("Cannot freeze stepper at first value.")
         value_i = stepper.itr.itr[current_state_prev_index]
     else
-        value_i = iterate(stepper.itr)[ITR_VALUE]
+        value_i = iterate(stepper.itr)[1]
     end
 
     value_data = stepper.data[nonmissing(stepper.data[:, stepper.field] .== value_i), :]
