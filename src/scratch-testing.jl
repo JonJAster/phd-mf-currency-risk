@@ -16,9 +16,11 @@ using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
+includet("pipeline/regressions/regress-fund-flows.jl")
 
 using .CommonConstants
 using .CommonFunctions
+using .RegressFundFlows
 
 function test()
     ## Morningstar
@@ -66,15 +68,9 @@ function test()
     unique_dates = unique(data.date)
     unique_datecodes = Symbol.(["fe_month_$(year(d))$(month(d)<10 ? "0" : "")$(month(d))" for d in unique_dates])
 
-    for i in unique_datecodes
-        i ∉ fe_names && println(i)
-    end
-
-    regout = regress_fund_flows("ff_usa_ffc6")
+    regout = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
     regfit = regout.regfit;
-    propertynames(regfit.mf)
-    regfit.mf.f.rhs.terms
-    x_terms = vcat([:const], [regfit.mf.f.rhs.terms[i].sym for i in 2:15])
+    x_terms = [regfit.mf.f.rhs.terms[i].sym for i in 1:14]
     V = vcov(regfit)
 
     ## CRSP
