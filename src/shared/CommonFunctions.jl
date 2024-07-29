@@ -210,6 +210,7 @@ function initialise_base_data(model)
 end
 
 function initialise_flow_data(model_name)
+    # model_name = "ff_usa_ffc6"
     filename_mf = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
@@ -327,7 +328,9 @@ function rolling_std(data, col, window; lagged, grouped_by=nothing)
 
         start_date = data[i, :date] - Month(i_date_offset)
         data[window_start, :date] != start_date && continue
-        data[window_start, grouped_by] != data[i, grouped_by] && continue
+        if !isnothing(grouped_by)
+            data[window_start, grouped_by] != data[i, grouped_by] && continue
+        end
         rolling_std[i] = std(data[window_start:window_end, col])
     end
 
