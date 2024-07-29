@@ -87,8 +87,6 @@ function main()
     return
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    task_start = time()
-    main()
-    printtime("time-weighting all decomposed returns", task_start)
-end
+task_start = time()
+main()
+printtime("time-weighting all decomposed returns", task_start)
