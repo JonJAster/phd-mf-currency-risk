@@ -67,8 +67,6 @@ function main()
     return
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    task_start = time()
-    main()
-    printtime("decomposing all fund returns", task_start)
-end
+task_start = time()
+main()
+printtime("decomposing all fund returns", task_start)
