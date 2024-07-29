@@ -517,8 +517,9 @@ function _add_lags!(data, col; nlags, skip_to=false)
     end
 end
 
-function _convert_to_category_dummies!(data, col)
-    categories = unique(data[!, col])[2:end]
+function _convert_to_category_dummies!(data, col, drop_first=true)
+    category_col = sort(unique(data[!, col]))
+    categories = drop_first ? category_col[2:end] : category_col
     for category in categories
         data[!, "$(col)_$category"] = Int.(data[!, col] .== category)
     end
@@ -550,12 +551,12 @@ function _add_time_fe!(data; frequency)
         error("Invalid frequency: $frequency. Must be :month, :quarter, or :year.")
     end
 
-    _convert_to_category_dummies!(data, date_category)
+    _convert_to_category_dummies!(data, date_category; drop_first=false)
 end
 
 function _add_entity_fe!(data)
     data[!, :fe_entity] = data[!, :entity]
-    _convert_to_category_dummies!(data, :fe_entity)
+    _convert_to_category_dummies!(data, :fe_entity; drop_first=false)
 end
 
 function _normalise_names!(df; info=false)
