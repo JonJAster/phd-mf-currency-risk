@@ -14,13 +14,13 @@ using .CommonFunctions
 using .CommonConstants
 
 export regress_fund_flows
-export flow_regression_table
+export _flow_regression_table
 
 function regress_fund_flows(model_name; filter_by=nothing) 
     # model_name = "ff_usa_ffc6"; filter_by = nothing
     task_start = time()
 
-    regression_packet = flow_regression_table(model_name; filter_by=filter_by)
+    regression_packet = _flow_regression_table(model_name; filter_by=filter_by)
 
     regression_data = regression_packet.regression_data
     return_component_cols = regression_packet.return_component_cols
@@ -31,7 +31,7 @@ function regress_fund_flows(model_name; filter_by=nothing)
     return flow_output
 end
 
-function flow_regression_table(model_name; filter_by=nothing) # model_name = "ff_usa_ffc6"
+function _flow_regression_table(model_name; filter_by=nothing) # model_name = "ff_usa_ffc6"
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
