@@ -16,7 +16,8 @@ using .CommonConstants
 export regress_fund_flows
 export flow_regression_table
 
-function regress_fund_flows(model_name; filter_by=nothing)
+function regress_fund_flows(model_name; filter_by=nothing) 
+    # model_name = "ff_usa_ffc6"; filter_by = nothing
     task_start = time()
 
     regression_packet = flow_regression_table(model_name; filter_by=filter_by)
@@ -70,6 +71,7 @@ function _flow_regression(regression_data, return_component_cols)
     reg_formula = term(:flow) ~ sum(term.(X_names))
 
     regfit = lm(reg_formula, regression_data)
+
     return_col_indices = findall(x->in(x,return_component_cols), Symbol.(coefnames(regfit)))
 
     factor_names = [
