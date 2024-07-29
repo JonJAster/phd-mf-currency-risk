@@ -324,13 +324,10 @@ function rolling_std(data, col, window; lagged, grouped_by=nothing)
             i_date_offset = window - 1
         end
 
-        data[window_start, :fundid] != data[window_end, :fundid] && continue
-
+        data[window_start, :fundid] != data[i, :fundid] && continue
         start_date = data[i, :date] - Month(i_date_offset)
         data[window_start, :date] != start_date && continue
-        if !isnothing(grouped_by)
-            data[window_start, grouped_by] != data[i, grouped_by] && continue
-        end
+
         rolling_std[i] = std(data[window_start:window_end, col])
     end
 
