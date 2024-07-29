@@ -13,7 +13,7 @@ using .CommonConstants
 using .CommonFunctions
 using .RegressFundFlows
 
-function replicate_bho_summary_table() # start_month = Date(1996,1,1); end_month = Date(2011,11,1)
+function summary_tables() # start_month = Date(1996,1,1); end_month = Date(2011,11,1)
     output_characteristics = _replicate_characteristics(Date(1996,1,1), Date(2011,11,1))
     output_betas = _replicate_betas(Date(1996,1,1), Date(2011,11,1))
     output_return_components = _replicate_return_components(Date(1996,1,1), Date(2011,11,1))
@@ -170,5 +170,5 @@ function _summarise_series(data_series)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    replicate_bho_summary_table()
+    summary_tables()
 end
