@@ -2,6 +2,7 @@ using Revise
 using BenchmarkTools
 using DataFrames
 using CSV
+using REPL
 using Arrow
 using GLM
 using Dates
@@ -11,6 +12,7 @@ using Base.Threads
 using LinearAlgebra
 using Plots
 using Distributions
+using ColorSchemes
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
@@ -20,7 +22,196 @@ using .CommonConstants
 using .CommonFunctions
 
 function test()
-	# Test IDs
+    ## Morningstar
+    # Exploring regression output
+    function flow_regression_table(model_name; filter_by=nothing)
+        # TEST # model_name = "ff_usa_ffc6"
+        flow_data = initialise_flow_data(model_name)
+    
+        if !isnothing(filter_by)
+            flow_data = filter_fundids(filter_by, flow_data)
+        end
+    
+        cols = names(flow_data)
+        find_return_col(name) = !isnothing(match(r"ret_", name))
+        return_component_cols = cols[find_return_col.(cols)] .|> Symbol
+    
+        regression_data = regression_table(
+            flow_data, :fundid, :date,
+            :flow,
+            :flow, :nth_lag, FLOW_CONTROL_LAGS,
+            return_component_cols...,
+            :costs, :lag,
+            :true_no_load,
+            :std_return_12m,
+            :log_size_m1,
+            :log_age, :lag,
+            :tfe, :month
+        )
+    
+        dropmissing!(regression_data)
+        _drop_zero_cols!(regression_data)
+    
+        output = (
+            regression_data = regression_data,
+            return_component_cols = return_component_cols
+        )
+    
+        return output
+    end
+
+    data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    test_regtable = flow_regression_table()
+
+    regout = regress_fund_flows("ff_usa_ffc6")
+    regfit = regout.regfit;
+    propertynames(regfit.mf)
+    regfit.mf.f.rhs.terms[2].sym
+    x_terms = vcat([:const], [regfit.mf.f.rhs.terms[i].sym for i in 2:15])
+    V = vcov(regfit)
+
+    ## CRSP
+    # Crawl a group-class there
+    data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+    eq_data = data[nonmissing(passmissing(startswith).(data.investment_objective, "E")), :]
+    sort!(eq_data, :date)
+
+    n_shared_classes = combine(
+        groupby(eq_data, :class_group_id),
+        :fund_class_id => (x->length(unique(skipmissing(x)))) => :n_shared_classes
+    )
+    dropmissing!(n_shared_classes)
+
+    share_classes_counts = countmap(n_shared_classes.n_shared_classes) |> collect |> sort
+
+    shared2 = n_shared_classes[n_shared_classes.n_shared_classes .== 2, :]
+    shared5 = n_shared_classes[n_shared_classes.n_shared_classes .== 5, :]
+
+    function crawl_fund_set(data, group_ids_0)
+        group_iterations = OrderedDict{Int32, Union{Int64, Vector{Int64}}}(0 => group_ids_0)
+        class_iterations = OrderedDict(
+            0 => unique(fundgroup(data, group_ids_0).fund_class_id)
+        )
+
+        group_i = 0
+        class_j = 0
+        function grown(group_i, class_j)
+            # class_j is 0 on entry into the loop and never again
+            class_j == 0 && return true
+    
+            groups_grown = (
+                length(group_iterations[group_i]) > length(group_iterations[group_i-1])
+            )
+            classes_grown = (
+                length(class_iterations[class_j]) > length(class_iterations[class_j-1])
+            )
+            return groups_grown && classes_grown
+        end
+        while grown(group_i, class_j)
+            subdata = fundclass(data, class_iterations[class_j])
+            group_iterations[group_i+1] = unique(skipmissing(subdata.class_group_id))
+
+            subdata = fundgroup(data, group_iterations[group_i+1])
+            class_iterations[class_j+1] = unique(subdata.fund_class_id)
+
+            group_i += 1
+            class_j += 1
+        end
+        return group_iterations, class_iterations
+    end
+
+    testgroup = shared2.class_group_id[5]
+    test_output = crawl_fund_set(eq_data, testgroup)
+    max_itr_group = maximum(keys(test_output[1]))
+    max_itr_class = maximum(keys(test_output[2]))
+    testgroups = test_output[1][max_itr_group]
+    testclasses = test_output[2][max_itr_class]
+    testdata = eq_data[
+            nonmissing(eq_data.class_group_id .∈ Ref(testgroups)) .||
+            (eq_data.fund_class_id .∈ Ref(testclasses)),
+            propertynames(eq_data)
+    ]
+    interested_cols = [
+        :date,
+        :class_group_id,
+        :fund_class_id,
+        :ret,
+        :net_assets,
+        :costs,
+        :investment_objective,
+        :fund_name
+    ]
+    inspected_data = leftjoin(
+        testdata[:, interested_cols],
+        info[!, [:fund_class_id, :recent_fund_name]],
+        on=:fund_class_id
+    )
+    sort!(inspected_data, :date)
+    pprint(inspected_data, color_by=:fund_class_id)
+
+    data[(data.fund_class_id .== 30566) .&& (data.date .== Date(2001,11,30)),:]
+
+    # Return data quality test
+    data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    eq_data = data[nonmissing(passmissing(startswith).(data.investment_objective, "E")), :]
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+
+    inspect(data, :fund_class_id)
+
+    data.ret[3]
+
+    testidxs = findall(x->!ismissing(x) && -0.0000000001<x<0, eq_data.ret)
+
+    testdata = eq_data[testidxs, :]
+    testid = testdata.fund_class_id[3]
+    testdate = testdata.date[3]
+
+    nav = loadarrow(joinpath(DIRS.mf.raw, "monthly_nav.arrow"))
+
+    nav[(nav.crsp_fundno .== testid) .&& (testdate-Month(4) .<= nav.caldt .<= testdate+Month(4)), :]
+
+    length(unique(eq_data.fund_class_id))
+
+    pprint(test_data)
+
+    # Test IDs
+    init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
+    init_info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+
+    n_funds = combine(
+        groupby(init_data, :class_group_id),
+        :fund_class_id => (x->length(unique(skipmissing(x)))) => :n_funds
+    )
+
+    dropmissing!(n_funds)
+
+    init_data = sort(init_data, :date)
+
+    funds2 = n_funds[n_funds.n_funds .== 2, :class_group_id]
+    funds2_stepper = stepgroup(init_data, funds2)
+
+    pprint(datastep(funds2_stepper), centre=true, color_by=:fund_class_id)
+
+    backids = [38239, 95245]
+    pprint(fundclass(init_data, backids))
+
+    value_i = iterate(funds2_stepper.itr)
+    x = funds2_stepper.data[nonmissing(funds2_stepper.data.class_group_id .== funds2[1]),:]
+    
+    # Test iterators
+    x = (1,3,5,7)
+    a = iterate(x)
+
+    it = Iterators.Stateful(["a", "b", "c"])
+    propertynames(it)
+    it.itr[it.nextvalstate[2]-2]
+
+    isempty(it)
+    iterate(it)
+    iterate(it, ans[2])
+
+    # Test IDs
     init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
     init_info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
 
@@ -63,8 +254,81 @@ function test()
     total_funds = length(unique(init_data.fund_class_id))
     println(n_singletons, " out of ", total_funds, " ($(round(n_singletons/total_funds*100,digits=2))%) class groups are singletons")
 
+    funds2 = n_funds[n_funds.n_funds .== 2, :]
+
+    pprint(data[nonmissing(data.class_group_id .== funds2.class_group_id[1]),:])
+
+    ## Start CRSP data era tests
+    fund_header = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr.arrow"))
+
+    x = fund_header[coalesce.((fund_header.retail_fund .== "N"),false) .&& coalesce.((fund_header.inst_fund .== "N"),false), :]
+
+    pprint(x[1:5,:])
+
+    println(x[end-20:end, 1:7])
+
+    fund_header_hist = loadarrow(joinpath(DIRS.mf.raw, "fund_hdr_hist.arrow"))
+
+    class_counts = combine(
+        groupby(fund_header, :crsp_cl_grp),
+        :retail_fund => (x->count(==("Y"), skipmissing(x))) => :retail_fund_count,
+        :inst_fund => (x->count(==("Y"), skipmissing(x))) => :inst_fund_count
+    )
+
+    dropmissing!(class_counts)
+    class_counts.both_flag = (class_counts.retail_fund_count .* class_counts.inst_fund_count) .> 0
+
+    class_counts[class_counts.both_flag, :]
+
+    pprint(fund_header[coalesce.(fund_header.crsp_cl_grp .== 2000010,false), [:fund_name, :retail_fund, :inst_fund]])
+
+    nunique_crsp_cl_grp = combine(
+        groupby(fund_header_hist, :crsp_fundno),
+        :crsp_cl_grp => (x->length(unique(skipmissing(x)))) => :nunique_crsp_cl_grp
+    )
+
+    test_fundno = nunique_crsp_cl_grp[nunique_crsp_cl_grp.nunique_crsp_cl_grp .== maximum(nunique_crsp_cl_grp.nunique_crsp_cl_grp), :crsp_fundno][1]
+
+    fund_header[fund_header.crsp_fundno .== test_fundno, :]
+    fund_header_hist[fund_header_hist.crsp_fundno .== test_fundno, :]
+
+    test_hist = fund_header_hist[fund_header_hist.crsp_fundno .== test_fundno, 1:7]
+
+    println(test_hist)
+
+    grp_ids = Int.(unique(skipmissing(test_hist.crsp_cl_grp)))
+
+    for id in grp_ids
+        println(fund_header_hist[coalesce.(fund_header_hist.crsp_cl_grp .== id,false), 1:7])
+    end
 
 
+
+    nmissing = OrderedDict(
+        col => count(ismissing, fund_header[!, col]) for col in propertynames(fund_header)
+    )
+
+    list_nmissing = sort(collect(nmissing), by=x->x[2])
+    for (field, nmissing) in list_nmissing
+        println("$field: $nmissing")
+    end
+
+    function inspect_missing(field)
+        message = (
+            "$(round(nmissing[:crsp_portno]/1000; digits=1))k missing from " *
+            "$(round(nrow(fund_header)/1000; digits=1))k total records " *
+            "[$(round(nmissing[:crsp_portno]/nrow(fund_header)*100, digits=2))%]"
+        )
+
+        return message
+    end
+
+    inspect_missing(:fund_name)
+
+        
+
+
+    ## Start Morningstar data era tests
     # Testing fees
     init_data = loadarrow(joinpath(DIRS.mf.init, "mf-data.arrow"))
     
