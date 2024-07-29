@@ -12,7 +12,6 @@ using Base.Threads
 using LinearAlgebra
 using Plots
 using Distributions
-using ColorSchemes
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
@@ -74,7 +73,7 @@ function test()
     regout = regress_fund_flows("ff_usa_ffc6")
     regfit = regout.regfit;
     propertynames(regfit.mf)
-    regfit.mf.f.rhs.terms[2].sym
+    regfit.mf.f.rhs.terms
     x_terms = vcat([:const], [regfit.mf.f.rhs.terms[i].sym for i in 2:15])
     V = vcov(regfit)
 
