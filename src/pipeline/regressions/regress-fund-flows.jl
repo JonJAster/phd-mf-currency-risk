@@ -68,7 +68,7 @@ end
 
 function _flow_regression(regression_data, return_component_cols)
     X_names = regression_data[!, Not([:fundid, :date, :flow])] |> names
-    reg_formula = term(:flow) ~ sum(term.(X_names))
+    reg_formula = term(:flow) ~ term(0) + sum(term.(X_names))
 
     regfit = lm(reg_formula, regression_data)
 
