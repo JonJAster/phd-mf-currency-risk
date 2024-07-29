@@ -177,14 +177,14 @@ function _replicate_return_components(start_month=nothing, end_month=nothing; re
         :ret_cma => "wret_cma"
     )
 
-    return_components[!, return_parameters[:ex_ret]] = return_components.ex_ret_m1 * 100
-    return_components[!, return_parameters[:ret_alpha]] = return_components.ret_alpha_m1 * 100
-    return_components[!, return_parameters[:ret_mkt]] = return_components.ret_mkt_m1 * 100
-    return_components[!, return_parameters[:ret_smb]] = return_components.ret_smb_m1 * 100
-    return_components[!, return_parameters[:ret_hml]] = return_components.ret_hml_m1 * 100
-    return_components[!, return_parameters[:ret_wml]] = return_components.ret_wml_m1 * 100
-    return_components[!, return_parameters[:ret_rmw]] = return_components.ret_rmw_m1 * 100
-    return_components[!, return_parameters[:ret_cma]] = return_components.ret_cma_m1 * 100
+    return_components[!, return_parameters[:ex_ret]] = return_components.ex_ret_m1 * 10000
+    return_components[!, return_parameters[:ret_alpha]] = return_components.ret_alpha_m1 * 10000
+    return_components[!, return_parameters[:ret_mkt]] = return_components.ret_mkt_m1 * 10000
+    return_components[!, return_parameters[:ret_smb]] = return_components.ret_smb_m1 * 10000
+    return_components[!, return_parameters[:ret_hml]] = return_components.ret_hml_m1 * 10000
+    return_components[!, return_parameters[:ret_wml]] = return_components.ret_wml_m1 * 10000
+    return_components[!, return_parameters[:ret_rmw]] = return_components.ret_rmw_m1 * 10000
+    return_components[!, return_parameters[:ret_cma]] = return_components.ret_cma_m1 * 10000
 
     output_return_components = (
         _summarise_series(return_components[!, [return_parameters[:ex_ret]]])
