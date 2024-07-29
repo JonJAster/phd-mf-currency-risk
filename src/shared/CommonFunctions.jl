@@ -517,7 +517,7 @@ function _add_lags!(data, col; nlags, skip_to=false)
     end
 end
 
-function _convert_to_category_dummies!(data, col, drop_first=true)
+function _convert_to_category_dummies!(data, col; drop_first=true)
     category_col = sort(unique(data[!, col]))
     categories = drop_first ? category_col[2:end] : category_col
     for category in categories
