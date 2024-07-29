@@ -307,24 +307,27 @@ function init_raw(filepath; info=false)
     return data
 end
 
-function rolling_std(data, col, window; lagged)
+function rolling_std(data, col, window; lagged, grouped_by=nothing)
     rolling_std = Vector{Union{Missing, Float64}}(missing, size(data, 1))
 
-    for i in 1:size(data, 1)
+    for i in 1:nrow(data)
         if lagged
             i <= window && continue
             window_start = i - window
             window_end = i - 1
+            i_date_offset = window
         else
             i < window && continue
             window_start = i - window + 1
             window_end = i
+            i_date_offset = window - 1
         end
 
         data[window_start, :fundid] != data[window_end, :fundid] && continue
 
-        start_date = data[window_end, :date] - Month(window-1)
+        start_date = data[i, :date] - Month(i_date_offset)
         data[window_start, :date] != start_date && continue
+        data[window_start, grouped_by] != data[i, grouped_by] && continue
         rolling_std[i] = std(data[window_start:window_end, col])
     end
 

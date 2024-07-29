@@ -4,6 +4,7 @@ using Arrow
 using StatsBase
 using Dates
 using DataStructures
+using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
@@ -14,54 +15,85 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function summary_tables() # start_month = Date(1996,1,1); end_month = Date(2011,11,1)
-    output_characteristics = _replicate_characteristics(Date(1996,1,1), Date(2011,11,1))
-    output_betas = _replicate_betas(Date(1996,1,1), Date(2011,11,1))
-    output_return_components = _replicate_return_components(Date(1996,1,1), Date(2011,11,1))
+    _replicate_characteristics()
+    _replicate_characteristics(nothing, Date(2010,12,31))
+    _replicate_characteristics(Date(2011,1,1))
+
+    _replicate_betas()
+    _replicate_betas(nothing, Date(2010,12,31))
+    _replicate_betas(Date(2011,1,1))
+
+    _replicate_betas(region="dev")
+    _replicate_betas(nothing, Date(2010,12,31), region="dev")
+    _replicate_betas(Date(2011,1,1), region="dev")
+
+    _replicate_return_components()
+    _replicate_return_components(nothing, Date(2010,12,31))
+    _replicate_return_components(Date(2011,1,1))
+
+    _replicate_return_components(region="dev")
+    _replicate_return_components(nothing, Date(2010,12,31), region="dev")
+    _replicate_return_components(Date(2011,1,1), region="dev")
 end
 
 function _replicate_characteristics(start_month=nothing, end_month=nothing)
-    filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
-    main_data = loadarrow(filename)
+    data_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
+    info_filename = joinpath(DIRS.mf.refined, "mf-info.arrow")
+    
+    data = loadarrow(data_filename)
+    info = loadarrow(info_filename)
+
+    data = innerjoin(data, info[!,[:fundid, :inception_date, :true_no_load]], on=:fundid)
 
     if !isnothing(start_month)
-        main_data = main_data[main_data.date .>= start_month, :]
+        data = data[data.date .>= start_month, :]
     end
 
     if !isnothing(end_month)
-        main_data = main_data[main_data.date .<= end_month, :]
+        data = data[data.date .<= end_month, :]
     end
+
+    data.age = (
+        12 .* (year.(data.date) .- year.(data.inception_date))
+        .+ month.(data.date) .- month.(data.inception_date)
+    )
+
+    data.std_return_12m = rolling_std(data, :ex_ret, 12; lagged=true, grouped_by=:fundid)
 
     summary_parameters = OrderedDict(
         :flow => "Flow",
-        :log_lag_size => "Size (\$mil)",
-        :log_age_lag1 => "Age (months)",
-        :costs_lag1 => "Expense Ratio",
+        :net_assets_m1 => "Size (\$mil)",
+        :age => "Age (months)",
+        :costs => "Expense Ratio",
         :true_no_load => "% No Load",
+        :ex_ret => "Monthly Excess Return",
         :std_return_12m => "12-Month Return Volatility"
     )
 
-    main_data[!, summary_parameters[:flow]] = main_data.flow*100
-    main_data[!, summary_parameters[:log_lag_size]] = (ℯ .^ (main_data.log_lag_size)) / 1_000_000
-    main_data[!, summary_parameters[:log_age_lag1]] = ℯ .^ (main_data.log_age_lag1) 
-    main_data[!, summary_parameters[:costs_lag1]] = main_data.costs_lag1 * 100
-    main_data[!, summary_parameters[:true_no_load]] = main_data.true_no_load
-    main_data[!, summary_parameters[:std_return_12m]] = main_data.std_return_12m * 100
+    data[!, summary_parameters[:flow]] = data.flow * 100
+    data[!, summary_parameters[:net_assets_m1]] = data.net_assets_m1 / 1_000_000
+    data[!, summary_parameters[:age]] = data.age
+    data[!, summary_parameters[:costs]] = data.costs * 100 * 12
+    data[!, summary_parameters[:true_no_load]] = data.true_no_load
+    data[!, summary_parameters[:ex_ret]] = data.ex_ret * 100
+    data[!, summary_parameters[:std_return_12m]] = data.std_return_12m * 100
 
-    output_characteristics = _summarise_series(main_data[!, [summary_parameters[:flow]]])
+    output_characteristics = _summarise_series(data[!, [summary_parameters[:flow]]])
     for i in keys(summary_parameters)
         i == :flow && continue
         
         output_characteristics = vcat(
             output_characteristics,
-            _summarise_series(main_data[!, [summary_parameters[i]]])
+            _summarise_series(data[!, [summary_parameters[i]]])
         )
     end
 
     return output_characteristics
 end
 
-function _replicate_betas(start_month=nothing, end_month=nothing)
-    return_beta_filename = joinpath(DIRS.combo.return_betas, "usa_ff3.arrow")
+function _replicate_betas(start_month=nothing, end_month=nothing; region="usa")
+    factor_set = "ff_$(region)_ffc6.arrow"
+    return_beta_filename = joinpath(DIRS.combo.return_betas, factor_set)
     
     return_betas = loadarrow(return_beta_filename)
 
@@ -80,13 +112,19 @@ function _replicate_betas(start_month=nothing, end_month=nothing)
         :const => "Alpha",
         :mkt => "Beta",
         :smb => "Size coefficient",
-        :hml => "Value coefficient"
+        :hml => "Value coefficient",
+        :wml => "Momentum coefficient",
+        :rmw => "Profitability coefficient",
+        :cma => "Investment coefficient"
     )
 
     return_betas[!, betas_parameters[:const]] = return_betas.const * 100
     return_betas[!, betas_parameters[:mkt]] = return_betas.mkt
     return_betas[!, betas_parameters[:smb]] = return_betas.smb
     return_betas[!, betas_parameters[:hml]] = return_betas.hml
+    return_betas[!, betas_parameters[:wml]] = return_betas.wml
+    return_betas[!, betas_parameters[:rmw]] = return_betas.rmw
+    return_betas[!, betas_parameters[:cma]] = return_betas.cma
 
     output_betas = _summarise_series(return_betas[!, [betas_parameters[:const]]])
     for i in keys(betas_parameters)
@@ -101,10 +139,24 @@ function _replicate_betas(start_month=nothing, end_month=nothing)
     return output_betas
 end
 
-function _replicate_return_components(start_month=nothing, end_month=nothing)
-    return_components_filename = joinpath(DIRS.combo.weighted, "usa_ff3.arrow")
+function _replicate_return_components(start_month=nothing, end_month=nothing; region="usa")
+    factor_set = "ff_$(region)_ffc6.arrow"
+    return_components_filename = joinpath(DIRS.combo.weighted, factor_set)
+    mf_data_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
 
-    return_components = loadarrow(return_data_filename)
+    return_components = loadarrow(return_components_filename)
+    mf_data = loadarrow(mf_data_filename)
+
+    transform!(
+        groupby(mf_data, :fundid),
+        :ex_ret => (x -> lag(x, 1)) => :ex_ret_m1
+    )
+
+    return_components = innerjoin(
+        return_components,
+        mf_data[!, [:fundid, :date, :ex_ret_m1]],
+        on=[:fundid, :date]
+    )
 
     if !isnothing(start_month)
         return_components = return_components[return_components.date .>= start_month, :]
@@ -115,30 +167,31 @@ function _replicate_return_components(start_month=nothing, end_month=nothing)
     end
 
     return_parameters = OrderedDict(
-        :ret_alpha => "ALPHA",
-        :ret_mkt => "MKTRET",
-        :ret_smb => "SIZRET",
-        :ret_hml => "VALRET"
+        :ex_ret => "Monthly Excess Return",
+        :ret_alpha => "wret_alpha",
+        :ret_mkt => "wret_mkt",
+        :ret_smb => "wret_smb",
+        :ret_hml => "wret_hml",
+        :ret_wml => "wret_wml",
+        :ret_rmw => "wret_rmw",
+        :ret_cma => "wret_cma"
     )
 
-    return_components[!, return_parameters[:ret_alpha]] = return_components.ret_alpha * 100
-    return_components[!, return_parameters[:ret_mkt]] = return_components.ret_mkt * 100
-    return_components[!, return_parameters[:ret_smb]] = return_components.ret_smb * 100
-    return_components[!, return_parameters[:ret_hml]] = return_components.ret_hml * 100
-
-    return_components = combine(
-        groupby(return_components, :date),
-        return_parameters[:ret_alpha] => mean => return_parameters[:ret_alpha],
-        return_parameters[:ret_mkt] => mean => return_parameters[:ret_mkt],
-        return_parameters[:ret_smb] => mean => return_parameters[:ret_smb],
-        return_parameters[:ret_hml] => mean => return_parameters[:ret_hml]
-    )
+    return_components[!, return_parameters[:ex_ret]] = return_components.ex_ret_m1 * 100
+    return_components[!, return_parameters[:ret_alpha]] = return_components.ret_alpha_m1 * 100
+    return_components[!, return_parameters[:ret_mkt]] = return_components.ret_mkt_m1 * 100
+    return_components[!, return_parameters[:ret_smb]] = return_components.ret_smb_m1 * 100
+    return_components[!, return_parameters[:ret_hml]] = return_components.ret_hml_m1 * 100
+    return_components[!, return_parameters[:ret_wml]] = return_components.ret_wml_m1 * 100
+    return_components[!, return_parameters[:ret_rmw]] = return_components.ret_rmw_m1 * 100
+    return_components[!, return_parameters[:ret_cma]] = return_components.ret_cma_m1 * 100
 
     output_return_components = (
-        _summarise_series(return_components[!, [return_parameters[:ret_alpha]]])
+        _summarise_series(return_components[!, [return_parameters[:ex_ret]]])
     )
+
     for i in keys(return_parameters)
-        i == :ret_alpha && continue
+        i == :ex_ret && continue
 
         output_return_components = vcat(
             output_return_components,
@@ -156,11 +209,9 @@ function _summarise_series(data_series)
     output = DataFrame(
         parameter_name = [parameter_name],
         num_obs = [length(data)],
-        mean = [mean(data) |> x-> round(x, digits=3)],
-        sd = [std(data) |> x-> round(x, digits=3)],
-        p25 = [quantile(data, 0.25) |> x-> round(x, digits=3)],
-        median = [median(data) |> x-> round(x, digits=3)],
-        p75 = [quantile(data, 0.75) |> x-> round(x, digits=3)]
+        mean = [mean(data) |> x-> round(x, digits=2)],
+        median = [median(data) |> x-> round(x, digits=2)],
+        sd = [std(data) |> x-> round(x, digits=2)]
     )
 
     return output
