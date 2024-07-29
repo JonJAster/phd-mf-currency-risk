@@ -25,7 +25,7 @@ function regress_fund_flows(model_name; filter_by=nothing)
     regression_data = regression_packet.regression_data
     return_component_cols = regression_packet.return_component_cols
 
-    flow_output = _flow_regression(regression_data, return_component_cols)
+    flow_output = _flow_regression(regression_data, return_component_cols; intercept=false)
 
     printtime("regressing flow betas on $model_name", task_start)
     return flow_output
@@ -66,8 +66,10 @@ function _flow_regression_table(model_name; filter_by=nothing) # model_name = "f
     return output
 end
 
-function _flow_regression(regression_data, return_component_cols)
+function _flow_regression(regression_data, return_component_cols; intercept=true)
     X_names = regression_data[!, Not([:fundid, :date, :flow])] |> names
+    X_formula = sum(term.(X_names))
+    !intercept && (X_formula = term(0) + X_formula)
     reg_formula = term(:flow) ~ term(0) + sum(term.(X_names))
 
     regfit = lm(reg_formula, regression_data)

@@ -50,7 +50,7 @@ function test()
         )
     
         dropmissing!(regression_data)
-        _drop_zero_cols!(regression_data)
+        #_drop_zero_cols!(regression_data)
     
         output = (
             regression_data = regression_data,
@@ -60,8 +60,16 @@ function test()
         return output
     end
 
+    test_regtable = flow_regression_table("ff_usa_ffc6").regression_data
+    fe_names = propertynames(test_regtable[!, r"fe_.*"])
+
     data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
-    test_regtable = flow_regression_table()
+    unique_dates = unique(data.date)
+    unique_datecodes = Symbol.(["fe_month_$(year(d))$(month(d)<10 ? "0" : "")$(month(d))" for d in unique_dates])
+
+    for i in unique_datecodes
+        i ∉ fe_names && println(i)
+    end
 
     regout = regress_fund_flows("ff_usa_ffc6")
     regfit = regout.regfit;
