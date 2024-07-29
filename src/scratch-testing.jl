@@ -68,7 +68,7 @@ function test()
     unique_dates = unique(data.date)
     unique_datecodes = Symbol.(["fe_month_$(year(d))$(month(d)<10 ? "0" : "")$(month(d))" for d in unique_dates])
 
-    regout = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
+    regout_usa = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
     regfit = regout.regfit;
     x_terms = [regfit.mf.f.rhs.terms[i].sym for i in 1:14]
     V = vcov(regfit)
