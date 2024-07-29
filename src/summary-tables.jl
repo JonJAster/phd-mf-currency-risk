@@ -20,11 +20,8 @@ function summary_tables() # start_month = Date(1996,1,1); end_month = Date(2011,
 end
 
 function _replicate_characteristics(start_month=nothing, end_month=nothing)
-    regression_packet = (
-        flow_regression_table("usa_ff3"; filter_by=x->investment_target_is(x, :usa))
-    )
-    
-    main_data = regression_packet.regression_data
+    filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
+    main_data = loadarrow(filename)
 
     if !isnothing(start_month)
         main_data = main_data[main_data.date .>= start_month, :]
@@ -35,12 +32,12 @@ function _replicate_characteristics(start_month=nothing, end_month=nothing)
     end
 
     summary_parameters = OrderedDict(
-        :flow => "Percentage fund flow",
-        :log_lag_size => "Fund size (\$mil)",
-        :log_age_lag1 => "Fund age (months)",
-        :costs_lag1 => "Expense ratio",
-        :true_no_load => "Load fund dummy",
-        :std_return_12m => "Volatility (t-12 to t-1)"
+        :flow => "Flow",
+        :log_lag_size => "Size (\$mil)",
+        :log_age_lag1 => "Age (months)",
+        :costs_lag1 => "Expense Ratio",
+        :true_no_load => "% No Load",
+        :std_return_12m => "12-Month Return Volatility"
     )
 
     main_data[!, summary_parameters[:flow]] = main_data.flow*100
