@@ -40,14 +40,15 @@ function _single_flow_regression(model_name)
 end
 
 function _split_flow_regression(model_name, split_by)
-    # model_name = "ff_usa_ffc6"; split_by = 
+    # model_name = "ff_usa_ffc6"; split_by = :
     splits = unique(split_by)
     @assert length(splits) == 2 "split_by must have exactly two unique values"
 
     regression_packet_1 = _flow_regression_table(model_name; filter_by=splits[1])
     regression_packet_2 = _flow_regression_table(model_name; filter_by=splits[2])
 
-function _flow_regression_table(model_name; filter_by=nothing) # model_name = "ff_usa_ffc6"
+function _flow_regression_table(model_name; filter_by=nothing)
+    # model_name = "ff_usa_ffc6"
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)

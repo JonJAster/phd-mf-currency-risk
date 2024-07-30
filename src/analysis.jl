@@ -8,6 +8,7 @@ using DataStructures
 using StatsBase
 using Base.Threads
 using LinearAlgebra
+using Distributions
 # using Plots
 using ShiftedArrays: lead, lag
 
@@ -62,6 +63,20 @@ function analysis()
     se_proportion_usa_usa = [
         _delta_se(i, coef_usa_usa, v_usa_usa_coefs) for i in 2:length(coef_usa_usa)
     ]
+    se_proportion_usa_dev = [
+        _delta_se(i, coef_usa_dev, v_usa_dev_coefs) for i in 2:length(coef_usa_dev)
+    ]
+    se_proportion_wld_usa = [
+        _delta_se(i, coef_wld_usa, v_wld_usa_coefs) for i in 2:length(coef_wld_usa)
+    ]
+    se_proportion_wld_dev = [
+        _delta_se(i, coef_wld_dev, v_wld_dev_coefs) for i in 2:length(coef_wld_dev)
+    ]
+
+    p_proportion_usa_usa = [
+        2 * cdf(TDist(nrow(regout_usa_usa.regfit) - length(coef_usa_usa) - 1), -abs(proportion_coef_usa_usa[i] / se_proportion_usa_usa[i]))
+        for i in 1:length(proportion_coef_usa_usa)
+    ]
 
 end
  
@@ -73,16 +88,18 @@ function _coef_idx(regout)
 end
 
 _proportion_coefs(coefs) = coefs ./ coefs[1]
-_deltagrad(coef, alpha_coef) = [-coef / alpha_coef^2, 1 / alpha_coef]
 
 function _delta_se(i, coefs, v_coefs)
-    delta_se = sqrt.(
-        _deltagrad(coefs[i], coefs[1])' * v_coefs * _deltagrad.(coefs[i], coefs[1])
-    )
+    delta_se = sqrt(_deltagrad(i, coefs)' * v_coefs * _deltagrad(i, coefs))
     return delta_se
 end
 
-
+function _deltagrad(i, coefs)
+    deltagrad = zeros(length(coefs))
+    deltagrad[1] = -coefs[i] / coefs[1]^2
+    deltagrad[i] = 1 / coefs[1]
+    return deltagrad
+end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     analysis()
