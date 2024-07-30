@@ -424,9 +424,13 @@ function regression_table(data, entity_col, date_col, column_args...)
                 _do_arg_call!(active_arg_call, regression_table, active_column)
                 active_column, active_arg_call = nothing, nothing
             else
-                _do_arg_call!(
-                    active_arg_call, regression_table, active_column; parameter=arg
-                )
+                try
+                    _do_arg_call!(
+                        active_arg_call, regression_table, active_column; parameter=arg
+                    )
+                catch e
+                    error("Error in applying $active_arg_call to $active_column: $e")
+                end
                 active_column, active_arg_call = nothing, nothing
                 continue
             end
