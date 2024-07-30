@@ -11,7 +11,7 @@ include("CommonConstants.jl")
 using .CommonConstants
 
 export dirslist
-export fundlag, fundlag!
+export fundlag, fundlag!, safelag
 export makepath
 export qhead
 export qscan
@@ -67,10 +67,16 @@ end
 function fundlag!(data, col, nlags)
     transform!(
         groupby(data, :fundid),
-        col => (col->lag(col, nlags)) => "$(col)_lag$nlags"
+        [:date, col] => ((date_col, x)->safelag(x, nlags, date_col)) => "$(col)_lag$nlags"
     )
     return nothing
 end
+
+function safelag(col_values, nlags, date_col)
+    @assert issorted(date_col) "Failed to lag because a dataframe group is not date sorted."
+    return lag(col_values, nlags)
+end
+
 
 function makepath(paths...)
     pathstring = joinpath(paths...)
