@@ -17,54 +17,16 @@ export regress_fund_flows
 export _flow_regression_table
 
 function regress_fund_flows(model_name; filter_by=nothing) 
-    # model_name = "ff_usa_ffc6"; filter_by = nothing
+    # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign
     task_start = time()
 
-    regression_packet = _flow_regression_table(model_name; filter_by=filter_by)
+    flow_data = initialise_flow_data(model_name)
+    !isnothing(filter_by) && filter!(filter_by, flow_data)
 
-    regression_data = regression_packet.regression_data
-    return_component_cols = regression_packet.return_component_cols
-
-    flow_output = _flow_regression(regression_data, return_component_cols; intercept=false)
+    flow_output = _flow_regression(flow_data; intercept=false)
 
     printtime("regressing flow betas on $model_name", task_start)
     return flow_output
-end
-
-function _flow_regression_table(model_name; filter_by=nothing)
-    # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign
-    flow_data = initialise_flow_data(model_name)
-
-    if !isnothing(filter_by)
-        flow_data = filter(filter_by, flow_data)
-    end
-
-    cols = names(flow_data)
-    find_return_col(name) = !isnothing(match(r"ret_", name))
-    return_component_cols = cols[find_return_col.(cols)] .|> Symbol
-
-    regression_data = regression_table(
-        flow_data, :fundid, :date,
-        :flow,
-        return_component_cols...,
-        :flow, :nth_lag, FLOW_CONTROL_LAGS,
-        :costs, :lag,
-        :true_no_load,
-        :std_return_12m,
-        :log_size_m1,
-        :log_age, :lag,
-        :tfe, :month
-    )
-
-    dropmissing!(regression_data)
-    _drop_zero_cols!(regression_data)
-
-    output = (
-        regression_data = regression_data,
-        return_component_cols = return_component_cols
-    )
-
-    return output
 end
 
 function _flow_regression(regression_data, return_component_cols; intercept=true)
