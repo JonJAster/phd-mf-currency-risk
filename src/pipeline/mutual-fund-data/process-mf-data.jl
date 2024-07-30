@@ -183,8 +183,8 @@ function _add_foreign_dummy(data, info)
 
     # First ensure that the retained fields don't differ for the same fundid before
     # selecting only the first row for each fundid.
-    assert_similar_fundids(info)
-    fund_investment_targets = unique(info, :fundid)
+    assert_similar_fundids(investment_target_info)
+    fund_investment_targets = unique(investment_target_info, :fundid)
 
     target_data = innerjoin(data, fund_investment_targets, on=:fundid)
     target_data.foreign = investment_target_is(target_data, :wld)
