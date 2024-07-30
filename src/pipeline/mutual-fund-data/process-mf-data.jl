@@ -19,9 +19,14 @@ function process_mf_data()
     task_start = time()
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
     info_filename = joinpath(DIRS.mf.raw, "info.csv")
+    mkt_filename = joinpath(DIRS.eq.factors, "ff.arrow")
+    rf_filename = joinpath(DIRS.eq.refined, "rf.arrow")
 
     data = loadarrow(data_filename)
     info = init_raw(info_filename, info=true)
+    mkt = _load_mkt(mkt_filename)
+    rf = loadarrow(rf_filename)
+
 
     active_data = _filter_out_passive(data, info)
     sort!(active_data, [:fundid, :date])
@@ -34,6 +39,7 @@ function process_mf_data()
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
     processed_data = _add_info_data(aggregate_data, aggregate_info)
+
 
     sort!(processed_data, [:fundid, :date])
 
@@ -48,6 +54,7 @@ function process_mf_data()
         processed_data, :ret, 12;
         lagged=true, grouped_by=:fundid
     )
+    processed_data.usa_correlation_12m = _usa_correlation_12m(processed_data)
 
     output = (
         data=select(
@@ -70,6 +77,19 @@ function process_mf_data()
 
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
+end
+
+function _load_mkt(mkt_filename)
+    """
+    Load the FF factor data, filters to the USA mkt factor and renames :ret column to :mkt.
+    """
+    mkt = loadarrow(mkt_filename) |> copy # copy to allow filtering
+
+    filter!(x->(x.factor .== "mkt") .&& (x.source_id .== "ff_usa"), mkt)
+    select!(mkt, [:date, :ret])
+    rename!(mkt, :ret => :mkt)
+
+    return mkt
 end
 
 function _filter_out_passive(data, info)
