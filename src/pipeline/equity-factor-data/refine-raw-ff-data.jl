@@ -82,7 +82,7 @@ function _normalise_names(names)
     return normal_names
 end
 
-if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
+if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     output_data = refine_raw_ff_data()
     output_filename_factors = makepath(DIRS.eq.factors, "ff.arrow")
     output_filename_rf = makepath(DIRS.eq.refined, "rf.arrow")

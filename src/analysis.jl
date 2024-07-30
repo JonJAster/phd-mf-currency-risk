@@ -99,6 +99,6 @@ end
 
 
 
-if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
+if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     analysis()
 end

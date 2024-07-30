@@ -117,7 +117,7 @@ function main()
     return
 end
 
-if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
+if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     task_start = time()
     main()
     printtime("regressing all flows", task_start; minutes=true)
