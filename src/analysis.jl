@@ -99,6 +99,6 @@ end
 
 
 
-if abspath(PROGRAM_FILE) == @__FILE__
+if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
     analysis()
 end

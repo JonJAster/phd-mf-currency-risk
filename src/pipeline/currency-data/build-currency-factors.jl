@@ -196,7 +196,7 @@ function _compute_factors(df)
     return factors
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
+if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
     output_data = build_currency_factors()
     output_filename = makepath(DIRS.fx.factors, "currency_factors.arrow")
 

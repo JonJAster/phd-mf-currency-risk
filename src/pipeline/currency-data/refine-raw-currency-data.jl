@@ -233,7 +233,7 @@ function _termcheck(rate::AbstractVector{T}, term) where T<:Union{Missing,Float6
     end
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
+if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
     output_data = refine_raw_currency_data()
     output_filename = makepath(DIRS.fx.refined, "currency_data.arrow")
 

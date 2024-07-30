@@ -65,7 +65,7 @@ function _drop_allmissing_funds!(data)
     delete!(data, findall(in(all_missing_funds), data.fundid))
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
+if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
     output_data = init_mf_data()
     output_filename = makepath(DIRS.mf.init, "mf-data.arrow")
 

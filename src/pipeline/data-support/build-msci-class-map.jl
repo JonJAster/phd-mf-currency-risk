@@ -102,7 +102,7 @@ function _assert_valid_change(copied_row, class_before_change)
     return
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
+if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
     output_data = build_msci_class_map()
     output_filename = makepath(DIRS.map.refined, "msci-class.csv")
 

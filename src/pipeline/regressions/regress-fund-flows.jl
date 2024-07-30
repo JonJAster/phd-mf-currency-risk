@@ -117,7 +117,7 @@ function main()
     return
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
+if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
     task_start = time()
     main()
     printtime("regressing all flows", task_start; minutes=true)
