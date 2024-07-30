@@ -23,7 +23,17 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function test()
-
+    # Check the number of fundids not represented in info
+    info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
+    data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    info_funds = unique(info.fundid)
+    data_funds = unique(data.fundid)
+    for id in data_funds
+        if id ∉ info_funds
+            println(id)
+        end
+    end
+    count(x->!in(x, info_funds), unique(data.fundid))
 
     ## Morningstar
     # Exploring regression output
