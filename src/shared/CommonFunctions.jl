@@ -209,7 +209,7 @@ end
 
 function loadarrow(filename)
     arrow_table = Arrow.Table(filename)
-    df = copy(DataFrame(arrow_table))
+    df = copy(DataFrame(arrow_table)) # Copy to allow mutating column arrays
     arrow_table = nothing
     return df
 end
