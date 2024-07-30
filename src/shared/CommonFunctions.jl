@@ -317,8 +317,8 @@ function init_raw(filepath; info=false)
     return data
 end
 
-function rolling_combine(data, col, window; lagged, grouped_by=nothing)
-    rolling_std = Vector{Union{Missing, Float64}}(missing, size(data, 1))
+function rolling_combine(f, data, cols, window; lagged, grouped_by=nothing)
+    output = Vector{Union{Missing, Float64}}(missing, size(data, 1))
 
     for i in 1:nrow(data)
         if lagged
@@ -337,10 +337,10 @@ function rolling_combine(data, col, window; lagged, grouped_by=nothing)
         start_date = data[i, :date] - Month(i_date_offset)
         data[window_start, :date] != start_date && continue
 
-        rolling_std[i] = std(data[window_start:window_end, col])
+        output[i] = f(data[window_start:window_end, cols])
     end
 
-    return rolling_std
+    return output
 end
 
 drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
