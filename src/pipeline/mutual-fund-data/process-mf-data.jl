@@ -212,7 +212,6 @@ function _add_foreign_dummy_and_age(data, info)
     return output
 end
 
-println(abspath(PROGRAM_FILE))
 if isnothing(match(r"terminalserver.jl$", abspath(PROGRAM_FILE)))
     output_data = process_mf_data()
     output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
