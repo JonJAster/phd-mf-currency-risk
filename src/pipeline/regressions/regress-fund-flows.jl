@@ -32,8 +32,19 @@ end
 
 function _flow_regression(flow_data; intercept=true)
     # intercept = false
-    X_names = names(flow_data[!, Not([:fundid, :date, :flow])])
-    X_formula = sum(term.(X_names))
+
+    ret_vars = propertynames(flow_data[!, r"ret_"])
+    
+    # Initialised flow data doesn't contain any transformed columns, so define those
+    # in the formula. GLM can't handle missings introduced via formulae, so use of
+    # lag within formula is not supported and lags must be produced beforehand. The
+    # flow_data frame is not reused so it is fine to modify.
+    fundlag!(flow_data, :flow, 19)
+    fundlag
+
+        # X_formula = (
+        #     sum(term.(ret_vars))
+        #     + FunctionTerm(l, term(:flow),)
     !intercept && (X_formula = term(0) + X_formula)
     reg_formula = term(:flow) ~ term(0) + sum(term.(X_names))
 
