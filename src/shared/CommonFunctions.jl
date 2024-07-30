@@ -209,6 +209,9 @@ function initialise_base_data(model)
 end
 
 function initialise_flow_data(model_name)
+    """
+    Doesn't include any transformed columns. Create those in the regression function.
+    """
     # model_name = "ff_usa_ffc6"
     filename_mf = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
