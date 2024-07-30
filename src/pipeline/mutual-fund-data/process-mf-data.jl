@@ -32,14 +32,29 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    processed_data = _add_foreign_dummy(aggregate_data, info)
+    processed_data = _add_foreign_dummy_and_age(aggregate_data, info)
 
-    rename!(aggregate_data, :net_returns => :ret)
+    rename!(processed_data, :net_returns => :ret)
     aggregate_data[:, [:ret, :costs]] ./= 100
 
+    processed_data.std_return_12m = rolling_std(
+        processed_data, :ret, 12;
+        lagged=true, grouped_by=:fundid
+    )
+
     output = select(
-        aggregate_data, 
-        [:fundid, :date, :flow, :ret, :costs, :net_assets_m1]
+        processed_data, 
+        [
+            :fundid,
+            :date,
+            :flow,
+            :ret,
+            :costs,
+            :net_assets_m1,
+            :foreign,
+            :age,
+            :std_return_12m
+        ]
     )
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
@@ -175,11 +190,11 @@ function _filter_out_low_obs_funds!(data)
     return
 end
 
-function _add_foreign_dummy(data, info)
+function _add_foreign_dummy_and_age(data, info)
     investment_target_cols = [
         :global_category, :morningstar_category, :us_category_group, :investment_area
     ]
-    investment_target_info = info[:, [:fundid; investment_target_cols]]
+    investment_target_info = info[:, [:fundid; investment_target_cols; inception_date]]
 
     # First ensure that the retained fields don't differ for the same fundid before
     # selecting only the first row for each fundid.
@@ -188,7 +203,11 @@ function _add_foreign_dummy(data, info)
 
     target_data = innerjoin(data, fund_investment_targets, on=:fundid)
     target_data.foreign = investment_target_is(target_data, :wld)
-    output = select(target_data, Not(investment_target_cols))
+    target_data.age = (
+        12 .* (year.(target_data.date) .- year.(target_data.inception_date))
+        .+ month.(target_data.date) .- month.(target_data.inception_date)
+    )
+    output = select(target_data, [propertynames(data); [:foreign, :age]])
 
     return output
 end
