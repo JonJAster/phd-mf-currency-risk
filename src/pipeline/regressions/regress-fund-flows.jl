@@ -31,7 +31,8 @@ function regress_fund_flows(model_name; filter_by=nothing)
     return flow_output
 end
 
-function _flow_regression_table(model_name; filter_by=nothing) # model_name = "ff_usa_ffc6"
+function _flow_regression_table(model_name; filter_by=nothing)
+    # model_name = "ff_usa_ffc6"; filter_by=nothing
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
