@@ -10,6 +10,7 @@ using ShiftedArrays: lead, lag
 include("CommonConstants.jl")
 using .CommonConstants
 
+export assert_similar_fundids
 export dirslist
 export makepath
 export qhead
@@ -39,6 +40,26 @@ const PARAMETER_REGRESSION_ARGS = [
     :plus_lags, :plus_lag, :nth_lags, :nth_lag, :lags, :lag, :time_fixed_effects, :tfe
 ]
 const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
+
+function assert_similar_fundids(info)
+    """
+    Throw an error if a single fundid has at least two distinct values for any field in
+    the input DataFrame.
+    """
+
+    fundids = unique(info.fundid)
+    test_fields = setdiff(propertynames(info), [:fundid])
+
+    for fund in fundids
+        for field in test_fields
+            if length(unique(info[info.fundid .== fund, field])) > 1
+                error("Non-unique $field for fundid $fund.")
+            end
+        end
+    end
+    
+    return
+end
 
 function dirslist()
     println("-- DIRS LIST --")
@@ -369,7 +390,7 @@ function filter_fundids(condition, data)
 
     # First ensure that the retained fields don't differ for the same fundid before
     # selecting only the first row for each fundid.
-    _assert_similar_fundids(info)
+    assert_similar_fundids(info)
     info = unique(info, :fundid)
 
     joined_data = innerjoin(data, info, on=:fundid)
@@ -614,26 +635,6 @@ function _null_empty_strings!(df)
             df[!, col] = replace(df[!, col], "" => missing)
         end
     end
-    return
-end
-
-function _assert_similar_fundids(info)
-    """
-    Throw an error if a single fundid has at least two distinct values for any field in
-    the input DataFrame.
-    """
-
-    fundids = unique(info.fundid)
-    test_fields = setdiff(propertynames(info), [:fundid])
-
-    for fund in fundids
-        for field in test_fields
-            if length(unique(info[info.fundid .== fund, field])) > 1
-                error("Non-unique $field for fundid $fund.")
-            end
-        end
-    end
-    
     return
 end
 
