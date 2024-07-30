@@ -206,11 +206,10 @@ function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, 
         end
     end
 end
-    
 
 function loadarrow(filename)
     arrow_table = Arrow.Table(filename)
-    df = deepcopy(DataFrame(arrow_table))
+    df = copy(DataFrame(arrow_table))
     arrow_table = nothing
     return df
 end
