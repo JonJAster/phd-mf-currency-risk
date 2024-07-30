@@ -211,40 +211,20 @@ end
 function initialise_flow_data(model_name)
     # model_name = "ff_usa_ffc6"
     filename_mf = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
-    filename_info = joinpath(DIRS.mf.refined, "mf-info.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
 
     fund_base_data = loadarrow(filename_mf)
-    fund_info = loadarrow(filename_info)
     decomposed_returns = loadarrow(filename_decomposition)
-
-    # Returns are already date-sorted within fundid
-    fund_base_data.std_return_12m = rolling_std(fund_base_data, :ex_ret, 12; lagged=true)
-
-    select!(
-        fund_base_data,
-        [:fundid, :date, :flow, :net_assets_m1, :costs, :std_return_12m]
-    )
-    select!(fund_info, [:fundid, :true_no_load, :inception_date])
 
     fund_rets_data = outerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
 
-    fund_full_data = innerjoin(
-        fund_rets_data, fund_info, on=:fundid
-    )
-
-    fund_full_data.age = (
-        12*(year.(fund_full_data.date) .- year.(fund_full_data.inception_date)) .+
-        (month.(fund_full_data.date) .- month.(fund_full_data.inception_date)) .+ 1
-    )
-
-    fund_full_data.log_size_m1 = log.(fund_full_data.net_assets_m1)
-    fund_full_data.log_age = log.(fund_full_data.age)
+    fund_rets_data.log_size_m1 = log.(fund_rets_data.net_assets_m1)
+    fund_rets_data.log_age = log.(fund_rets_data.age)
     
-    sort!(fund_full_data, [:fundid, :date])
-    select!(fund_full_data, Not(["inception_date", "age", "net_assets_m1"]))
+    sort!(fund_rets_data, [:fundid, :date])
+    select!(fund_rets_data, Not([:ex_ret, :age, :net_assets_m1]))
 
-    return fund_full_data
+    return fund_rets_data
 end
 
 function _prepare_factors(factors_data, model) 
