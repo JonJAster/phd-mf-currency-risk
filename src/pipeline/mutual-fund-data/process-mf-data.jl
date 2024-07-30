@@ -29,7 +29,6 @@ function process_mf_data()
     mkt = _load_mkt(mkt_filename)
     rf = loadarrow(rf_filename)
 
-
     active_data = _filter_out_passive(data, info)
     sort!(active_data, [:fundid, :date])
     aggregate_data = _aggregate_to_fundid(active_data)
@@ -40,23 +39,19 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    processed_data = _add_info_data(aggregate_data, aggregate_info)
-
-
+    filled_data = _add_info_data(aggregate_data, aggregate_info)
+    combined_data = reduce((l,r)->innerjoin(l, r, on=:date), [filled_data, mkt, rf])
+    combined_data[:, [:net_returns, :costs]] ./= 100
+    combined_data.ex_ret = combined_data.net_returns .- combined_data.rf
+    
     sort!(processed_data, [:fundid, :date])
-
-    rename!(
-        processed_data,
-        :net_returns => :ret,
-        :true_no_load => :no_load
-    )
-    processed_data[:, [:ret, :costs]] ./= 100
-
+    processed_data.usa_correlation_12m = _usa_correlation_12m(processed_data)
     processed_data.std_return_12m = rolling_std(
         processed_data, :ret, 12;
         lagged=true, grouped_by=:fundid
     )
-    processed_data.usa_correlation_12m = _usa_correlation_12m(processed_data)
+
+    rename!(combined_data, :true_no_load => :no_load)
 
     output = (
         data=select(
@@ -247,7 +242,7 @@ function _add_info_data(data, aggregate_info)
     Adds the following columns to the data:
     - foreign: whether the fund invests primarily in foreign assets
     - age: the minimum age across share classes of the fund in months
-    - true_no_load: whether all share classes of the fund are no-load
+    - no_load: whether all share classes of the fund are no-load
     """
 
     combined_data = innerjoin(data, aggregate_info, on=:fundid)
@@ -257,7 +252,8 @@ function _add_info_data(data, aggregate_info)
         .+ month.(combined_data.date) .- month.(combined_data.inception_date)
     )
 
-    output = select(combined_data, [propertynames(data); [:foreign, :age, :true_no_load]])
+    rename!(combined_data, :true_no_load => :no_load)
+    output = select(combined_data, [propertynames(data); [:foreign, :age, :no_load]])
 
     return output
 end
