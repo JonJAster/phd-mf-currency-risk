@@ -610,6 +610,11 @@ function _null_empty_strings!(df)
 end
 
 function _assert_similar_fundids(info)
+    """
+    Throw an error if a single fundid has at least two distinct values for any field in
+    the input DataFrame.
+    """
+    
     fundids = unique(info.fundid)
     test_fields = setdiff(propertynames(info), [:fundid])
 
