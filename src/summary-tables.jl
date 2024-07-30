@@ -44,13 +44,14 @@ function _replicate_characteristics(filter_by=nothing)
     !isnothing(filter_by) && filter!(filter_by, data)
 
     summary_parameters = OrderedDict(
-        :flow => "Flow",
+        :flow => "Flow (%)",
         :net_assets_m1 => "Size (\$mil)",
+        :costs => "Annualised Expenses (%)",
+        :no_load => "% No Load",
         :age => "Age (months)",
-        :costs => "Expense Ratio",
-        :true_no_load => "% No Load",
-        :ex_ret => "Monthly Excess Return",
-        :std_return_12m => "12-Month Return Volatility"
+        :ex_ret => "Excess Return (%)",
+        :std_return_12m => "12-Month Return Volatility (%)",
+        :usa_correlation_12m => "12-Month US Correlation"
     )
 
     data[!, summary_parameters[:flow]] = data.flow * 100
