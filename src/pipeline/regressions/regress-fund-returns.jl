@@ -96,6 +96,8 @@ end
 
 _combine_reg_results(date, rr...) = zip(repeat(date, inner=size(first(rr),1)), vec.(rr)...)
 
-task_start = time()
-main()
-printtime("regressing all fund returns", task_start; minutes=true)
+if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
+    task_start = time()
+    main()
+    printtime("regressing all fund returns", task_start; minutes=true)
+end
