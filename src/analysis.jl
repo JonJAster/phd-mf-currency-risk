@@ -72,7 +72,7 @@ function analysis()
     se_proportion_wld_dev = [
         _delta_se(i, coef_wld_dev, v_wld_dev_coefs) for i in 2:length(coef_wld_dev)
     ]
-
+    )
     p_proportion_usa_usa = [
         2 * cdf(TDist(nrow(regout_usa_usa.regfit) - length(coef_usa_usa) - 1), -abs(proportion_coef_usa_usa[i] / se_proportion_usa_usa[i]))
         for i in 1:length(proportion_coef_usa_usa)
