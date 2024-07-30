@@ -37,7 +37,11 @@ function process_mf_data()
 
     sort!(processed_data, [:fundid, :date])
 
-    rename!(processed_data, :net_returns => :ret)
+    rename!(
+        processed_data,
+        :net_returns => :ret,
+        :true_no_load => :no_load
+    )
     processed_data[:, [:ret, :costs]] ./= 100
 
     processed_data.std_return_12m = rolling_std(
@@ -55,6 +59,7 @@ function process_mf_data()
                 :ret,
                 :costs,
                 :net_assets_m1,
+                :no_load
                 :foreign,
                 :age,
                 :std_return_12m
