@@ -1,6 +1,7 @@
-module RegressFundFlows
+#module RegressFundFlows
+### TODO ###
 
-#using Revise
+using Revise
 using DataFrames
 using Arrow
 using Dates
@@ -21,21 +22,22 @@ function regress_fund_flows(model_name; filter_by=nothing)
     task_start = time()
 
     flow_data = initialise_flow_data(model_name)
-    !isnothing(filter_by) && filter!(filter_by, flow_data)
+    isnothing(filter_by) || filter!(filter_by, flow_data)
 
-    flow_output = _flow_regression(flow_data; intercept=false)
+    flow_model = _flow_regression(flow_data; intercept=false)
 
     printtime("regressing flow betas on $model_name", task_start)
     return flow_output
 end
 
-function _flow_regression(regression_data, return_component_cols; intercept=true)
-    X_names = regression_data[!, Not([:fundid, :date, :flow])] |> names
+function _flow_regression(flow_data; intercept=true)
+    # intercept = false
+    X_names = names(flow_data[!, Not([:fundid, :date, :flow])])
     X_formula = sum(term.(X_names))
     !intercept && (X_formula = term(0) + X_formula)
     reg_formula = term(:flow) ~ term(0) + sum(term.(X_names))
 
-    regfit = lm(reg_formula, regression_data)
+    regfit = lm(reg_formula, flow_data)
 
     return_col_indices = findall(x->in(x,return_component_cols), Symbol.(coefnames(regfit)))
 
@@ -49,7 +51,7 @@ function _flow_regression(regression_data, return_component_cols; intercept=true
         se = stderror(regfit)[return_col_indices]
     )
 
-    df = nrow(regression_data) - length(X_names) - 1
+    df = nrow(flow_data) - length(X_names) - 1
     flow_betas.tstat = flow_betas.coef ./ flow_betas.se
     flow_betas.pval = 2 * cdf(TDist(df), -abs.(flow_betas.tstat))
 
@@ -86,4 +88,4 @@ if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     printtime("regressing all flows", task_start; minutes=true)
 end
 
-end # module RegressFundFlows
+#end # module RegressFundFlows
