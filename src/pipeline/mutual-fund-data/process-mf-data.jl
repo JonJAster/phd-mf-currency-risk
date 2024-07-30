@@ -15,6 +15,8 @@ using .CommonFunctions
 function process_mf_data()
     """
     The returned output is known to include all dates internal to the sample period.
+
+    The equity-factor-data pipeline scripts need to be run before this one.
     """
     task_start = time()
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
