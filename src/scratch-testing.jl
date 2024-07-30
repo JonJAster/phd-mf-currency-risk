@@ -10,7 +10,7 @@ using DataStructures
 using StatsBase
 using Base.Threads
 using LinearAlgebra
-using Plots
+# using Plots
 using Distributions
 using ShiftedArrays: lead, lag
 
@@ -25,6 +25,37 @@ using .RegressFundFlows
 function test()
     ## Morningstar
     # Exploring regression output
+    regout_usa_usa = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
+    regout_usa_dev = regress_fund_flows("ff_dev_ffc6", filter_by=x->investment_target_is(x, :usa))
+    regout_wld_usa = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :wld))
+    regout_wld_dev = regress_fund_flows("ff_dev_ffc6", filter_by=x->investment_target_is(x, :wld))
+
+    regout_usa_usa.summary
+    regout_usa_dev.summary
+    regout_wld_usa.summary
+    regout_wld_dev.summary
+    
+    function coef_idx(regout)
+        findall(
+            x->!isnothing(match(r"ret_.*", string(x.sym))),
+            regout.regfit.mf.f.rhs.terms[2:end]
+        )
+    end
+
+    i_regout_usa_usa = coef_idx(regout_usa_usa)
+    v_usa_usa = vcov(regout_usa_usa.regfit)
+    v_usa_usa_coefs = v_usa_usa[i_regout_usa_usa, i_regout_usa_usa]
+    coef_usa_usa = coef(regout_usa_usa.regfit)[coef_idx(regout_usa_usa)]
+
+    v_usa_dev = vcov(regout_usa_dev.regfit)
+    coef_usa_dev = coef(regout_usa_dev.regfit)[coef_idx(regout_usa_dev)]
+
+    v_wld_usa = vcov(regout_wld_usa.regfit)
+    coef_wld_usa = coef(regout_wld_usa.regfit)[coef_idx(regout_wld_usa)]
+
+    v_wld_dev = vcov(regout_wld_dev.regfit)
+    coef_wld_dev = coef(regout_wld_dev.regfit)[coef_idx(regout_wld_dev)]
+
     function flow_regression_table(model_name; filter_by=nothing)
         # TEST # model_name = "ff_usa_ffc6"
         flow_data = initialise_flow_data(model_name)
@@ -71,7 +102,7 @@ function test()
     regout_usa = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
     regfit = regout.regfit;
     x_terms = [regfit.mf.f.rhs.terms[i].sym for i in 1:14]
-    V = vcov(regfit)
+    v = vcov(regfit)
 
     ## CRSP
     # Crawl a group-class there
