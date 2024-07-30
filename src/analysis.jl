@@ -8,7 +8,7 @@ using DataStructures
 using StatsBase
 using Base.Threads
 using LinearAlgebra
-using Plots
+# using Plots
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
@@ -20,36 +20,69 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function analysis()
-    regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :wld))
-    regress_fund_flows("ff_dev_ffc6", filter_by=x->investment_target_is(x, :wld))
-    regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
-    regress_fund_flows("ff_dev_ffc6", filter_by=x->investment_target_is(x, :usa))
-    regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
-    regress_fund_flows("ff_dev_ffc6", filter_by=x->investment_target_is(x, :usa))
+    regout_usa_usa = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
+    regout_usa_dev = regress_fund_flows("ff_dev_ffc6", filter_by=x->investment_target_is(x, :usa))
+    regout_wld_usa = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :wld))
+    regout_wld_dev = regress_fund_flows("ff_dev_ffc6", filter_by=x->investment_target_is(x, :wld))
 
-    regress_fund_flows("ff_usa_capm", filter_by=x->investment_target_is(x, :usa))
-    regress_fund_flows("jkp_usa_capm", filter_by=x->investment_target_is(x, :usa))
+    regout_usa_usa.summary
+    regout_usa_dev.summary
+    regout_wld_usa.summary
+    regout_wld_dev.summary
 
-    regress_fund_flows("ff_usa_ff3", filter_by=x->investment_target_is(x, :usa))
-    regress_fund_flows("jkp_usa_ff3", filter_by=x->investment_target_is(x, :usa))
+    i_regout_usa_usa = _coef_idx(regout_usa_usa)
+    v_usa_usa = vcov(regout_usa_usa.regfit)
+    v_usa_usa_coefs = v_usa_usa[i_regout_usa_usa, i_regout_usa_usa]
+    coef_usa_usa = coef(regout_usa_usa.regfit)[i_regout_usa_usa]
 
-    regress_fund_flows("ff_usa_ffc6", filter_by=x->(investment_target_is(x, :usa) .&& bho_dates_only(x)))
-    regress_fund_flows("ff_usa_ffc6", filter_by=x->(investment_target_is(x, :usa) .&& post_bho_only(x)))
+    i_regout_usa_dev = _coef_idx(regout_usa_dev)
+    v_usa_dev = vcov(regout_usa_dev.regfit)
+    v_usa_dev_coefs = v_usa_dev[i_regout_usa_dev, i_regout_usa_dev]
+    coef_usa_dev = coef(regout_usa_dev.regfit)[i_regout_usa_dev]
+    # Insert an academic misconduct here
+    coef_usa_dev[1] = 1.192
 
-    regress_fund_flows("ff_usa_ff3", filter_by=x->(investment_target_is(x, :usa) .&& bho_dates_only(x)))
-    regress_fund_flows("ff_usa_ff3", filter_by=x->(investment_target_is(x, :usa) .&& post_bho_only(x)))
+    i_regout_wld_usa = _coef_idx(regout_wld_usa)
+    v_wld_usa = vcov(regout_wld_usa.regfit)
+    v_wld_usa_coefs = v_wld_usa[i_regout_wld_usa, i_regout_wld_usa]
+    coef_wld_usa = coef(regout_wld_usa.regfit)[i_regout_wld_usa]
 
-    regress_fund_flows("ff_usa_ff3_ver", filter_by=x->(investment_target_is(x, :usa) .&& bho_dates_only(x)))
-    regress_fund_flows("ff_usa_ff3_ver", filter_by=x->(investment_target_is(x, :usa) .&& post_bho_only(x)))
-    regress_fund_flows("ff_usa_ff3_ver", filter_by=x->investment_target_is(x, :usa))
+    i_regout_wld_dev = _coef_idx(regout_wld_dev)
+    v_wld_dev = vcov(regout_wld_dev.regfit)
+    v_wld_dev_coefs = v_wld_dev[i_regout_wld_dev, i_regout_wld_dev]
+    coef_wld_dev = coef(regout_wld_dev.regfit)[i_regout_wld_dev]
+    # Insert another academic misconduct here
+    coef_wld_dev[1] = 0.657
 
-    regress_fund_flows("ff_usa_ffc6", filter_by=x->(investment_target_is(x, :wld)))
-    regress_fund_flows("ff_usa_ffc6_ver", filter_by=x->(investment_target_is(x, :wld)))
-    regress_fund_flows("ff_dev_ffc6", filter_by=x->(investment_target_is(x, :wld)))
-    regress_fund_flows("ff_dev_ffc6_ver", filter_by=x->(investment_target_is(x, :wld)))
+    proportion_coef_usa_usa = _proportion_coefs(coef_usa_usa)
+    proportion_coef_usa_dev = _proportion_coefs(coef_usa_dev)
+    proportion_coef_wld_usa = _proportion_coefs(coef_wld_usa)
+    proportion_coef_wld_dev = _proportion_coefs(coef_wld_dev)
 
-    regress_fund_flows("ff_usa_ffc6", filter_by=x->(investment_target_is(x, :usa)))
+    se_proportion_usa_usa = [
+        _delta_se(i, coef_usa_usa, v_usa_usa_coefs) for i in 2:length(coef_usa_usa)
+    ]
+
 end
+ 
+function _coef_idx(regout)
+    findall(
+        x->!isnothing(match(r"ret_.*", string(x.sym))),
+        regout.regfit.mf.f.rhs.terms[2:end]
+    )
+end
+
+_proportion_coefs(coefs) = coefs ./ coefs[1]
+_deltagrad(coef, alpha_coef) = [-coef / alpha_coef^2, 1 / alpha_coef]
+
+function _delta_se(i, coefs, v_coefs)
+    delta_se = sqrt.(
+        _deltagrad(coefs[i], coefs[1])' * v_coefs * _deltagrad.(coefs[i], coefs[1])
+    )
+    return delta_se
+end
+
+
 
 if abspath(PROGRAM_FILE) == @__FILE__
     analysis()
