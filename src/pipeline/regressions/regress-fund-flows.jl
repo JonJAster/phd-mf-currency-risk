@@ -16,20 +16,36 @@ using .CommonConstants
 export regress_fund_flows
 export _flow_regression_table
 
-function regress_fund_flows(model_name; filter_by=nothing) 
-    # model_name = "ff_usa_ffc6"; filter_by = nothing
+function regress_fund_flows(model_name; split_by=nothing)
+    # model_name = "ff_usa_ffc6"; split_by = nothing
     task_start = time()
 
-    regression_packet = _flow_regression_table(model_name; filter_by=filter_by)
-
-    regression_data = regression_packet.regression_data
-    return_component_cols = regression_packet.return_component_cols
-
-    flow_output = _flow_regression(regression_data, return_component_cols; intercept=false)
+    if isnothing(split_by)
+        flow_output = _single_flow_regression(model_name)
+    else
+        flow_output = _split_flow_regression(model_name, split_by)
+    end
 
     printtime("regressing flow betas on $model_name", task_start)
     return flow_output
 end
+
+function _single_flow_regression(model_name)
+    regression_packet = _flow_regression_table(model_name)
+    regression_data = regression_packet.regression_data
+    return_component_cols = regression_packet.return_component_cols
+
+    flow_output = _flow_regression(regression_data, return_component_cols; intercept=false)
+    return flow_output
+end
+
+function _split_flow_regression(model_name, split_by)
+    # model_name = "ff_usa_ffc6"; split_by = 
+    splits = unique(split_by)
+    @assert length(splits) == 2 "split_by must have exactly two unique values"
+
+    regression_packet_1 = _flow_regression_table(model_name; filter_by=splits[1])
+    regression_packet_2 = _flow_regression_table(model_name; filter_by=splits[2])
 
 function _flow_regression_table(model_name; filter_by=nothing) # model_name = "ff_usa_ffc6"
     flow_data = initialise_flow_data(model_name)
