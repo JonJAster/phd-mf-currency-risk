@@ -10,6 +10,7 @@ using DataStructures
 using StatsBase
 using Base.Threads
 using LinearAlgebra
+using StatsModels
 # using Plots
 using Distributions
 using ShiftedArrays: lead, lag
@@ -23,6 +24,16 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function test()
+    data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    data = copy(data)
+    data.yearmonth = (
+        string.(year.(data.date))
+        .* map(mth -> mth < 10 ? "0" : "", month.(data.date))
+        .* string.(month.(data.date))
+    )
+
+    
+
     ## Morningstar
     # Exploring regression output
     regout_usa_usa = regress_fund_flows("ff_usa_ffc6", filter_by=x->investment_target_is(x, :usa))
