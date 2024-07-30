@@ -213,7 +213,7 @@ function _add_foreign_dummy_and_age(data, info)
 end
 
 println(abspath(PROGRAM_FILE))
-if abspath(PROGRAM_FILE) == @__FILE__
+if isnothing(match(r"terminalserver.jl$", abspath(PROGRAM_FILE)))
     output_data = process_mf_data()
     output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
 
