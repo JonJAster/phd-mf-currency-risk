@@ -1,5 +1,5 @@
-#module RegressFundFlows
-### TODO ###
+module RegressFundFlows
+### TODO: Finish simplifying regression script ###
 
 using Revise
 using DataFrames
@@ -99,4 +99,4 @@ if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     printtime("regressing all flows", task_start; minutes=true)
 end
 
-#end # module RegressFundFlows
+end # module RegressFundFlows
