@@ -33,7 +33,7 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    processed_data = _add_foreign_dummy_and_age(aggregate_data, info)
+    processed_data = _add_foreign_dummy_and_age(aggregate_data, aggregate_info)
 
     rename!(processed_data, :net_returns => :ret)
     aggregate_data[:, [:ret, :costs]] ./= 100
@@ -213,16 +213,14 @@ function _filter_out_low_obs_funds!(data)
     return
 end
 
-function _add_foreign_dummy_and_age(data, info)
+function _add_foreign_dummy_and_age(data, aggregate_info)
     investment_target_cols = [
         :global_category, :morningstar_category, :us_category_group, :investment_area
     ]
-    investment_target_info = info[:, [:fundid; investment_target_cols; :inception_date]]
-
-    # First ensure that the retained fields don't differ for the same fundid before
-    # selecting only the first row for each fundid.
-    assert_similar_fundids(investment_target_info)
-    fund_investment_targets = unique(investment_target_info, :fundid)
+    investment_target_info = aggregate_info[
+        :,
+        [:fundid; investment_target_cols; :inception_date]
+    ]
 
     target_data = innerjoin(data, fund_investment_targets, on=:fundid)
     target_data.foreign = investment_target_is(target_data, :wld)
