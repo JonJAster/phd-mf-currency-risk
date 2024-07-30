@@ -45,14 +45,7 @@ function _replicate_characteristics(filter_by=nothing)
 
     data = innerjoin(data, info[!,[:fundid, :inception_date, :true_no_load]], on=:fundid)
 
-    !isnothing(filter_by) && data = filter(filter_by, data)
-
-    data.age = (
-        12 .* (year.(data.date) .- year.(data.inception_date))
-        .+ month.(data.date) .- month.(data.inception_date)
-    )
-
-    data.std_return_12m = rolling_combine(data, :ex_ret, 12; lagged=true, grouped_by=:fundid)
+    !isnothing(filter_by) && filter!(filter_by, data)
 
     summary_parameters = OrderedDict(
         :flow => "Flow",
