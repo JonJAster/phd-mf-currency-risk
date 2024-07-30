@@ -26,6 +26,7 @@ function process_mf_data()
     active_data = _filter_out_passive(data, info)
     sort!(active_data, [:fundid, :date])
     aggregate_data = _aggregate_to_fundid(active_data)
+    aggregate_info = _aggregate_info(info)
 
     _null_out_small!(aggregate_data)
     _trim_missing_tails!(aggregate_data)
@@ -42,20 +43,24 @@ function process_mf_data()
         lagged=true, grouped_by=:fundid
     )
 
-    output = select(
-        processed_data, 
-        [
-            :fundid,
-            :date,
-            :flow,
-            :ret,
-            :costs,
-            :net_assets_m1,
-            :foreign,
-            :age,
-            :std_return_12m
-        ]
+    output = (
+        data=select(
+            processed_data, 
+            [
+                :fundid,
+                :date,
+                :flow,
+                :ret,
+                :costs,
+                :net_assets_m1,
+                :foreign,
+                :age,
+                :std_return_12m
+            ]
+        ),
+        info=aggregate_info
     )
+
     printtime("processing mutual fund data", task_start, minutes=false)
     return output
 end
@@ -118,6 +123,24 @@ function _aggregate_to_fundid(data)
     )
 
     return lagged_assets_aggregate_data
+end
+
+function _aggregate_info(mf_info)
+    match_if_equal(x) = length(unique(x)) == 1 ? first(x) : missing
+
+    output = combine(
+        groupby(mf_info, :fundid),
+        :fund_standard_name => match_if_equal => :fund_standard_name,
+        :fund_legal_name => match_if_equal => :fund_legal_name,
+        :global_category => match_if_equal => :global_category,
+        :morningstar_category => match_if_equal => :morningstar_category,
+        :us_category_group => match_if_equal => :us_category_group,
+        :investment_area => match_if_equal => :investment_area,
+        :true_no_load => all => :true_no_load,
+        :inception_date => minimum => :inception_date
+    )
+
+    return output
 end
 
 function _null_out_small!(data)
@@ -214,9 +237,11 @@ end
 
 if isnothing(match(r"terminalserver.jl$", abspath(PROGRAM_FILE)))
     output_data = process_mf_data()
-    output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
+    output_filename_data = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
+    output_filename_info = makepath(DIRS.mf.refined, "mf-info.arrow")
 
     task_start = time()
-    Arrow.write(output_filename, output_data)
+    Arrow.write(output_filename_data, output_data.data)
+    Arrow.write(output_filename_info, output_data.info)
     printtime("writing processed mutual fund data", task_start, minutes=false)
 end
