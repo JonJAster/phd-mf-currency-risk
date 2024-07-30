@@ -193,6 +193,7 @@ function _add_foreign_dummy(data, info)
     return output
 end
 
+println(abspath(PROGRAM_FILE))
 if abspath(PROGRAM_FILE) == @__FILE__
     output_data = process_mf_data()
     output_filename = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
