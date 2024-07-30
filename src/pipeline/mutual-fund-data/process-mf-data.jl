@@ -13,6 +13,9 @@ using .CommonConstants
 using .CommonFunctions
 
 function process_mf_data()
+    """
+    The returned output is known to include all dates internal to the sample period.
+    """
     task_start = time()
     data_filename = joinpath(DIRS.mf.init, "mf-data.arrow")
     info_filename = joinpath(DIRS.mf.raw, "info.csv")
