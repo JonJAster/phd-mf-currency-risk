@@ -263,7 +263,7 @@ end
 
 if isnothing(match(r"terminalserver.jl$", abspath(PROGRAM_FILE)))
     output_data = process_mf_data()
-    output_filename_data = makepath(DIRS.mf.refined, "mf-simple-returns.arrow")
+    output_filename_data = makepath(DIRS.mf.refined, "mf-data.arrow")
     output_filename_info = makepath(DIRS.mf.refined, "mf-info.arrow")
 
     task_start = time()
