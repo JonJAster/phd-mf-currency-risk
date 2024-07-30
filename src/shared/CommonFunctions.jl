@@ -11,6 +11,7 @@ include("CommonConstants.jl")
 using .CommonConstants
 
 export dirslist
+export fundlag, fundlag!
 export makepath
 export qhead
 export qscan
@@ -55,6 +56,20 @@ function dirslist()
         end
         println("----")
     end
+end
+
+function fundlag(data, col, nlags)
+    output_data = deepcopy(data)
+    fundlag!(output_data, col, nlags)
+    return output_data
+end
+
+function fundlag!(data, col, nlags)
+    transform!(
+        groupby(data, :fundid),
+        col => (col->lag(col, nlags)) => "$(col)_lag$nlags"
+    )
+    return nothing
 end
 
 function makepath(paths...)
