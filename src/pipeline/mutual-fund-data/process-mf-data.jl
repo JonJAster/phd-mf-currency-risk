@@ -46,12 +46,10 @@ function process_mf_data()
     
     sort!(processed_data, [:fundid, :date])
     processed_data.usa_correlation_12m = _usa_correlation_12m(processed_data)
-    processed_data.std_return_12m = rolling_std(
+    processed_data.std_return_12m = rolling_combine(
         processed_data, :ret, 12;
         lagged=true, grouped_by=:fundid
     )
-
-    rename!(combined_data, :true_no_load => :no_load)
 
     output = (
         data=select(
@@ -257,6 +255,9 @@ function _add_info_data(data, aggregate_info)
 
     return output
 end
+
+function _usa_correlation_12m(data)
+
 
 if isnothing(match(r"terminalserver.jl$", abspath(PROGRAM_FILE)))
     output_data = process_mf_data()

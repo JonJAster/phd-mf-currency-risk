@@ -22,7 +22,7 @@ export initialise_base_data
 export initialise_flow_data
 export printtime
 export init_raw
-export rolling_std
+export rolling_combine
 export drop_allmissing!
 export investment_target_is
 export bho_dates_only
@@ -317,7 +317,7 @@ function init_raw(filepath; info=false)
     return data
 end
 
-function rolling_std(data, col, window; lagged, grouped_by=nothing)
+function rolling_combine(data, col, window; lagged, grouped_by=nothing)
     rolling_std = Vector{Union{Missing, Float64}}(missing, size(data, 1))
 
     for i in 1:nrow(data)

@@ -52,7 +52,7 @@ function _replicate_characteristics(filter_by=nothing)
         .+ month.(data.date) .- month.(data.inception_date)
     )
 
-    data.std_return_12m = rolling_std(data, :ex_ret, 12; lagged=true, grouped_by=:fundid)
+    data.std_return_12m = rolling_combine(data, :ex_ret, 12; lagged=true, grouped_by=:fundid)
 
     summary_parameters = OrderedDict(
         :flow => "Flow",
