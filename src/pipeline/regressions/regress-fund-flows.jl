@@ -35,7 +35,7 @@ function _flow_regression_table(model_name; filter_by=nothing) # model_name = "f
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
-        flow_data = filter_fundids(filter_by, flow_data)
+        flow_data = filter(filter_by, flow_data)
     end
 
     cols = names(flow_data)
