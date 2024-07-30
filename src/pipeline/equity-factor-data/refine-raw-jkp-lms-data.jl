@@ -67,7 +67,7 @@ function _filter_to_desired_factors(lms_factors_full, factor_names_map)
     return lms_factors
 end
 
-if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
+if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     output_data = refine_raw_jkp_lms_data()
     output_filestring = makepath(DIRS.eq.factors, "jkp-lms.arrow")
     

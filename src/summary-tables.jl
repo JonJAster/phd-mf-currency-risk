@@ -211,6 +211,6 @@ function _summarise_series(data_series)
     return output
 end
 
-if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
+if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     summary_tables()
 end

@@ -34,7 +34,7 @@ function _prep_fx!(fx_data)
     return fx_data
 end
 
-if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
+if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     output_data = combine_factors()
     output_filename = makepath(DIRS.combo.factors, "factors.arrow")
 

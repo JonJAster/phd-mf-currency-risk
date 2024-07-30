@@ -27,7 +27,8 @@ function compute_excess_mf_returns()
     return mf_data
 end
 
-if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
+println(PROGRAM_FILE)
+if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     output_data = compute_excess_mf_returns()
     output_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
 

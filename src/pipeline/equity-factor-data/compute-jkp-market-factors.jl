@@ -84,7 +84,7 @@ function _weight_returns(data)
     return weighted_returns
 end
 
-if !isnothing(match(r"terminalserver.jl", PROGRAM_FILE))
+if !isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     output_data = compute_jkp_market_factors()
     output_filestring = makepath(DIRS.eq.factors, "jkp-mkt.arrow")
 
