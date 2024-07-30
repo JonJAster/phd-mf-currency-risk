@@ -219,6 +219,7 @@ function initialise_flow_data(model_name)
     fund_info = loadarrow(filename_info)
     decomposed_returns = loadarrow(filename_decomposition)
 
+    # Returns are already date-sorted within fundid
     fund_base_data.std_return_12m = rolling_std(fund_base_data, :ex_ret, 12; lagged=true)
 
     select!(
