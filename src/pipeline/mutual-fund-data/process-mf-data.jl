@@ -83,7 +83,7 @@ function _load_mkt(mkt_filename)
     """
     Load the FF factor data, filters to the USA mkt factor and renames :ret column to :mkt.
     """
-    mkt = loadarrow(mkt_filename) |> copy # copy to allow filtering
+    mkt = loadarrow(mkt_filename)
 
     filter!(x->(x.factor .== "mkt") .&& (x.source_id .== "ff_usa"), mkt)
     select!(mkt, [:date, :ret])
