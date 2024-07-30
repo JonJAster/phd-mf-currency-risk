@@ -35,8 +35,10 @@ function process_mf_data()
     _filter_out_low_obs_funds!(aggregate_data)
     processed_data = _add_info_data(aggregate_data, aggregate_info)
 
+    sort!(processed_data, [:fundid, :date])
+
     rename!(processed_data, :net_returns => :ret)
-    aggregate_data[:, [:ret, :costs]] ./= 100
+    processed_data[:, [:ret, :costs]] ./= 100
 
     processed_data.std_return_12m = rolling_std(
         processed_data, :ret, 12;
@@ -221,7 +223,7 @@ function _add_info_data(data, aggregate_info)
     - true_no_load: whether all share classes of the fund are no-load
     """
 
-    combined_data = innerjoin(data, aggregated_info, on=:fundid)
+    combined_data = innerjoin(data, aggregate_info, on=:fundid)
     combined_data.foreign = investment_target_is(combined_data, :wld)
     combined_data.age = (
         12 .* (year.(combined_data.date) .- year.(combined_data.inception_date))
