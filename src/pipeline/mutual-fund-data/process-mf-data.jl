@@ -218,23 +218,17 @@ function _add_info_data(data, aggregate_info)
     Adds the following columns to the data:
     - foreign: whether the fund invests primarily in foreign assets
     - age: the minimum age across share classes of the fund in months
-    - no_load: whether all share classes of the fund are no-load
+    - true_no_load: whether all share classes of the fund are no-load
     """
-    investment_target_cols = [
-        :global_category, :morningstar_category, :us_category_group, :investment_area
-    ]
-    investment_target_info = aggregate_info[
-        :,
-        [:fundid; investment_target_cols; :inception_date]
-    ]
 
-    target_data = innerjoin(data, fund_investment_targets, on=:fundid)
-    target_data.foreign = investment_target_is(target_data, :wld)
-    target_data.age = (
-        12 .* (year.(target_data.date) .- year.(target_data.inception_date))
-        .+ month.(target_data.date) .- month.(target_data.inception_date)
+    combined_data = innerjoin(data, aggregated_info, on=:fundid)
+    combined_data.foreign = investment_target_is(combined_data, :wld)
+    combined_data.age = (
+        12 .* (year.(combined_data.date) .- year.(combined_data.inception_date))
+        .+ month.(combined_data.date) .- month.(combined_data.inception_date)
     )
-    output = select(target_data, [propertynames(data); [:foreign, :age]])
+
+    output = select(combined_data, [propertynames(data); [:foreign, :age, :true_no_load]])
 
     return output
 end
