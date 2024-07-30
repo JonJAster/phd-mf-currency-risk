@@ -32,7 +32,7 @@ function regress_fund_flows(model_name; filter_by=nothing)
 end
 
 function _flow_regression_table(model_name; filter_by=nothing)
-    # model_name = "ff_usa_ffc6"
+    # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign
     flow_data = initialise_flow_data(model_name)
 
     if !isnothing(filter_by)
@@ -46,8 +46,8 @@ function _flow_regression_table(model_name; filter_by=nothing)
     regression_data = regression_table(
         flow_data, :fundid, :date,
         :flow,
-        :flow, :nth_lag, FLOW_CONTROL_LAGS,
         return_component_cols...,
+        :flow, :nth_lag, FLOW_CONTROL_LAGS,
         :costs, :lag,
         :true_no_load,
         :std_return_12m,
