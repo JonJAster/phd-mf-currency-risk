@@ -361,23 +361,15 @@ end
 function filter_fundids(condition, data)
     info_filename = joinpath(DIRS.mf.init, "mf-info.arrow")
     info = loadarrow(info_filename)
+    select!(info, [:fundid, :global_category, :morningstar_category, :us_category_group, :investment_area])
 
-    info_condition_cols = [
-        :global_category, :morningstar_category, :us_category_group, :investment_area
-    ]
-    select!(info, [:fundid; info_condition_cols])
-
-    # First ensure that the retained fields don't differ for the same fundid before
-    # selecting only the first row for each fundid.
     _assert_similar_fundids(info)
     info = unique(info, :fundid)
 
     joined_data = innerjoin(data, info, on=:fundid)
     filtered_data = joined_data[condition(joined_data), propertynames(data)]
 
-    output = filtered_data[!, Not(info_condition_cols)]
-
-    return output
+    return filtered_data
 end
 
 function investment_target_is(data, target)
@@ -622,7 +614,7 @@ function _assert_similar_fundids(info)
     Throw an error if a single fundid has at least two distinct values for any field in
     the input DataFrame.
     """
-
+    
     fundids = unique(info.fundid)
     test_fields = setdiff(propertynames(info), [:fundid])
 
