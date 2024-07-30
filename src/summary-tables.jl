@@ -14,29 +14,29 @@ using .CommonConstants
 using .CommonFunctions
 using .RegressFundFlows
 
-function summary_tables() # start_month = Date(1996,1,1); end_month = Date(2011,11,1)
+function summary_tables()
     _replicate_characteristics()
-    _replicate_characteristics(nothing, Date(2010,12,31))
-    _replicate_characteristics(Date(2011,1,1))
+    _replicate_characteristics(end_month=Date(2010,12,31))
+    _replicate_characteristics(start_month=Date(2011,1,1))
 
     _replicate_betas()
-    _replicate_betas(nothing, Date(2010,12,31))
-    _replicate_betas(Date(2011,1,1))
+    _replicate_betas(end_month=Date(2010,12,31))
+    _replicate_betas(start_month=Date(2011,1,1))
 
     _replicate_betas(region="dev")
-    _replicate_betas(nothing, Date(2010,12,31), region="dev")
-    _replicate_betas(Date(2011,1,1), region="dev")
+    _replicate_betas(end_month=Date(2010,12,31), region="dev")
+    _replicate_betas(start_month=Date(2011,1,1), region="dev")
 
     _replicate_return_components()
-    _replicate_return_components(nothing, Date(2010,12,31))
-    _replicate_return_components(Date(2011,1,1))
+    _replicate_return_components(end_month=Date(2010,12,31))
+    _replicate_return_components(start_month=Date(2011,1,1))
 
     _replicate_return_components(region="dev")
-    _replicate_return_components(nothing, Date(2010,12,31), region="dev")
-    _replicate_return_components(Date(2011,1,1), region="dev")
+    _replicate_return_components(end_month=Date(2010,12,31), region="dev")
+    _replicate_return_components(start_month=Date(2011,1,1), region="dev")
 end
 
-function _replicate_characteristics(start_month=nothing, end_month=nothing)
+function _replicate_characteristics(;start_month=nothing, end_month=nothing)
     data_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     info_filename = joinpath(DIRS.mf.refined, "mf-info.arrow")
     
@@ -91,7 +91,7 @@ function _replicate_characteristics(start_month=nothing, end_month=nothing)
     return output_characteristics
 end
 
-function _replicate_betas(start_month=nothing, end_month=nothing; region="usa")
+function _replicate_betas(start_month=end_month=end_month=nothing; region="usa")
     factor_set = "ff_$(region)_ffc6.arrow"
     return_beta_filename = joinpath(DIRS.combo.return_betas, factor_set)
     
@@ -139,7 +139,7 @@ function _replicate_betas(start_month=nothing, end_month=nothing; region="usa")
     return output_betas
 end
 
-function _replicate_return_components(start_month=nothing, end_month=nothing; region="usa")
+function _replicate_return_components(start_month=end_month=end_month=nothing; region="usa")
     factor_set = "ff_$(region)_ffc6.arrow"
     return_components_filename = joinpath(DIRS.combo.weighted, factor_set)
     mf_data_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
