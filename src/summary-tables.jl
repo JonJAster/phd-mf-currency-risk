@@ -37,13 +37,9 @@ function summary_tables()
 end
 
 function _replicate_characteristics(filter_by=nothing)
-    data_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
-    info_filename = joinpath(DIRS.mf.refined, "mf-info.arrow")
+    data_filename = joinpath(DIRS.mf.refined, "mf-data.arrow")
     
     data = loadarrow(data_filename)
-    info = loadarrow(info_filename)
-
-    data = innerjoin(data, info[!,[:fundid, :inception_date, :true_no_load]], on=:fundid)
 
     !isnothing(filter_by) && filter!(filter_by, data)
 
