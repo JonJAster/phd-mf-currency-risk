@@ -59,7 +59,7 @@ function process_mf_data()
                 :ret,
                 :costs,
                 :net_assets_m1,
-                :no_load
+                :no_load,
                 :foreign,
                 :age,
                 :std_return_12m
