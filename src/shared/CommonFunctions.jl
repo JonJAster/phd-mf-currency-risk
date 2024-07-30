@@ -218,9 +218,6 @@ function initialise_flow_data(model_name)
 
     fund_rets_data = outerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
     ret_cols = propertynames(decomposed_returns[!, Not([:fundid, :date])])
-
-    fund_rets_data.log_size_m1 = log.(fund_rets_data.net_assets_m1)
-    fund_rets_data.log_age = log.(fund_rets_data.age)
     
     sort!(fund_rets_data, [:fundid, :date])
     select!(
