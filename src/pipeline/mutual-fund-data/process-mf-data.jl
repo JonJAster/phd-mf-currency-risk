@@ -194,7 +194,7 @@ function _add_foreign_dummy_and_age(data, info)
     investment_target_cols = [
         :global_category, :morningstar_category, :us_category_group, :investment_area
     ]
-    investment_target_info = info[:, [:fundid; investment_target_cols; inception_date]]
+    investment_target_info = info[:, [:fundid; investment_target_cols; :inception_date]]
 
     # First ensure that the retained fields don't differ for the same fundid before
     # selecting only the first row for each fundid.
