@@ -91,7 +91,7 @@ function _replicate_characteristics(;start_month=nothing, end_month=nothing)
     return output_characteristics
 end
 
-function _replicate_betas(start_month=end_month=end_month=nothing; region="usa")
+function _replicate_betas(;start_month=nothing, end_month=nothing, region="usa")
     factor_set = "ff_$(region)_ffc6.arrow"
     return_beta_filename = joinpath(DIRS.combo.return_betas, factor_set)
     
@@ -139,7 +139,7 @@ function _replicate_betas(start_month=end_month=end_month=nothing; region="usa")
     return output_betas
 end
 
-function _replicate_return_components(start_month=end_month=end_month=nothing; region="usa")
+function _replicate_return_components(;start_month=nothing, end_month=nothing, region="usa")
     factor_set = "ff_$(region)_ffc6.arrow"
     return_components_filename = joinpath(DIRS.combo.weighted, factor_set)
     mf_data_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
