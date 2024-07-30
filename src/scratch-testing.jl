@@ -61,7 +61,7 @@ function test()
         flow_data = initialise_flow_data(model_name)
     
         if !isnothing(filter_by)
-            flow_data = filter_fundids(filter_by, flow_data)
+            #flow_data = filter_fundids(filter_by, flow_data)
         end
     
         cols = names(flow_data)
