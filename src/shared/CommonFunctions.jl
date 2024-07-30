@@ -224,10 +224,12 @@ function initialise_flow_data(model_name)
     
     sort!(fund_rets_data, [:fundid, :date])
     select!(
+        :fundid,
+        :date,
         fund_rets_data,
         :flow,
         ret_cols,
-        Not([:flow, ret_cols..., :ex_ret, :age, :net_assets_m1])
+        Not([:fundid, :date, :flow, ret_cols..., :ex_ret, :age, :net_assets_m1])
     )
 
     return fund_rets_data
