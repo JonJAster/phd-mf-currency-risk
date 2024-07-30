@@ -33,7 +33,7 @@ function process_mf_data()
     _calculate_fund_flows!(aggregate_data)
     _clip_fund_flows!(aggregate_data)
     _filter_out_low_obs_funds!(aggregate_data)
-    processed_data = _add_foreign_dummy_and_age(aggregate_data, aggregate_info)
+    processed_data = _add_info_data(aggregate_data, aggregate_info)
 
     rename!(processed_data, :net_returns => :ret)
     aggregate_data[:, [:ret, :costs]] ./= 100
@@ -213,7 +213,13 @@ function _filter_out_low_obs_funds!(data)
     return
 end
 
-function _add_foreign_dummy_and_age(data, aggregate_info)
+function _add_info_data(data, aggregate_info)
+    """
+    Adds the following columns to the data:
+    - foreign: whether the fund invests primarily in foreign assets
+    - age: the minimum age across share classes of the fund in months
+    - no_load: whether all share classes of the fund are no-load
+    """
     investment_target_cols = [
         :global_category, :morningstar_category, :us_category_group, :investment_area
     ]
