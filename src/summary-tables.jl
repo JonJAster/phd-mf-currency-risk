@@ -36,7 +36,7 @@ function summary_tables()
     _replicate_return_components(start_month=Date(2011,1,1), region="dev")
 end
 
-function _replicate_characteristics(;start_month=nothing, end_month=nothing)
+function _replicate_characteristics(filter_by=nothing)
     data_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
     info_filename = joinpath(DIRS.mf.refined, "mf-info.arrow")
     
@@ -45,13 +45,7 @@ function _replicate_characteristics(;start_month=nothing, end_month=nothing)
 
     data = innerjoin(data, info[!,[:fundid, :inception_date, :true_no_load]], on=:fundid)
 
-    if !isnothing(start_month)
-        data = data[data.date .>= start_month, :]
-    end
-
-    if !isnothing(end_month)
-        data = data[data.date .<= end_month, :]
-    end
+    !isnothing(filter_by) && data = filter(filter_by, data)
 
     data.age = (
         12 .* (year.(data.date) .- year.(data.inception_date))
