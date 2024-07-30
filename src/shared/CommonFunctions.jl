@@ -77,7 +77,6 @@ function safelag(col_values, nlags, date_col)
     return lag(col_values, nlags)
 end
 
-
 function makepath(paths...)
     pathstring = joinpath(paths...)
     if match(FILE_SUFFIX, pathstring) |> isnothing

@@ -4,6 +4,7 @@ using CSV
 using Arrow
 using Dates
 using Statistics
+using StatsBase
 using ShiftedArrays: lead, lag
 
 includet("../../shared/CommonConstants.jl")
@@ -44,27 +45,31 @@ function process_mf_data()
     combined_data[:, [:net_returns, :costs]] ./= 100
     combined_data.ex_ret = combined_data.net_returns .- combined_data.rf
     
-    sort!(processed_data, [:fundid, :date])
-    processed_data.usa_correlation_12m = _usa_correlation_12m(processed_data)
-    processed_data.std_return_12m = rolling_combine(
-        processed_data, :ret, 12;
+    sort!(combined_data, [:fundid, :date])
+    combined_data.std_return_12m = rolling_combine(
+        std, combined_data, :ex_ret, 12;
+        lagged=true, grouped_by=:fundid
+    )
+    combined_data.usa_correlation_12m = rolling_combine(
+        x->cor(x.ex_ret, x.mkt), combined_data, [:ex_ret, :mkt], 12;
         lagged=true, grouped_by=:fundid
     )
 
     output = (
         data=select(
-            processed_data, 
+            combined_data, 
             [
                 :fundid,
                 :date,
                 :flow,
-                :ret,
+                :ex_ret,
                 :costs,
                 :net_assets_m1,
                 :no_load,
                 :foreign,
                 :age,
-                :std_return_12m
+                :std_return_12m,
+                :usa_correlation_12m
             ]
         ),
         info=aggregate_info
