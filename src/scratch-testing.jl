@@ -32,10 +32,11 @@ function test()
         .* map(mth -> mth < 10 ? "0" : "", month.(data.date))
         .* string.(month.(data.date))
     )
+    wrongdata = sort(data, :flow)
 
-    data
-    
-    form = term(:flow) ~ FunctionTerm(lag, [term(:flow)], :(lag($(term(:flow)), 19)))
+    fundlag!(wrongdata, :flow, 19)
+
+    form = term(:flow) ~ term(:flow_lag19)
     model = lm(form, data)
 
 
@@ -700,8 +701,5 @@ function test()
         xlims=(0,0.4),
         framestyle=:origin
     )
-
-
-
 
 end
