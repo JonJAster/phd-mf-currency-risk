@@ -24,6 +24,7 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function test()
+    # Formula macro testing
     data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
     data = copy(data)
     data.yearmonth = (
@@ -31,6 +32,12 @@ function test()
         .* map(mth -> mth < 10 ? "0" : "", month.(data.date))
         .* string.(month.(data.date))
     )
+
+    data
+    
+    form = term(:flow) ~ FunctionTerm(lag, [term(:flow)], :(lag($(term(:flow)), 19)))
+    model = lm(form, data)
+
 
     
 
