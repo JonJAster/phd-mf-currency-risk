@@ -25,7 +25,7 @@ using .RegressFundFlows
 
 function test()
     # Formula macro testing
-    data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     data = copy(data)
     data.yearmonth = (
         string.(year.(data.date))
@@ -114,7 +114,7 @@ function test()
     test_regtable = flow_regression_table("ff_usa_ffc6").regression_data
     fe_names = propertynames(test_regtable[!, r"fe_.*"])
 
-    data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     unique_dates = unique(data.date)
     unique_datecodes = Symbol.(["fe_month_$(year(d))$(month(d)<10 ? "0" : "")$(month(d))" for d in unique_dates])
 
@@ -459,7 +459,7 @@ function test()
     
 
     # Selecting a fund today
-    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     current_funds = fund_data[fund_data.date .== maximum(fund_data.date), :]
     info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
     duplicate_values = combine(
@@ -533,7 +533,7 @@ function test()
     end
 
     # Description of fund size
-    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     describe(fund_data)
 
     monthly_flow_data = combine(
@@ -584,7 +584,7 @@ function test()
     plot!(yearly_flow_data.year, fill(0, length(yearly_flow_data.year)), color=:red, alpha=0.2, linewidth=2)
 
     # Do funds of various subcategories earn average positive gross returns?
-    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     info = loadarrow(joinpath(DIRS.mf.init, "mf-info.arrow"))
 
     betas = loadarrow(joinpath(DIRS.combo.return_betas, "ff_usa_ff3.arrow"))
@@ -654,7 +654,7 @@ function test()
     fund_data[(fund_data.fundid .== testcase.fundid) .&& (fund_data.date .== (testcase.date-Month(1))), :]
 
     # Do fund returns display an efficient frontier?
-    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-excess-returns.arrow"))
+    fund_data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     fund_data.year = year.(fund_data.date)
 
     function annualise_returns(year_of_returns)

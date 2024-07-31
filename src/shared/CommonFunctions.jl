@@ -215,7 +215,7 @@ function loadarrow(filename)
 end
 
 function initialise_base_data(model)
-    mf_filename = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
+    mf_filename = joinpath(DIRS.mf.refined, "mf-data.arrow")
     factors_filename = joinpath(DIRS.combo.factors, "factors.arrow")
 
     mf_data = loadarrow(mf_filename)
@@ -232,7 +232,7 @@ function initialise_flow_data(model_name)
     Doesn't include any transformed columns. Create those in the regression function.
     """
     # model_name = "ff_usa_ffc6"
-    filename_mf = joinpath(DIRS.mf.refined, "mf-excess-returns.arrow")
+    filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
 
     fund_base_data = loadarrow(filename_mf)
