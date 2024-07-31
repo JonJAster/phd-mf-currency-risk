@@ -1,4 +1,4 @@
-module RegressFundFlows
+# module RegressFundFlows
 ### TODO: Finish simplifying regression script ###
 
 using Revise
@@ -8,8 +8,8 @@ using Dates
 using GLM
 using Distributions
 
-include("../../shared/CommonConstants.jl")
-include("../../shared/CommonFunctions.jl")
+includet("../../shared/CommonConstants.jl") # TODO: Change back to include
+includet("../../shared/CommonFunctions.jl")
 
 using .CommonFunctions
 using .CommonConstants
@@ -39,21 +39,40 @@ function _flow_regression(flow_data; intercept=true)
     # in the formula. GLM can't handle missings introduced via formulae, so use of
     # lag within formula is not supported and lags must be produced beforehand. The
     # flow_data frame is not reused so it is fine to modify.
-    fundlag!(flow_data, :flow, 19)
-    fundlag
 
-        # X_formula = (
-        #     sum(term.(ret_vars))
-        #     + FunctionTerm(l, term(:flow),)
-    !intercept && (X_formula = term(0) + X_formula)
-    reg_formula = term(:flow) ~ term(0) + sum(term.(X_names))
+    # TODO: Currently avoiding programatic FunctionTerm's altogether from lack of
+    #       understanding. May be able to simplify in the future.
+    fundlag!(flow_data, :flow, FLOW_CONTROL_LAGS; drop=false)
+    fundlag!(flow_data, :costs)
+    fundlag!(flow_data, :age)
+    flow_data.log_size_lag1 = log.(flow_data.net_assets_m1)
+    flow_data.log_age_lag1 = log.(flow_data.age_lag1)
+    select!(flow_data, Not(:net_assets_m1, :age_lag1))
+    flow_data.yearmonth = yearmonth.(flow_data.date)
+
+    X_formula = (
+        sum(term.(ret_vars))
+        + term("flow_lag$FLOW_CONTROL_LAGS")
+        + term(:std_return_12m)
+        + term(:usa_correlation_12m)
+        + term(:no_load)
+        + term(:costs_lag1)
+        + term(:log_size_lag1)
+        + term(:log_age_lag1)
+        + term(:yearmonth)
+    )
+    if intercept
+        reg_formula = term(:flow) ~ X_formula
+    else
+        reg_formula = term(:flow) ~ 0 + X_formula
+    end
 
     regfit = lm(reg_formula, flow_data)
 
-    return_col_indices = findall(x->in(x,return_component_cols), Symbol.(coefnames(regfit)))
+    return_col_indices = findall(x->in(x,ret_vars), Symbol.(coefnames(regfit)))
 
     factor_names = [
-        match(r"(?<=ret_).+(?=_m1)", string(name)).match for name in return_component_cols
+        match(r"(?<=ret_).+(?=_m1)", string(name)).match for name in ret_vars
     ]
     
     flow_betas = DataFrame(
@@ -62,7 +81,7 @@ function _flow_regression(flow_data; intercept=true)
         se = stderror(regfit)[return_col_indices]
     )
 
-    df = nrow(flow_data) - length(X_names) - 1
+    df = nrow(flow_data) - length(X_formula)
     flow_betas.tstat = flow_betas.coef ./ flow_betas.se
     flow_betas.pval = 2 * cdf(TDist(df), -abs.(flow_betas.tstat))
 
@@ -99,4 +118,4 @@ if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     printtime("regressing all flows", task_start; minutes=true)
 end
 
-end # module RegressFundFlows
+#end # module RegressFundFlows
