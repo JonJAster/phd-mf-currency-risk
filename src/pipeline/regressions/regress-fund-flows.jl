@@ -1,15 +1,15 @@
-# module RegressFundFlows
+ module RegressFundFlows
 ### TODO: Finish simplifying regression script ###
 
-using Revise
+#using Revise
 using DataFrames
 using Arrow
 using Dates
 using GLM
 using Distributions
 
-includet("../../shared/CommonConstants.jl") # TODO: Change back to include
-includet("../../shared/CommonFunctions.jl")
+include("../../shared/CommonConstants.jl")
+include("../../shared/CommonFunctions.jl")
 
 using .CommonFunctions
 using .CommonConstants
@@ -118,4 +118,4 @@ if isnothing(match(r"terminalserver.jl$", PROGRAM_FILE))
     printtime("regressing all flows", task_start; minutes=true)
 end
 
-#end # module RegressFundFlows
+end # module RegressFundFlows
