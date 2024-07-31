@@ -289,7 +289,7 @@ function _replicate_betas(sample_period; filter_by=nothing, region)
 
     output_betas = Dict(
         Symbol("Sample Period") => sample_period,
-        :n => nrow(data)
+        :n => nrow(return_betas_filt)
     ) |> DataFrame
     for i in keys(betas_parameters)
         output_betas = hcat(
@@ -346,7 +346,7 @@ function _replicate_return_components(sample_period; filter_by=nothing, region)
 
     output_return_components = Dict(
         Symbol("Sample Period") => sample_period,
-        :n => nrow(mf_data)
+        :n => nrow(return_components_filt)
     ) |> DataFrame
     for i in keys(return_parameters)
         output_return_components = hcat(
