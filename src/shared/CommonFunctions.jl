@@ -248,7 +248,7 @@ function initialise_flow_data(model_name)
         :date,
         :flow,
         ret_cols,
-        Not([:fundid, :date, :flow, ret_cols..., :ex_ret, :age, :net_assets_m1])
+        Not([:fundid, :date, :flow, ret_cols..., :ex_ret])
     )
 
     return fund_rets_data
