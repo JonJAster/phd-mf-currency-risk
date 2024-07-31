@@ -24,6 +24,8 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function test()
+    qhead(joinpath(DIRS.mf.refined, "mf-data.arrow"))
+
     # Formula macro testing
     data = loadarrow(joinpath(DIRS.mf.refined, "mf-data.arrow"))
     data = copy(data)
