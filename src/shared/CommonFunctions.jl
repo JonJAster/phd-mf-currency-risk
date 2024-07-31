@@ -10,35 +10,199 @@ using ShiftedArrays: lead, lag
 include("CommonConstants.jl")
 using .CommonConstants
 
+export bho_dates_only, post_bho_only
 export dirslist
+export drop_allmissing!
 export fundlag, fundlag!, safelag
-export makepath
-export qhead
-export qscan
-export qlookup
-export pprint
-export loadarrow
+export init_raw
 export initialise_base_data
 export initialise_flow_data
-export printtime
-export init_raw
-export rolling_combine
-export drop_allmissing!
 export investment_target_is
-export bho_dates_only
-export post_bho_only
+export loadarrow
+export makepath
+export pprint
+export printtime
+export qhead, qscan, qlookup
 export regression_table
+export rolling_combine
 
 const FILE_SUFFIX = r"\.[a-zA-Z0-9]+$"
+
+const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
+
+const PARAMETER_REGRESSION_ARGS = [
+    :plus_lags, :plus_lag, :nth_lags, :nth_lag, :lags, :lag, :time_fixed_effects, :tfe
+]
 
 const REGRESSION_ARGS = [
     :plus_lags, :plus_lag, :nth_lags, :nth_lag, :lags, :lag, :categories, :cat,
     :time_fixed_effects, :tfe, :entity_fixed_effects, :efe
 ]
-const PARAMETER_REGRESSION_ARGS = [
-    :plus_lags, :plus_lag, :nth_lags, :nth_lag, :lags, :lag, :time_fixed_effects, :tfe
-]
-const NOCOLUMN_REGRESSION_ARGS = [:time_fixed_effects, :tfe, :entity_fixed_effects, :efe]
+
+bho_dates_only(data) = (data.date .>= Date(1996,1,1)) .&& (data.date .<= Date(2011,11,1))
+post_bho_only(data) = data.date .> Date(2011,11,1)
+
+drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
+function drop_allmissing!(df, cols; dims=1)
+    if dims ∉ [1, 2, :row, :rows, :col, :cols]
+        error("dims must be :rows or :cols")
+    end
+
+    dimsmap = Dict(:row => 1, :rows => 1, :col => 2, :cols => 2)
+    if dims ∉ [1, 2]
+        dims = dimsmap[dims]
+    end
+
+    mask_matrix = .!(Matrix(df[!, cols]) .|> ismissing)
+    if dims == 1
+        one_vector = ones(size(mask_matrix,2))
+        all_missing = mask_matrix * one_vector .== zero(size(mask_matrix,1))
+        delete!(df, findall(all_missing))
+    else
+        one_vector = ones(size(mask_matrix,1))
+        all_missing = mask_matrix' * one_vector .== zero(size(mask_matrix,2))
+        select!(df, Not(cols[all_missing]))
+    end
+end
+
+function _add_entity_fe!(data)
+    data[!, :fe_entity] = data[!, :entity]
+    _convert_to_category_dummies!(data, :fe_entity; drop_first=false)
+end
+
+function _add_lags!(data, col; nlags, skip_to=false)
+    isnothing(nlags) && (nlags = 1)
+    typeof(nlags) <: Integer || error("Number of lags must be an integer.")
+    gb = groupby(data, :entity)
+
+    start_i = skip_to ? nlags : 1
+
+    for i in start_i:nlags
+        transform!(gb, col => (col->lag(col, i)) => "$(col)_lag$i")
+    end
+end
+
+function _add_time_fe!(data; frequency)
+    if isnothing(frequency)
+        date_category = :fe_date_enum
+        unique_dates_indexer = (
+            unique(data.date) |> enumerate |> collect .|> reverse |> Dict
+        )
+        data[!, date_category] = get.(Ref(unique_dates_indexer), data.date, nothing)
+    elseif frequency ∈ [:d, :day, :daily]
+        date_category = :fe_date
+        data[!, date_category] = Dates.format.(data.date, "yyyymmdd")
+    elseif frequency ∈ [:m, :month, :monthly]
+        date_category = :fe_month
+        data[!, date_category] = Dates.format.(data.date, "yyyymm")
+    elseif frequency ∈ [:q, :quarter, :quarterly]
+        date_category = :fe_quarter
+        yearstr = string.(Dates.year.(data.date))
+        quarterstr = string.(Dates.quarterofyear.(data.date))
+        data[!, date_category] = String.(yearstr) .* "Q" .* String.(quarterstr)
+    elseif frequency ∈ [:y, :year, :yearly]
+        date_category = :fe_year
+        data[!, date_category] = Dates.format.(data.date, "yyyy")
+    else
+        error("Invalid frequency: $frequency. Must be :month, :quarter, or :year.")
+    end
+
+    _convert_to_category_dummies!(data, date_category; drop_first=false)
+end
+
+function _convert_to_category_dummies!(data, col; drop_first=true)
+    category_col = sort(unique(data[!, col]))
+    categories = drop_first ? category_col[2:end] : category_col
+    for category in categories
+        data[!, "$(col)_$category"] = Int.(data[!, col] .== category)
+    end
+    select!(data, Not(col))
+end
+
+function _do_arg_call!(arg, data, col; parameter=nothing)
+    if arg == :lags || arg == :lag
+        _add_lags!(data, col, nlags=parameter)
+        select!(data, Not(col))
+    elseif arg == :plus_lags || arg == :plus_lag
+        _add_lags!(data, col, nlags=parameter)
+    elseif arg == :nth_lag || arg == :nth_lags
+        _add_lags!(data, col, nlags=parameter, skip_to=true)
+    elseif arg == :categories || arg == :cat
+        _convert_to_category_dummies!(data, col)
+    elseif arg == :time_fixed_effects || arg == :tfe
+        _add_time_fe!(data, frequency=parameter)
+    elseif arg == :entity_fixed_effects || arg == :efe
+        _add_entity_fe!(data)
+    end
+end
+
+function _normalise_names!(df; info=false)
+    if info
+        re_invalidchars_nonend = r"[^a-zA-Z0-9]+(?!$)"
+        re_invalidchars_end = r"[^a-zA-Z0-9]+$"
+
+        function namemap(x)
+            replace(x, re_invalidchars_nonend => "_") |> x ->
+            replace(x, re_invalidchars_end => "") |>
+            lowercase
+        end
+
+        new_names = names(df) .|> namemap
+        rename!(df, new_names)
+    else
+        n_id_cols = 3
+        n_date_cols = ncol(df) - n_id_cols
+
+        id_cols = names(df)[1:n_id_cols] .|> lowercase
+
+        re_fieldname = r"^.+(?=\s?\r?\n\d{4}-\d{2})"
+        re_date = r"(?<=\n)\d{4}-\d{2}"
+
+        fieldname_match = match(re_fieldname, names(df)[n_id_cols + 1]).match
+        fieldname = replace(fieldname_match, r"\r|\n| $" => "")
+
+        start_date = match(re_date, names(df)[n_id_cols + 1]).match |> Dates.Date
+        last_date = match(re_date, last(names(df))).match |> Dates.Date
+        date_cols = [start_date + Month(i) for i in 0:n_date_cols-1]
+
+        last(date_cols) != last_date && @warn(
+            "The calculated end date ($(last(date_cols))) is not the same as the last date " *
+            "in the dataset for $fieldname ($last_date). This suggests that some date " *
+            "columns may be missing or incorrectly sequenced."
+        )
+
+        rename!(df, Symbol.([id_cols; date_cols]))
+    end
+    return
+end
+
+function _null_empty_strings!(df)
+    for col in propertynames(df)
+        if count(coalesce.(df[!, col] .== "", false)) > 0
+            df[!, col] = replace(df[!, col], "" => missing)
+        end
+    end
+    return
+end
+
+function _prepare_factors(factors_data, model) 
+    model_source = model[1]
+    model_factors = model[2]
+
+    source_condition = (
+        factors_data.source_id .== model_source .||
+        factors_data.source_id .== "fx"
+    )
+
+    factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
+
+    source_factors = factors_data[source_condition .&& factor_condition, :]
+
+    wide_factors = unstack(source_factors, :date, :factor, :ret)
+    dropmissing!(wide_factors)
+
+    return wide_factors
+end
 
 function dirslist()
     println("-- DIRS LIST --")
@@ -58,12 +222,6 @@ function dirslist()
     end
 end
 
-function fundlag(data, col, nlags=1; drop=true)
-    output_data = deepcopy(data)
-    fundlag!(output_data, col, nlags; drop=drop)
-    return output_data
-end
-
 function fundlag!(data, col, nlags=1; drop=true)
     transform!(
         groupby(data, :fundid),
@@ -73,146 +231,24 @@ function fundlag!(data, col, nlags=1; drop=true)
     return nothing
 end
 
-function safelag(col_values, nlags, date_col)
-    @assert issorted(date_col) "Failed to lag because a dataframe group is not date sorted."
-    return lag(col_values, nlags)
+function fundlag(data, col, nlags=1; drop=true)
+    output_data = deepcopy(data)
+    fundlag!(output_data, col, nlags; drop=drop)
+    return output_data
 end
 
-function makepath(paths...)
-    pathstring = joinpath(paths...)
-    if match(FILE_SUFFIX, pathstring) |> isnothing
-        dirstring = pathstring
+function init_raw(filepath; info=false)
+    if info
+        data = CSV.read(filepath, DataFrame; truestrings=["Yes"], falsestrings=["No"])
+        _normalise_names!(data; info=true)
+        _null_empty_strings!(data)
     else
-        dirstring = dirname(pathstring)
+        data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
+        _normalise_names!(data)
+        drop_allmissing!(data, dims=:cols)
+        drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
     end
-    
-    if !isdir(dirstring)
-        mkpath(dirstring)
-        println("Missing directory created: $dirstring")
-    end
-
-    return pathstring
-end
-
-function qhead(filename)
-    data = Arrow.Table(filename)
-    output = propertynames(data)
-    return output
-end
-
-function qscan(filename)
-    data = Arrow.Table(filename)
-    println("------")
-    for col in propertynames(data)
-        println(col)
-        println()
-        describe(data[col])
-        println("------")
-    end
-    return
-end
-
-function qlookup(id; data=false)
-    if data
-        filestring = joinpath(DIRS.mf.init, "mf-data.arrow")
-        mf_data = loadarrow(filestring)
-        output = mf_data[mf_data.fundid .== id, :]
-        nrow(output) == 0 && (output = mf_data[mf_data.secid .== id, :])
-        return output
-    else
-        filestring_raw = joinpath(DIRS.mf.raw, "info.csv")
-        mf_info = init_raw(filestring_raw, info=true)
-        output = mf_info[mf_info.fundid .== id, :]
-        nrow(output) > 0 && return output
-
-        filestring_refined = joinpath(DIRS.mf.refined, "mf-info.arrow")
-        mf_info = loadarrow(filestring_refined)
-        output = mf_info[mf_info.fundid .== id, :]
-        return output
-    end
-end
-
-function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, secondaryid=4:6, seuss=["Aunt Annie's Alligator", "Barber Baby Bubbles and a Bumblebee", "Camel on the Ceiling"]); rows=nothing; centre=false
-    isnothing(rows) && (rows = nrow(df))
-    terminal_width = displaysize(stdout)[2]
-    col_content_widths = Dict(
-        col_name => maximum(length.(string.(df[!, col_name])))
-        for col_name in propertynames(df)
-    )
-    col_total_widths = Dict(
-        col_name => maximum([length(string(col_name)), col_content_widths[col_name]])
-        for col_name in propertynames(df)
-    )
-
-    function printwidth(cols)
-        isempty(cols) && return 0
-        
-        print_width = sum(get.(Ref(col_total_widths), cols, 0)) + 2*(length(cols) - 1)
-        return print_width
-    end
-
-    print_sets = []
-    current_print_set = []
-    for col_name in propertynames(df) 
-        col_total_widths[col_name] > terminal_width && error("Column width exceeds terminal width.")
-        
-        if printwidth([current_print_set..., col_name]) > terminal_width
-            push!(print_sets, deepcopy(current_print_set))
-            current_print_set = [col_name]
-        else
-            push!(current_print_set, col_name)
-        end
-    end
-    isempty(current_print_set) || push!(print_sets, current_print_set)
-
-    function centre_text(text, width)
-        text_length = length(text)
-        padding = width - text_length
-        left_padding = div(padding, 2)
-        right_padding = padding - left_padding
-        return " "^left_padding * text * " "^right_padding
-    end
-
-    function pad_text(text, width)
-        text_length = length(text)
-        padding = width - text_length
-        return text * " "^padding
-    end
-
-    centre ? (align_text = centre_text) : (align_text = pad_text)
-    
-    
-    last_printed_row = 0
-    while(last_printed_row < rows)
-        for print_set in print_sets
-            printout = ""
-            for col_name in print_set
-                printout *= align_text(string(col_name), col_total_widths[col_name]) * "  "
-            end
-            println(printout[1:end-2])
-            println("-"^printwidth(print_set))
-            for i in last_printed_row+1:min(last_printed_row+10, rows)
-                printout = ""
-                for col_name in print_set
-                    printout *= align_text(string(df[i, col_name]), col_total_widths[col_name]) * "  "
-                end
-                println(printout)
-            end
-            println()
-        end
-        last_printed_row += 10
-        if last_printed_row < rows
-            println("*"^terminal_width)
-            println()
-        end
-    end
-end
-
-function loadarrow(filename)
-    arrow_table = Arrow.Table(filename)
-    df = copy(DataFrame(arrow_table)) # Copy to allow mutating column arrays
-    arrow_table = nothing
-    return df
+    return data
 end
 
 function initialise_base_data(model)
@@ -241,7 +277,7 @@ function initialise_flow_data(model_name)
 
     fund_rets_data = outerjoin(fund_base_data, decomposed_returns, on=[:fundid, :date])
     ret_cols = propertynames(decomposed_returns[!, Not([:fundid, :date])])
-    
+
     sort!(fund_rets_data, [:fundid, :date])
     select!(
         fund_rets_data,
@@ -253,116 +289,6 @@ function initialise_flow_data(model_name)
     )
 
     return fund_rets_data
-end
-
-function _prepare_factors(factors_data, model) 
-    model_source = model[1]
-    model_factors = model[2]
-
-    source_condition = (
-        factors_data.source_id .== model_source .||
-        factors_data.source_id .== "fx"
-    )
-
-    factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
-
-    source_factors = factors_data[source_condition .&& factor_condition, :]
-
-    wide_factors = unstack(source_factors, :date, :factor, :ret)
-    dropmissing!(wide_factors)
-
-    return wide_factors
-end
-
-function printtime(
-        task, start_time;
-        process_subtask="", process_start_time=0, minutes=false
-        )
-    if isempty(process_subtask) ⊻ iszero(process_start_time)
-        error("If any process parameters are supplied, all must be supplied")
-    end
-    timed_process = !isempty(process_subtask)
-
-    duration_s = round(time() - start_time, digits=2)
-    duration_m = round(duration_s / 60, digits=2)
-    
-    if !timed_process
-        printout = "Finished $task in $duration_s seconds"
-        minutes && (printout *= " ($duration_m minutes)")
-    else
-        process_duration_s = round(time() - process_start_time, digits=2)
-        process_duration_m = round(process_duration_s / 60, digits=2)
-
-        printout = "Finished $task for $process_subtask in $process_duration_s seconds"
-        minutes && (printout *= " ($process_duration_m minutes)")
-        printout *= ", total running time $duration_s seconds ($duration_m minutes)"
-    end
-
-    println(printout)
-    return nothing
-end
-
-function init_raw(filepath; info=false)
-    if info
-        data = CSV.read(filepath, DataFrame; truestrings=["Yes"], falsestrings=["No"])
-        _normalise_names!(data; info=true)
-        _null_empty_strings!(data)
-    else
-        data = CSV.read(filepath, DataFrame; stringtype=String, groupmark=',')
-        _normalise_names!(data)
-        drop_allmissing!(data, dims=:cols)
-        drop_allmissing!(data, Not([:name, :fundid, :secid]); dims=:rows)
-    end
-    return data
-end
-
-function rolling_combine(f, data, cols, window; lagged, grouped_by=nothing)
-    output = Vector{Union{Missing, Float64}}(missing, size(data, 1))
-
-    for i in 1:nrow(data)
-        if lagged
-            i <= window && continue
-            window_start = i - window
-            window_end = i - 1
-            i_date_offset = window
-        else
-            i < window && continue
-            window_start = i - window + 1
-            window_end = i
-            i_date_offset = window - 1
-        end
-
-        data[window_start, :fundid] != data[i, :fundid] && continue
-        start_date = data[i, :date] - Month(i_date_offset)
-        data[window_start, :date] != start_date && continue
-
-        output[i] = f(data[window_start:window_end, cols])
-    end
-
-    return output
-end
-
-drop_allmissing!(df; dims=1) = drop_allmissing!(df, propertynames(df); dims=dims)
-function drop_allmissing!(df, cols; dims=1)
-    if dims ∉ [1, 2, :row, :rows, :col, :cols]
-        error("dims must be :rows or :cols")
-    end
-
-    dimsmap = Dict(:row => 1, :rows => 1, :col => 2, :cols => 2)
-    if dims ∉ [1, 2]
-        dims = dimsmap[dims]
-    end
-
-    mask_matrix = .!(Matrix(df[!, cols]) .|> ismissing)
-    if dims == 1
-        one_vector = ones(size(mask_matrix,2))
-        all_missing = mask_matrix * one_vector .== zero(size(mask_matrix,1))
-        delete!(df, findall(all_missing))
-    else
-        one_vector = ones(size(mask_matrix,1))
-        all_missing = mask_matrix' * one_vector .== zero(size(mask_matrix,2))
-        select!(df, Not(cols[all_missing]))
-    end
 end
 
 function investment_target_is(data, target)
@@ -390,8 +316,170 @@ function investment_target_is(data, target)
     return condition
 end
 
-bho_dates_only(data) = (data.date .>= Date(1996,1,1)) .&& (data.date .<= Date(2011,11,1))
-post_bho_only(data) = data.date .> Date(2011,11,1)
+function loadarrow(filename)
+    arrow_table = Arrow.Table(filename)
+    df = copy(DataFrame(arrow_table)) # Copy to allow mutating column arrays
+    arrow_table = nothing
+    return df
+end
+
+function makepath(paths...)
+    pathstring = joinpath(paths...)
+    if match(FILE_SUFFIX, pathstring) |> isnothing
+        dirstring = pathstring
+    else
+        dirstring = dirname(pathstring)
+    end
+
+    if !isdir(dirstring)
+        mkpath(dirstring)
+        println("Missing directory created: $dirstring")
+    end
+
+    return pathstring
+end
+
+function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, secondaryid=4:6, seuss=["Aunt Annie's Alligator", "Barber Baby Bubbles and a Bumblebee", "Camel on the Ceiling"]); rows=nothing; centre=false
+    isnothing(rows) && (rows = nrow(df))
+    terminal_width = displaysize(stdout)[2]
+    col_content_widths = Dict(
+        col_name => maximum(length.(string.(df[!, col_name])))
+        for col_name in propertynames(df)
+    )
+    col_total_widths = Dict(
+        col_name => maximum([length(string(col_name)), col_content_widths[col_name]])
+        for col_name in propertynames(df)
+    )
+
+    function printwidth(cols)
+        isempty(cols) && return 0
+
+        print_width = sum(get.(Ref(col_total_widths), cols, 0)) + 2*(length(cols) - 1)
+        return print_width
+    end
+
+    print_sets = []
+    current_print_set = []
+    for col_name in propertynames(df) 
+        col_total_widths[col_name] > terminal_width && error("Column width exceeds terminal width.")
+
+        if printwidth([current_print_set..., col_name]) > terminal_width
+            push!(print_sets, deepcopy(current_print_set))
+            current_print_set = [col_name]
+        else
+            push!(current_print_set, col_name)
+        end
+    end
+    isempty(current_print_set) || push!(print_sets, current_print_set)
+
+    function centre_text(text, width)
+        text_length = length(text)
+        padding = width - text_length
+        left_padding = div(padding, 2)
+        right_padding = padding - left_padding
+        return " "^left_padding * text * " "^right_padding
+    end
+
+    function pad_text(text, width)
+        text_length = length(text)
+        padding = width - text_length
+        return text * " "^padding
+    end
+
+    centre ? (align_text = centre_text) : (align_text = pad_text)
+
+
+    last_printed_row = 0
+    while(last_printed_row < rows)
+        for print_set in print_sets
+            printout = ""
+            for col_name in print_set
+                printout *= align_text(string(col_name), col_total_widths[col_name]) * "  "
+            end
+            println(printout[1:end-2])
+            println("-"^printwidth(print_set))
+            for i in last_printed_row+1:min(last_printed_row+10, rows)
+                printout = ""
+                for col_name in print_set
+                    printout *= align_text(string(df[i, col_name]), col_total_widths[col_name]) * "  "
+                end
+                println(printout)
+            end
+            println()
+        end
+        last_printed_row += 10
+        if last_printed_row < rows
+            println("*"^terminal_width)
+            println()
+        end
+    end
+end
+
+function printtime(
+        task, start_time;
+        process_subtask="", process_start_time=0, minutes=false
+        )
+    if isempty(process_subtask) ⊻ iszero(process_start_time)
+        error("If any process parameters are supplied, all must be supplied")
+    end
+    timed_process = !isempty(process_subtask)
+
+    duration_s = round(time() - start_time, digits=2)
+    duration_m = round(duration_s / 60, digits=2)
+
+    if !timed_process
+        printout = "Finished $task in $duration_s seconds"
+        minutes && (printout *= " ($duration_m minutes)")
+    else
+        process_duration_s = round(time() - process_start_time, digits=2)
+        process_duration_m = round(process_duration_s / 60, digits=2)
+
+        printout = "Finished $task for $process_subtask in $process_duration_s seconds"
+        minutes && (printout *= " ($process_duration_m minutes)")
+        printout *= ", total running time $duration_s seconds ($duration_m minutes)"
+    end
+
+    println(printout)
+    return nothing
+end
+
+function qhead(filename)
+    data = Arrow.Table(filename)
+    output = propertynames(data)
+    return output
+end
+
+function qlookup(id; data=false)
+    if data
+        filestring = joinpath(DIRS.mf.init, "mf-data.arrow")
+        mf_data = loadarrow(filestring)
+        output = mf_data[mf_data.fundid .== id, :]
+        nrow(output) == 0 && (output = mf_data[mf_data.secid .== id, :])
+        return output
+    else
+        filestring_raw = joinpath(DIRS.mf.raw, "info.csv")
+        mf_info = init_raw(filestring_raw, info=true)
+        output = mf_info[mf_info.fundid .== id, :]
+        nrow(output) > 0 && return output
+
+        filestring_refined = joinpath(DIRS.mf.refined, "mf-info.arrow")
+        mf_info = loadarrow(filestring_refined)
+        output = mf_info[mf_info.fundid .== id, :]
+        return output
+    end
+end
+
+function qscan(filename)
+    data = Arrow.Table(filename)
+    println("------")
+    for col in propertynames(data)
+        println(col)
+        println()
+        describe(data[col])
+        println("------")
+    end
+    return
+end
 
 function regression_table(data, entity_col, date_col, column_args...)
     """
@@ -471,7 +559,7 @@ function regression_table(data, entity_col, date_col, column_args...)
         !isnothing(active_column) || arg ∈ NOCOLUMN_REGRESSION_ARGS || error(
             "No column selected for $arg."
         )
-        
+
         if arg ∈ PARAMETER_REGRESSION_ARGS
             active_arg_call = arg
             continue
@@ -486,124 +574,36 @@ function regression_table(data, entity_col, date_col, column_args...)
     return regression_table
 end
 
-function _do_arg_call!(arg, data, col; parameter=nothing)
-    if arg == :lags || arg == :lag
-        _add_lags!(data, col, nlags=parameter)
-        select!(data, Not(col))
-    elseif arg == :plus_lags || arg == :plus_lag
-        _add_lags!(data, col, nlags=parameter)
-    elseif arg == :nth_lag || arg == :nth_lags
-        _add_lags!(data, col, nlags=parameter, skip_to=true)
-    elseif arg == :categories || arg == :cat
-        _convert_to_category_dummies!(data, col)
-    elseif arg == :time_fixed_effects || arg == :tfe
-        _add_time_fe!(data, frequency=parameter)
-    elseif arg == :entity_fixed_effects || arg == :efe
-        _add_entity_fe!(data)
-    end
-end
+function rolling_combine(f, data, cols, window; lagged, grouped_by=nothing)
+    output = Vector{Union{Missing, Float64}}(missing, size(data, 1))
 
-function _add_lags!(data, col; nlags, skip_to=false)
-    isnothing(nlags) && (nlags = 1)
-    typeof(nlags) <: Integer || error("Number of lags must be an integer.")
-    gb = groupby(data, :entity)
-
-    start_i = skip_to ? nlags : 1
-
-    for i in start_i:nlags
-        transform!(gb, col => (col->lag(col, i)) => "$(col)_lag$i")
-    end
-end
-
-function _convert_to_category_dummies!(data, col; drop_first=true)
-    category_col = sort(unique(data[!, col]))
-    categories = drop_first ? category_col[2:end] : category_col
-    for category in categories
-        data[!, "$(col)_$category"] = Int.(data[!, col] .== category)
-    end
-    select!(data, Not(col))
-end
-
-function _add_time_fe!(data; frequency)
-    if isnothing(frequency)
-        date_category = :fe_date_enum
-        unique_dates_indexer = (
-            unique(data.date) |> enumerate |> collect .|> reverse |> Dict
-        )
-        data[!, date_category] = get.(Ref(unique_dates_indexer), data.date, nothing)
-    elseif frequency ∈ [:d, :day, :daily]
-        date_category = :fe_date
-        data[!, date_category] = Dates.format.(data.date, "yyyymmdd")
-    elseif frequency ∈ [:m, :month, :monthly]
-        date_category = :fe_month
-        data[!, date_category] = Dates.format.(data.date, "yyyymm")
-    elseif frequency ∈ [:q, :quarter, :quarterly]
-        date_category = :fe_quarter
-        yearstr = string.(Dates.year.(data.date))
-        quarterstr = string.(Dates.quarterofyear.(data.date))
-        data[!, date_category] = String.(yearstr) .* "Q" .* String.(quarterstr)
-    elseif frequency ∈ [:y, :year, :yearly]
-        date_category = :fe_year
-        data[!, date_category] = Dates.format.(data.date, "yyyy")
-    else
-        error("Invalid frequency: $frequency. Must be :month, :quarter, or :year.")
-    end
-
-    _convert_to_category_dummies!(data, date_category; drop_first=false)
-end
-
-function _add_entity_fe!(data)
-    data[!, :fe_entity] = data[!, :entity]
-    _convert_to_category_dummies!(data, :fe_entity; drop_first=false)
-end
-
-function _normalise_names!(df; info=false)
-    if info
-        re_invalidchars_nonend = r"[^a-zA-Z0-9]+(?!$)"
-        re_invalidchars_end = r"[^a-zA-Z0-9]+$"
-
-        function namemap(x)
-            replace(x, re_invalidchars_nonend => "_") |> x ->
-            replace(x, re_invalidchars_end => "") |>
-            lowercase
+    for i in 1:nrow(data)
+        if lagged
+            i <= window && continue
+            window_start = i - window
+            window_end = i - 1
+            i_date_offset = window
+        else
+            i < window && continue
+            window_start = i - window + 1
+            window_end = i
+            i_date_offset = window - 1
         end
 
-        new_names = names(df) .|> namemap
-        rename!(df, new_names)
-    else
-        n_id_cols = 3
-        n_date_cols = ncol(df) - n_id_cols
+        data[window_start, :fundid] != data[i, :fundid] && continue
+        start_date = data[i, :date] - Month(i_date_offset)
+        data[window_start, :date] != start_date && continue
 
-        id_cols = names(df)[1:n_id_cols] .|> lowercase
-        
-        re_fieldname = r"^.+(?=\s?\r?\n\d{4}-\d{2})"
-        re_date = r"(?<=\n)\d{4}-\d{2}"
-        
-        fieldname_match = match(re_fieldname, names(df)[n_id_cols + 1]).match
-        fieldname = replace(fieldname_match, r"\r|\n| $" => "")
-        
-        start_date = match(re_date, names(df)[n_id_cols + 1]).match |> Dates.Date
-        last_date = match(re_date, last(names(df))).match |> Dates.Date
-        date_cols = [start_date + Month(i) for i in 0:n_date_cols-1]
-
-        last(date_cols) != last_date && @warn(
-            "The calculated end date ($(last(date_cols))) is not the same as the last date " *
-            "in the dataset for $fieldname ($last_date). This suggests that some date " *
-            "columns may be missing or incorrectly sequenced."
-        )
-
-        rename!(df, Symbol.([id_cols; date_cols]))
+        output[i] = f(data[window_start:window_end, cols])
     end
-    return
+
+    return output
 end
 
-function _null_empty_strings!(df)
-    for col in propertynames(df)
-        if count(coalesce.(df[!, col] .== "", false)) > 0
-            df[!, col] = replace(df[!, col], "" => missing)
-        end
-    end
-    return
+function safelag(col_values, nlags, date_col)
+    @assert issorted(date_col) "Failed to lag because a dataframe group is not date sorted."
+    return lag(col_values, nlags)
 end
+
 
 end # module CommonFunctions
