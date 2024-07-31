@@ -14,9 +14,7 @@ export bho_dates_only, post_bho_only
 export dirslist
 export drop_allmissing!
 export fundlag, fundlag!, safelag
-export init_raw
-export initialise_base_data
-export initialise_flow_data
+export init_raw, initialise_base_data, initialise_flow_data
 export investment_target_is
 export loadarrow
 export makepath
@@ -63,145 +61,6 @@ function drop_allmissing!(df, cols; dims=1)
         all_missing = mask_matrix' * one_vector .== zero(size(mask_matrix,2))
         select!(df, Not(cols[all_missing]))
     end
-end
-
-function _add_entity_fe!(data)
-    data[!, :fe_entity] = data[!, :entity]
-    _convert_to_category_dummies!(data, :fe_entity; drop_first=false)
-end
-
-function _add_lags!(data, col; nlags, skip_to=false)
-    isnothing(nlags) && (nlags = 1)
-    typeof(nlags) <: Integer || error("Number of lags must be an integer.")
-    gb = groupby(data, :entity)
-
-    start_i = skip_to ? nlags : 1
-
-    for i in start_i:nlags
-        transform!(gb, col => (col->lag(col, i)) => "$(col)_lag$i")
-    end
-end
-
-function _add_time_fe!(data; frequency)
-    if isnothing(frequency)
-        date_category = :fe_date_enum
-        unique_dates_indexer = (
-            unique(data.date) |> enumerate |> collect .|> reverse |> Dict
-        )
-        data[!, date_category] = get.(Ref(unique_dates_indexer), data.date, nothing)
-    elseif frequency ∈ [:d, :day, :daily]
-        date_category = :fe_date
-        data[!, date_category] = Dates.format.(data.date, "yyyymmdd")
-    elseif frequency ∈ [:m, :month, :monthly]
-        date_category = :fe_month
-        data[!, date_category] = Dates.format.(data.date, "yyyymm")
-    elseif frequency ∈ [:q, :quarter, :quarterly]
-        date_category = :fe_quarter
-        yearstr = string.(Dates.year.(data.date))
-        quarterstr = string.(Dates.quarterofyear.(data.date))
-        data[!, date_category] = String.(yearstr) .* "Q" .* String.(quarterstr)
-    elseif frequency ∈ [:y, :year, :yearly]
-        date_category = :fe_year
-        data[!, date_category] = Dates.format.(data.date, "yyyy")
-    else
-        error("Invalid frequency: $frequency. Must be :month, :quarter, or :year.")
-    end
-
-    _convert_to_category_dummies!(data, date_category; drop_first=false)
-end
-
-function _convert_to_category_dummies!(data, col; drop_first=true)
-    category_col = sort(unique(data[!, col]))
-    categories = drop_first ? category_col[2:end] : category_col
-    for category in categories
-        data[!, "$(col)_$category"] = Int.(data[!, col] .== category)
-    end
-    select!(data, Not(col))
-end
-
-function _do_arg_call!(arg, data, col; parameter=nothing)
-    if arg == :lags || arg == :lag
-        _add_lags!(data, col, nlags=parameter)
-        select!(data, Not(col))
-    elseif arg == :plus_lags || arg == :plus_lag
-        _add_lags!(data, col, nlags=parameter)
-    elseif arg == :nth_lag || arg == :nth_lags
-        _add_lags!(data, col, nlags=parameter, skip_to=true)
-    elseif arg == :categories || arg == :cat
-        _convert_to_category_dummies!(data, col)
-    elseif arg == :time_fixed_effects || arg == :tfe
-        _add_time_fe!(data, frequency=parameter)
-    elseif arg == :entity_fixed_effects || arg == :efe
-        _add_entity_fe!(data)
-    end
-end
-
-function _normalise_names!(df; info=false)
-    if info
-        re_invalidchars_nonend = r"[^a-zA-Z0-9]+(?!$)"
-        re_invalidchars_end = r"[^a-zA-Z0-9]+$"
-
-        function namemap(x)
-            replace(x, re_invalidchars_nonend => "_") |> x ->
-            replace(x, re_invalidchars_end => "") |>
-            lowercase
-        end
-
-        new_names = names(df) .|> namemap
-        rename!(df, new_names)
-    else
-        n_id_cols = 3
-        n_date_cols = ncol(df) - n_id_cols
-
-        id_cols = names(df)[1:n_id_cols] .|> lowercase
-
-        re_fieldname = r"^.+(?=\s?\r?\n\d{4}-\d{2})"
-        re_date = r"(?<=\n)\d{4}-\d{2}"
-
-        fieldname_match = match(re_fieldname, names(df)[n_id_cols + 1]).match
-        fieldname = replace(fieldname_match, r"\r|\n| $" => "")
-
-        start_date = match(re_date, names(df)[n_id_cols + 1]).match |> Dates.Date
-        last_date = match(re_date, last(names(df))).match |> Dates.Date
-        date_cols = [start_date + Month(i) for i in 0:n_date_cols-1]
-
-        last(date_cols) != last_date && @warn(
-            "The calculated end date ($(last(date_cols))) is not the same as the last date " *
-            "in the dataset for $fieldname ($last_date). This suggests that some date " *
-            "columns may be missing or incorrectly sequenced."
-        )
-
-        rename!(df, Symbol.([id_cols; date_cols]))
-    end
-    return
-end
-
-function _null_empty_strings!(df)
-    for col in propertynames(df)
-        if count(coalesce.(df[!, col] .== "", false)) > 0
-            df[!, col] = replace(df[!, col], "" => missing)
-        end
-    end
-    return
-end
-
-function _prepare_factors(factors_data, model) 
-    model_source = model[1]
-    model_factors = model[2]
-
-    source_condition = (
-        factors_data.source_id .== model_source .||
-        factors_data.source_id .== "fx"
-    )
-
-    factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
-
-    source_factors = factors_data[source_condition .&& factor_condition, :]
-
-    wide_factors = unstack(source_factors, :date, :factor, :ret)
-    dropmissing!(wide_factors)
-
-    return wide_factors
 end
 
 function dirslist()
@@ -603,6 +462,145 @@ end
 function safelag(col_values, nlags, date_col)
     @assert issorted(date_col) "Failed to lag because a dataframe group is not date sorted."
     return lag(col_values, nlags)
+end
+
+function _add_entity_fe!(data)
+    data[!, :fe_entity] = data[!, :entity]
+    _convert_to_category_dummies!(data, :fe_entity; drop_first=false)
+end
+
+function _add_lags!(data, col; nlags, skip_to=false)
+    isnothing(nlags) && (nlags = 1)
+    typeof(nlags) <: Integer || error("Number of lags must be an integer.")
+    gb = groupby(data, :entity)
+
+    start_i = skip_to ? nlags : 1
+
+    for i in start_i:nlags
+        transform!(gb, col => (col->lag(col, i)) => "$(col)_lag$i")
+    end
+end
+
+function _add_time_fe!(data; frequency)
+    if isnothing(frequency)
+        date_category = :fe_date_enum
+        unique_dates_indexer = (
+            unique(data.date) |> enumerate |> collect .|> reverse |> Dict
+        )
+        data[!, date_category] = get.(Ref(unique_dates_indexer), data.date, nothing)
+    elseif frequency ∈ [:d, :day, :daily]
+        date_category = :fe_date
+        data[!, date_category] = Dates.format.(data.date, "yyyymmdd")
+    elseif frequency ∈ [:m, :month, :monthly]
+        date_category = :fe_month
+        data[!, date_category] = Dates.format.(data.date, "yyyymm")
+    elseif frequency ∈ [:q, :quarter, :quarterly]
+        date_category = :fe_quarter
+        yearstr = string.(Dates.year.(data.date))
+        quarterstr = string.(Dates.quarterofyear.(data.date))
+        data[!, date_category] = String.(yearstr) .* "Q" .* String.(quarterstr)
+    elseif frequency ∈ [:y, :year, :yearly]
+        date_category = :fe_year
+        data[!, date_category] = Dates.format.(data.date, "yyyy")
+    else
+        error("Invalid frequency: $frequency. Must be :month, :quarter, or :year.")
+    end
+
+    _convert_to_category_dummies!(data, date_category; drop_first=false)
+end
+
+function _convert_to_category_dummies!(data, col; drop_first=true)
+    category_col = sort(unique(data[!, col]))
+    categories = drop_first ? category_col[2:end] : category_col
+    for category in categories
+        data[!, "$(col)_$category"] = Int.(data[!, col] .== category)
+    end
+    select!(data, Not(col))
+end
+
+function _do_arg_call!(arg, data, col; parameter=nothing)
+    if arg == :lags || arg == :lag
+        _add_lags!(data, col, nlags=parameter)
+        select!(data, Not(col))
+    elseif arg == :plus_lags || arg == :plus_lag
+        _add_lags!(data, col, nlags=parameter)
+    elseif arg == :nth_lag || arg == :nth_lags
+        _add_lags!(data, col, nlags=parameter, skip_to=true)
+    elseif arg == :categories || arg == :cat
+        _convert_to_category_dummies!(data, col)
+    elseif arg == :time_fixed_effects || arg == :tfe
+        _add_time_fe!(data, frequency=parameter)
+    elseif arg == :entity_fixed_effects || arg == :efe
+        _add_entity_fe!(data)
+    end
+end
+
+function _normalise_names!(df; info=false)
+    if info
+        re_invalidchars_nonend = r"[^a-zA-Z0-9]+(?!$)"
+        re_invalidchars_end = r"[^a-zA-Z0-9]+$"
+
+        function namemap(x)
+            replace(x, re_invalidchars_nonend => "_") |> x ->
+            replace(x, re_invalidchars_end => "") |>
+            lowercase
+        end
+
+        new_names = names(df) .|> namemap
+        rename!(df, new_names)
+    else
+        n_id_cols = 3
+        n_date_cols = ncol(df) - n_id_cols
+
+        id_cols = names(df)[1:n_id_cols] .|> lowercase
+
+        re_fieldname = r"^.+(?=\s?\r?\n\d{4}-\d{2})"
+        re_date = r"(?<=\n)\d{4}-\d{2}"
+
+        fieldname_match = match(re_fieldname, names(df)[n_id_cols + 1]).match
+        fieldname = replace(fieldname_match, r"\r|\n| $" => "")
+
+        start_date = match(re_date, names(df)[n_id_cols + 1]).match |> Dates.Date
+        last_date = match(re_date, last(names(df))).match |> Dates.Date
+        date_cols = [start_date + Month(i) for i in 0:n_date_cols-1]
+
+        last(date_cols) != last_date && @warn(
+            "The calculated end date ($(last(date_cols))) is not the same as the last date " *
+            "in the dataset for $fieldname ($last_date). This suggests that some date " *
+            "columns may be missing or incorrectly sequenced."
+        )
+
+        rename!(df, Symbol.([id_cols; date_cols]))
+    end
+    return
+end
+
+function _null_empty_strings!(df)
+    for col in propertynames(df)
+        if count(coalesce.(df[!, col] .== "", false)) > 0
+            df[!, col] = replace(df[!, col], "" => missing)
+        end
+    end
+    return
+end
+
+function _prepare_factors(factors_data, model) 
+    model_source = model[1]
+    model_factors = model[2]
+
+    source_condition = (
+        factors_data.source_id .== model_source .||
+        factors_data.source_id .== "fx"
+    )
+
+    factor_condition = in.(factors_data.factor, Ref(String.(model_factors)))
+
+    source_factors = factors_data[source_condition .&& factor_condition, :]
+
+    wide_factors = unstack(source_factors, :date, :factor, :ret)
+    dropmissing!(wide_factors)
+
+    return wide_factors
 end
 
 
