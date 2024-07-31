@@ -58,17 +58,18 @@ function dirslist()
     end
 end
 
-function fundlag(data, col, nlags=1)
+function fundlag(data, col, nlags=1; drop=true)
     output_data = deepcopy(data)
-    fundlag!(output_data, col, nlags)
+    fundlag!(output_data, col, nlags; drop=drop)
     return output_data
 end
 
-function fundlag!(data, col, nlags=1)
+function fundlag!(data, col, nlags=1; drop=true)
     transform!(
         groupby(data, :fundid),
         [:date, col] => ((date_col, x)->safelag(x, nlags, date_col)) => "$(col)_lag$nlags"
     )
+    !drop || select!(data, Not(col))
     return nothing
 end
 
