@@ -1,5 +1,4 @@
 module RegressFundFlows
-### TODO: Finish simplifying regression script ###
 
 #using Revise
 using DataFrames
