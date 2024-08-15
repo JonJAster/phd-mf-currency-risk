@@ -53,14 +53,36 @@ function test()
     rets_data_dev_d_1 = filter(x->x.date < Date(2011), rets_data_dev_d)
     rets_data_dev_d_2 = filter(x->x.date >= Date(2011), rets_data_dev_d)
 
+    rets_data_usa_d_short = filter(x->x.date < Date(2008), rets_data_usa_d)
+    rets_data_dev_d_short = filter(x->x.date < Date(2008), rets_data_dev_d)
+
     f_cols = [:ret_m1, :ret_alpha_m1, :ret_mkt_m1, :ret_smb_m1, :ret_hml_m1, :ret_rmw_m1, :ret_cma_m1, :ret_wml_m1]
-    println("Full Domestic USA")
-    df_mean = DataFrame(f_cols .=> round.(mean.(eachcol(rets_data_usa_d[!, f_cols] .* 100)), digits=2))
-    df_median = DataFrame(f_cols .=> round.(median.(eachcol(rets_data_usa_d[!, f_cols] .* 100)), digits=2))
-    df_std = DataFrame(f_cols .=> round.(std.(eachcol(rets_data_usa_d[!, f_cols] .* 100)), digits=2))
-    df_stats = hcat(DataFrame(:stat => [:mean, :median, :std]), vcat(df_mean, df_median, df_std))
-    x = describe(rets_data_usa_d[!, f_cols] .* 100)
-    sum(x[2:8, :mean])
+    function print_stats(df, label)
+        println(label)
+        df_mean = DataFrame(f_cols .=> round.(mean.(eachcol(df[!, f_cols] .* 10000)), digits=2))
+        df_median = DataFrame(f_cols .=> round.(median.(eachcol(df[!, f_cols] .* 10000)), digits=2))
+        df_std = DataFrame(f_cols .=> round.(std.(eachcol(df[!, f_cols] .* 10000)), digits=2))
+        df_stats = hcat(DataFrame(:stat => [:mean, :median, :std]), vcat(df_mean, df_median, df_std))
+        println(df_stats)
+    end
+
+    print_stats(rets_data_usa_d, "Full Domestic USA")
+    print_stats(rets_data_usa_d_1, "Early Domestic USA")
+    print_stats(rets_data_usa_d_2, "Late Domestic USA")
+    print_stats(rets_data_dev_d, "Full Domestic DEV")
+    print_stats(rets_data_dev_d_1, "Early Domestic DEV")
+    print_stats(rets_data_dev_d_2, "Late Domestic DEV")
+
+    print_stats(rets_data_usa_f, "Full Foreign USA")
+    print_stats(rets_data_usa_f_1, "Early Foreign USA")
+    print_stats(rets_data_usa_f_2, "Late Foreign USA")
+    print_stats(rets_data_dev_f, "Full Foreign DEV")
+    print_stats(rets_data_dev_f_1, "Early Foreign DEV")
+    print_stats(rets_data_dev_f_2, "Late Foreign DEV")
+
+    print_stats(rets_data_usa_d_short, "Short Domestic USA")
+    print_stats(rets_data_dev_d_short, "Short Domestic DEV")
+
     println("Early Domestic USA")
     println(describe(rets_data_usa_d_1[!, f_cols] .* 100))
     println("Late Domestic USA")
