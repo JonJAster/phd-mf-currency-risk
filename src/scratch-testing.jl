@@ -34,14 +34,27 @@ function test()
         .* map(mth -> mth < 10 ? "0" : "", month.(data.date))
         .* string.(month.(data.date))
     )
-    wrongdata = sort(data, :flow)
 
-    fundlag!(wrongdata, :flow, 19)
+    fundlag!(data, :flow, 19)
 
-    form = term(:flow) ~ term(:flow_lag19)
+    typeof(:(log($(term(:flow_lag19)))))
+
+    Expr
+
+    form = (
+        term(:flow) ~
+            term(:flow_lag19)
+            + FunctionTerm(log, x->log(x), (:flow_lag19,), :(log($(term(:flow_lag19)))), [term(:flow_lag19)])
+    )
     model = lm(form, data)
 
-
+    f = @formula(flow ~ flow_lag19 + log(flow_lag19) +log(costs))
+    typeof(f.rhs)
+    FunctionTerm(log, [t], :(log($(t))))
+    
+    log_term(term(:y))
+    (y)->log(y)
+    
     
 
     ## Morningstar
