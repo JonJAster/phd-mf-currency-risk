@@ -171,6 +171,9 @@ function _aggregate_info(mf_info)
 end
 
 function _null_out_small!(data)
+    """
+    Set assets, returns and costs to missing for fund-months with assets below \$10m.
+    """
     data[
         coalesce.(data.net_assets_m1, 0) .< 10_000_000,
         [:net_assets_m1, :net_assets, :net_returns, :costs]
