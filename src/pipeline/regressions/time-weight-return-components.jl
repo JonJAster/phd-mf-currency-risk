@@ -9,7 +9,8 @@ includet("../../shared/CommonFunctions.jl")
 using .CommonConstants
 using .CommonFunctions
 
-function time_weight_return_components(model_name) # model_name = "dev_ff3_ver"
+function time_weight_return_components(model_name)
+    # model_name = "ff_usa_ffc6"
     task_start = time()
     model_returns_filename = joinpath(DIRS.combo.decomposed, "$model_name.arrow")
 
