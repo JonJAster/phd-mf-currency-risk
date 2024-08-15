@@ -170,9 +170,8 @@ function _aggregate_info(mf_info)
     return output
 end
 
-"""
-Set assets, returns and costs to missing for fund-months with assets below \$10m.
-"""
+
+"Set assets, returns and costs to missing for fund-months with assets below \$10m."
 function _null_out_small!(data)
     data[
         coalesce.(data.net_assets_m1, 0) .< 10_000_000,
@@ -182,6 +181,7 @@ function _null_out_small!(data)
     return
 end
 
+"Remove missing fund-months at the beginning and end of the sample period."
 function _trim_missing_tails!(data)
     tail_dates = DataFrame(
         fundid = String[],
@@ -220,6 +220,7 @@ function _calculate_fund_flows!(data)
     return
 end
 
+"Set all fields to missing for fund-months with flows below -90% or above 1000%."
 function _clip_fund_flows!(data)
     flow_lowerbound = -0.9
     flow_upperbound = 10
@@ -232,6 +233,7 @@ function _clip_fund_flows!(data)
     return
 end
 
+# Remove funds with less than 24 observations
 function _filter_out_low_obs_funds!(data)
     fund_obs = combine(
         groupby(data, :fundid),
