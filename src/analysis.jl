@@ -57,7 +57,6 @@ function analysis()
     v_usa_dev = vcov(regout_usa_dev.regfit)
     v_usa_dev_coefs = v_usa_dev[i_regout_usa_dev, i_regout_usa_dev]
     coef_usa_dev = coef(regout_usa_dev.regfit)[i_regout_usa_dev]
-    coef_usa_dev[1] = 1.192
 
     i_regout_wld_usa = _coef_idx(regout_wld_usa)
     v_wld_usa = vcov(regout_wld_usa.regfit)
@@ -68,12 +67,14 @@ function analysis()
     v_wld_dev = vcov(regout_wld_dev.regfit)
     v_wld_dev_coefs = v_wld_dev[i_regout_wld_dev, i_regout_wld_dev]
     coef_wld_dev = coef(regout_wld_dev.regfit)[i_regout_wld_dev]
-    coef_wld_dev[1] = 0.657
 
     proportion_coef_usa_usa = _proportion_coefs(coef_usa_usa)
     proportion_coef_usa_dev = _proportion_coefs(coef_usa_dev)
     proportion_coef_wld_usa = _proportion_coefs(coef_wld_usa)
     proportion_coef_wld_dev = _proportion_coefs(coef_wld_dev)
+
+    (proportion_coef_usa_dev - proportion_coef_usa_usa) .* 100
+    (proportion_coef_wld_dev - proportion_coef_wld_usa) .* 100
 
     se_proportion_usa_usa = [
         _delta_se(i, coef_usa_usa, v_usa_usa_coefs) for i in 2:length(coef_usa_usa)
