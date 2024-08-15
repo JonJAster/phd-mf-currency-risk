@@ -16,7 +16,7 @@ using .CommonConstants
 export regress_fund_flows
 export _flow_regression_table
 
-function regress_fund_flows(model_name, filter_by=nothing; ret_type=:decomposed) 
+function regress_fund_flows(model_name; filter_by=nothing, ret_type=:decomposed) 
     # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign; ret_type=:ret
     task_start = time()
 
