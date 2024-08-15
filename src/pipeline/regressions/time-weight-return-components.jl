@@ -15,6 +15,8 @@ function time_weight_return_components(model_name) # model_name = "dev_ff3_ver"
 
     model_returns = loadarrow(model_returns_filename)
 
+    rename!(model_returns, :ex_ret => :ret) # For consistency with ret_ naming
+
     weighted_returns = _timeweight_returns(model_returns)
 
     printtime("time-weighting decomposed returns for $model_name", task_start)
