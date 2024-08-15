@@ -79,10 +79,10 @@ function process_mf_data()
     return output
 end
 
+"""
+Load the FF factor data, filters to the USA mkt factor and renames :ret column to :mkt.
+"""
 function _load_mkt(mkt_filename)
-    """
-    Load the FF factor data, filters to the USA mkt factor and renames :ret column to :mkt.
-    """
     mkt = loadarrow(mkt_filename)
 
     filter!(x->(x.factor .== "mkt") .&& (x.source_id .== "ff_usa"), mkt)
@@ -170,10 +170,10 @@ function _aggregate_info(mf_info)
     return output
 end
 
+"""
+Set assets, returns and costs to missing for fund-months with assets below \$10m.
+"""
 function _null_out_small!(data)
-    """
-    Set assets, returns and costs to missing for fund-months with assets below \$10m.
-    """
     data[
         coalesce.(data.net_assets_m1, 0) .< 10_000_000,
         [:net_assets_m1, :net_assets, :net_returns, :costs]
@@ -243,13 +243,13 @@ function _filter_out_low_obs_funds!(data)
     return
 end
 
+"""
+Adds the following columns to the data:
+- foreign: whether the fund invests primarily in foreign assets
+- age: the minimum age across share classes of the fund in months
+- no_load: whether all share classes of the fund are no-load
+"""
 function _add_info_data(data, aggregate_info)
-    """
-    Adds the following columns to the data:
-    - foreign: whether the fund invests primarily in foreign assets
-    - age: the minimum age across share classes of the fund in months
-    - no_load: whether all share classes of the fund are no-load
-    """
 
     combined_data = innerjoin(data, aggregate_info, on=:fundid)
     combined_data.foreign = investment_target_is(combined_data, :wld)
