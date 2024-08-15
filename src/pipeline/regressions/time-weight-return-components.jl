@@ -14,8 +14,6 @@ function time_weight_return_components(model_name) # model_name = "dev_ff3_ver"
     model_returns_filename = joinpath(DIRS.combo.decomposed, "$model_name.arrow")
 
     model_returns = loadarrow(model_returns_filename)
-    
-    select!(model_returns, Not(:ex_ret))
 
     weighted_returns = _timeweight_returns(model_returns)
 
