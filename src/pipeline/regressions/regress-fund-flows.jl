@@ -16,11 +16,14 @@ using .CommonConstants
 export regress_fund_flows
 export _flow_regression_table
 
-function regress_fund_flows(model_name; filter_by=nothing, ret_type=:decomposed) 
-    # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign; ret_type=:ret
+function regress_fund_flows(
+        model_name;
+        filter_by=nothing, ret_type=:decomposed, bootstrapped=false
+    ) 
+    # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign; ret_type=:ret; bootstrapped=false
     task_start = time()
 
-    flow_data = initialise_flow_data(model_name)
+    flow_data = initialise_flow_data(model_name, bootstrapped=bootstrapped)
     isnothing(filter_by) || filter!(filter_by, flow_data)
 
     flow_output = _flow_regression(flow_data; intercept=false, ret_type=ret_type)
