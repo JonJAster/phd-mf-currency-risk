@@ -24,8 +24,9 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function test()
-    filename = joinpath(DIRS.combo.decomposed, "ff_usa_ffc4.arrow")
-    betas = loadarrow(filename)
+    filename = joinpath(DIRS.combo.weighted, "ff_usa_ffc4.arrow")
+    weighted = loadarrow(filename)
+    weighted.sum = weighted[!, 4] .+ weighted[!, 5] .+ weighted[!, 6] .+ weighted[!, 7] .+ weighted[!, 8]
     testdf = DataFrame(a = repeat([1,2], 5), b = 1:10, c = 1:10)
     x = combine(
         groupby(testdf, :a),
