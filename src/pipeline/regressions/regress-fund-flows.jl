@@ -1,4 +1,4 @@
- module RegressFundFlows
+module RegressFundFlows
 ### TODO: Finish simplifying regression script ###
 
 #using Revise
@@ -8,8 +8,8 @@ using Dates
 using GLM
 using Distributions
 
-include("../../shared/CommonConstants.jl")
-include("../../shared/CommonFunctions.jl")
+include("../../shared/CommonConstants.jl") #includet("../../shared/CommonConstants.jl")
+include("../../shared/CommonFunctions.jl") #includet("../../shared/CommonFunctions.jl") 
 
 using .CommonFunctions
 using .CommonConstants
@@ -17,23 +17,29 @@ using .CommonConstants
 export regress_fund_flows
 export _flow_regression_table
 
-function regress_fund_flows(model_name; filter_by=nothing) 
-    # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign
+function regress_fund_flows(model_name, filter_by=nothing; ret_type=:decomposed) 
+    # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign; ret_type=:ret
     task_start = time()
 
     flow_data = initialise_flow_data(model_name)
     isnothing(filter_by) || filter!(filter_by, flow_data)
 
-    flow_model = _flow_regression(flow_data; intercept=false)
+    flow_output = _flow_regression(flow_data; intercept=false, ret_type=ret_type)
 
     printtime("regressing flow betas on $model_name", task_start)
     return flow_output
 end
 
-function _flow_regression(flow_data; intercept=true)
+function _flow_regression(flow_data; intercept=true, ret_type=:decomposed)
     # intercept = false
 
-    ret_vars = propertynames(flow_data[!, r"ret_"])
+    if ret_type == :decomposed
+        select!(flow_data, Not(:ret_m1))
+        ret_vars = propertynames(flow_data[!, r"ret_"])
+    elseif ret_type == :ret
+        select!(flow_data, Not(r"ret_.+_m1"))
+        ret_vars = [:ret_m1]
+    end
     
     # Initialised flow data doesn't contain any transformed columns, so define those
     # in the formula. GLM can't handle missings introduced via formulae, so use of
@@ -64,7 +70,7 @@ function _flow_regression(flow_data; intercept=true)
     if intercept
         reg_formula = term(:flow) ~ X_formula
     else
-        reg_formula = term(:flow) ~ 0 + X_formula
+        reg_formula = term(:flow) ~ term(0) + X_formula
     end
 
     regfit = lm(reg_formula, flow_data)
@@ -72,7 +78,8 @@ function _flow_regression(flow_data; intercept=true)
     return_col_indices = findall(x->in(x,ret_vars), Symbol.(coefnames(regfit)))
 
     factor_names = [
-        match(r"(?<=ret_).+(?=_m1)", string(name)).match for name in ret_vars
+        name == :ret_m1 ? "total_ret" : match(r"(?<=ret_).*(?=_m1)", string(name)).match
+        for name in ret_vars
     ]
     
     flow_betas = DataFrame(
