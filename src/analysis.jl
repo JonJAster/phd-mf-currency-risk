@@ -9,7 +9,7 @@ using StatsBase
 using Base.Threads
 using LinearAlgebra
 using Distributions
-# using Plots
+using Plots
 using ShiftedArrays: lead, lag
 
 includet("shared/CommonConstants.jl")
