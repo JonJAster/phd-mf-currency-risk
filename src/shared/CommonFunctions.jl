@@ -123,10 +123,13 @@ function initialise_base_data(model)
     return output
 end
 
-function initialise_flow_data(model_name)
-    """
-    Doesn't include any transformed columns. Create those in the regression function.
-    """
+"""
+Doesn't include any transformed columns. Create those in the regression function.
+
+If bootstrapped is true, the function will produce a fund-clustered bootstrapped sample
+to use.
+"""
+function initialise_flow_data(model_name; bootstrapped=false)
     # model_name = "ff_usa_ffc6"
     filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
