@@ -130,7 +130,7 @@ If bootstrapped is true, the function will produce a fund-clustered bootstrapped
 to use.
 """
 function initialise_flow_data(model_name; bootstrapped=false)
-    # model_name = "ff_usa_ffc6"
+    # model_name = "ff_usa_ffc6"; bootstrapped=true
     filename_mf = joinpath(DIRS.mf.refined, "mf-data.arrow")
     filename_decomposition = joinpath(DIRS.combo.weighted, "$model_name.arrow")
 
@@ -150,7 +150,37 @@ function initialise_flow_data(model_name; bootstrapped=false)
         Not([:fundid, :date, :flow, ret_cols..., :ex_ret])
     )
 
-    return fund_rets_data
+    if bootstrapped
+        @benchmark output = _bootstrap_fund_data(fund_rets_data)
+    else
+        output = fund_rets_data
+    end
+
+    return output
+end
+
+function _parallel_bootstrap(fund_rets_data::DataFrame, n_iterations::Int)
+    results = @distributed (vcat) for i in 1:n_iterations
+        _bootstrap_fund_data(fund_rets_data)
+    end
+    return results
+end
+
+function _bootstrap_fund_data(fund_rets_data::DataFrame)
+    grouped_data = groupby(fund_rets_data, :fundid)
+    fundid_list = keys(grouped_data)
+    n_funds = length(fundid_list)
+    
+    selected_funds = sample(fundid_list, n_funds, replace=true)
+    
+    bootstrapped_funds = Vector{DataFrame}(undef, n_funds)   
+    for (i, fund_i) in enumerate(selected_funds)
+        bootstrapped_funds[i] = grouped_data[fund_i]
+    end
+    
+    bootstrapped_data = vcat(bootstrapped_funds...)
+    
+    return bootstrapped_data
 end
 
 function investment_target_is(data, target)
