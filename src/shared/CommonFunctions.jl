@@ -159,7 +159,7 @@ function initialise_flow_data(model_name; bootstrapped=false)
     return output
 end
 
-function _bootstrap_fund_data(fund_rets_data::DataFrame)
+function _bootstrap_fund_data(fund_rets_data)
     grouped_data = groupby(fund_rets_data, :fundid)
     fundid_list = keys(grouped_data)
     n_funds = length(fundid_list)
@@ -168,10 +168,12 @@ function _bootstrap_fund_data(fund_rets_data::DataFrame)
     
     bootstrapped_funds = Vector{DataFrame}(undef, n_funds)   
     for (i, fund_i) in enumerate(selected_funds)
+        fund_tag = "fund_$i" #TODO update fundids to be symbols universally
         bootstrapped_funds[i] = grouped_data[fund_i]
     end
     
     bootstrapped_data = vcat(bootstrapped_funds...)
+    sort!(bootstrapped_data, :date)
     
     return bootstrapped_data
 end
