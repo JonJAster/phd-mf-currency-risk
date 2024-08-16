@@ -159,13 +159,6 @@ function initialise_flow_data(model_name; bootstrapped=false)
     return output
 end
 
-function _parallel_bootstrap(fund_rets_data::DataFrame, n_iterations::Int)
-    results = @distributed (vcat) for i in 1:n_iterations
-        _bootstrap_fund_data(fund_rets_data)
-    end
-    return results
-end
-
 function _bootstrap_fund_data(fund_rets_data::DataFrame)
     grouped_data = groupby(fund_rets_data, :fundid)
     fundid_list = keys(grouped_data)
