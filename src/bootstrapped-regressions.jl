@@ -34,18 +34,18 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     true_regression_dev = regress_fund_flows("ff_dev_ffc6"; filter_by=filter_by, bootstrapped=false).summary
 
     bootstrapped_outputs = [copy(coefficient_table) for i in 1:n_trials]
-    for coefficient_table in bootstrapped_outputs
-        # coefficient_table = first(bootstrapped_outputs)
+    for i in bootstrapped_outputs
+        # i = first(bootstrapped_outputs)
         boot_regression_usa = regress_fund_flows("ff_usa_ffc6"; filter_by=filter_by, bootstrapped=true).summary
         boot_regression_dev = regress_fund_flows("ff_dev_ffc6"; filter_by=filter_by, bootstrapped=true).summary
-        _fill_coefficient_table!(coefficient_table, boot_regression_usa, boot_regression_dev)
+        _fill_coefficient_table!(i, boot_regression_usa, boot_regression_dev)
     end
 
 end
 
 function _fill_coefficient_table!(coefficient_table, regression_usa, regression_dev)
-    # coefficient_table = first(bootstrapped_outputs); regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
-    coefficient_table.usa_coef[1] = regression_usa.coefficients[1]
+    # coefficient_table = i; regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
+    coefficient_table.usa_coef[1] = regression_usa.coef[1]
     coefficient_table.dev_coef[1] = regression_dev.coefficients[1]
     coefficient_table.usa_propα[1] = regression_usa.coefficients[1] / true_regression_usa.coefficients[1]
     coefficient_table.dev_m_usa[1] = regression_dev.coefficients[1] / regression_usa.coefficients[1]
