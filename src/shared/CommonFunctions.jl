@@ -151,7 +151,7 @@ function initialise_flow_data(model_name; bootstrapped=false)
     )
 
     if bootstrapped
-        @benchmark output = _bootstrap_fund_data(fund_rets_data)
+        output = _bootstrap_fund_data(fund_rets_data)
     else
         output = fund_rets_data
     end

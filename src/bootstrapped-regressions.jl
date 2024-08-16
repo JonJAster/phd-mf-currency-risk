@@ -9,7 +9,7 @@ using .CommonConstants
 using .CommonFunctions
 using .RegressFundFlows
 
-function bootstrapped_regressions(n=100_000)
-    # n=100_000
-    original_
+function bootstrapped_regressions()
+    n_trials = 100_000
+    MODELS
 end
