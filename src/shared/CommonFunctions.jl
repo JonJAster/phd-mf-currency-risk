@@ -168,13 +168,13 @@ function _bootstrap_fund_data(fund_rets_data)
     
     bootstrapped_funds = Vector{DataFrame}(undef, n_funds)   
     for (i, fund_i) in enumerate(selected_funds)
+        # (i, fund_i) = first(enumerate(selected_funds))
         fund_tag = "fund_$i" #TODO update fundids to be symbols universally
         bootstrapped_funds[i] = grouped_data[fund_i]
         bootstrapped_funds[i][!, :fundid] .= fund_tag
     end
     
     bootstrapped_data = vcat(bootstrapped_funds...)
-    
     return bootstrapped_data
 end
 
