@@ -173,7 +173,6 @@ function _bootstrap_fund_data(fund_rets_data)
     end
     
     bootstrapped_data = vcat(bootstrapped_funds...)
-    sort!(bootstrapped_data, :date)
     
     return bootstrapped_data
 end
