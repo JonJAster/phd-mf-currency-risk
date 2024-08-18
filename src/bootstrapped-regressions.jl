@@ -12,12 +12,15 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 100#_000
+    n_trials = 10#0_000
     
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
 
-    output_filepath
+    output_filepath_d = makepath(DIRS.output, "domestic_coef_table.arrow")
+    output_filepath_f = makepath(DIRS.output, "foreign_coef_table.arrow")
+
+    Arrow.write(output_filepath_d, output_d)
 end
 
 function _create_bootstrapped_table(n_trials; filter_by=nothing)
@@ -135,9 +138,11 @@ function _fill_output_table!(output, true_coefficient_table, bootstrapped_se, tr
         true_coefficient_table.dev_coef, true_se.dev_se
     )
 
+    output.usa_propα[1] = ""
     output.usa_propα[2:end] = _format_output_column(
         true_coefficient_table.usa_propα[2:end], bootstrapped_se.usa_propα[2:end]
     )
+    output.dev_propα[1] = ""
     output.dev_propα[2:end] = _format_output_column(
         true_coefficient_table.dev_propα[2:end], bootstrapped_se.dev_propα[2:end]
     )
