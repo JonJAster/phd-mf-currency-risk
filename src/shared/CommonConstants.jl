@@ -44,7 +44,8 @@ const DIRS = (
         raw = "data/maps/raw",
         refined = "data/maps/refined"
     ),
-    test = "data/test"
+    test = "data/test",
+    output = "data/output"
 )
 
 const EQUITY_LMS_FACTORS = Dict(
