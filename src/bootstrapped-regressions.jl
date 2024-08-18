@@ -2,7 +2,7 @@ using Revise
 using DataFrames
 using Arrow
 using StatsBase
-using Threads
+using Base.Threads
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
@@ -13,7 +13,7 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10_000
+    n_trials = 10_0#00
     
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
@@ -48,8 +48,7 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     bootstrapped_outputs = Matrix{Float64}(undef, n_coefficients, n_trials)
 
     task_start = time()
-    Threads.@threads for i in 1:n_trials
-        # i=1
+    for i in 1:n_trials
         col_size = size(bootstrapped_outputs, 1)
         boot_regression_usa = regress_fund_flows("ff_usa_ffc6"; filter_by=filter_by, bootstrapped=true).summary
         boot_regression_dev = regress_fund_flows("ff_dev_ffc6"; filter_by=filter_by, bootstrapped=true).summary
@@ -59,7 +58,7 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
             boot_regression_dev
         )
     end
-    printtime("$i bootstrapped regressions", task_start)
+    printtime("$n_trials bootstrapped regressions", task_start)
 
     bootstrapped_se = copy(coefficient_table)
     _fill_bootstrapped_se!(bootstrapped_se, bootstrapped_outputs)
