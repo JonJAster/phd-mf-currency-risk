@@ -12,7 +12,7 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10#0_000
+    n_trials = 10_000
     
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
@@ -21,6 +21,7 @@ function bootstrapped_regressions()
     output_filepath_f = makepath(DIRS.output, "foreign_coef_table.arrow")
 
     Arrow.write(output_filepath_d, output_d)
+    Arrow.write(output_filepath_f, output_f)
 end
 
 function _create_bootstrapped_table(n_trials; filter_by=nothing)
