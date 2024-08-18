@@ -2,6 +2,7 @@ using Revise
 using DataFrames
 using Arrow
 using StatsBase
+using Threads
 
 includet("shared/CommonConstants.jl")
 includet("shared/CommonFunctions.jl")
@@ -26,7 +27,6 @@ end
 
 function _create_bootstrapped_table(n_trials; filter_by=nothing)
     # n_trials = 10; filter_by=x->!x.foreign
-    task_start = time()
 
     # TODO - the structure of this data is designed to be readable for me, but it is
     # almost certainly slower than alternatives, like just having a single list of floats
@@ -46,7 +46,9 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
 
     n_coefficients = nrow(coefficient_table)*(ncol(coefficient_table) - 1)
     bootstrapped_outputs = Matrix{Float64}(undef, n_coefficients, n_trials)
-    for i in 1:size(bootstrapped_outputs, 2)
+
+    task_start = time()
+    Threads.@threads for i in 1:n_trials
         # i=1
         col_size = size(bootstrapped_outputs, 1)
         boot_regression_usa = regress_fund_flows("ff_usa_ffc6"; filter_by=filter_by, bootstrapped=true).summary
@@ -56,8 +58,8 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
             boot_regression_usa,
             boot_regression_dev
         )
-        i % 5 == 0 && printtime("$(i)th bootstrapped regression", task_start)
     end
+    printtime("$i bootstrapped regressions", task_start)
 
     bootstrapped_se = copy(coefficient_table)
     _fill_bootstrapped_se!(bootstrapped_se, bootstrapped_outputs)
