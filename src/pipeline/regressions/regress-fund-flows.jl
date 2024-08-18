@@ -21,14 +21,12 @@ function regress_fund_flows(
         filter_by=nothing, ret_type=:decomposed, bootstrapped=false
     ) 
     # model_name = "ff_usa_ffc6"; filter_by = x->x.foreign; ret_type=:ret; bootstrapped=false
-    task_start = time()
-
+    
     flow_data = initialise_flow_data(model_name, bootstrapped=bootstrapped)
     isnothing(filter_by) || filter!(filter_by, flow_data)
 
     flow_output = _flow_regression(flow_data; intercept=false, ret_type=ret_type)
 
-    printtime("regressing flow betas on $model_name", task_start)
     return flow_output
 end
 
