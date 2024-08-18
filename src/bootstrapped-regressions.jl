@@ -17,7 +17,7 @@ function bootstrapped_regressions()
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
 
-    output_filepath)
+    output_filepath
 end
 
 function _create_bootstrapped_table(n_trials; filter_by=nothing)
@@ -84,9 +84,9 @@ function _fill_coefficient_col!(coefficient_col, regression_usa, regression_dev)
     # regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
     usa_propα = regression_usa.coef / regression_usa.coef[1]
     dev_propα = regression_dev.coef / regression_dev.coef[1]
-    usa_m_dev = [
-        regression_usa.coef[1] - regression_dev.coef[1];
-        usa_propα[2:end] - dev_propα[2:end]
+    dev_m_usa = [
+        regression_dev.coef[1] - regression_usa.coef[1];
+        dev_propα[2:end] - usa_propα[2:end]
     ]
     
     coefficient_col .= [
@@ -94,10 +94,28 @@ function _fill_coefficient_col!(coefficient_col, regression_usa, regression_dev)
         regression_dev.coef;
         usa_propα;
         dev_propα;
-        usa_m_dev
+        dev_m_usa
     ]
 
     return coefficient_col
+end
+
+function _fill_coefficient_table!(coefficient_table, regression_usa, regression_dev)
+    # coefficient_table = i; regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
+    coefficient_table.usa_coef = regression_usa.coef
+    coefficient_table.dev_coef = regression_dev.coef
+
+    coefficient_table.usa_propα = coefficient_table.usa_coef / coefficient_table.usa_coef[1]
+    coefficient_table.dev_propα = coefficient_table.dev_coef / coefficient_table.dev_coef[1]
+
+    coefficient_table.dev_m_usa[1] = (
+        coefficient_table.dev_coef[1] - coefficient_table.usa_coef[1]
+    )
+    coefficient_table.dev_m_usa[2:end] = (
+        coefficient_table.dev_propα[2:end] - coefficient_table.usa_propα[2:end]
+    )
+
+    return coefficient_table
 end
 
 function _fill_bootstrapped_se!(bootstrapped_se, bootstrapped_outputs)
