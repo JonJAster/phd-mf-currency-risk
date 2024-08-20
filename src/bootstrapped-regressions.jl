@@ -155,11 +155,21 @@ function _fill_output_table!(output, true_coefficient_table, bootstrapped_se, tr
     return output
 end
 
-function _format_output_column(coef, se)
-    return [
-        "$(round(coef[i], digits=3)) ± $(round(se[i], digits=3))"
-        for i in 1:length(coef)
+function _format_output_column(coef, se; percentage=false)
+    if percentage
+        coef .*= 100
+        se .*= 100
+        digits = 2
+    else
+        digits = 3
+    end
+
+    output = [
+        "$(round(coef[i], digits=digits)) ± $(round(se[i], digits=digits))"
+        for i in eachindex(coef)
     ]
+
+    return output
 end
 
 if isnothing(match(r"terminalserver.jl$", abspath(PROGRAM_FILE)))
