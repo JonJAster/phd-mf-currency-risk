@@ -126,7 +126,7 @@ function _fill_bootstrapped_se!(bootstrapped_se, bootstrapped_outputs)
         i == 1 && continue
         for j in 1:nrow(bootstrapped_se)
             idx = (i - 2)*nrow(bootstrapped_se) + j
-            bootstrapped_se[i, j] = std(bootstrapped_outputs[idx, :])
+            bootstrapped_se[j, i] = std(bootstrapped_outputs[idx, :])
         end
     end
 end
