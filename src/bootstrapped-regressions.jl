@@ -15,12 +15,14 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10_0#00
+    n_trials = 10_000
     
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
 
     mprint(output_d)
+    println()
+    println()
     mprint(output_f)
 
     output_filepath_d = makepath(DIRS.output, "domestic_coef_table.arrow")
