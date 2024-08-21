@@ -120,6 +120,8 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
         dev_m_usa_prop_se
     )
 
+    mprint(output)
+
     return output
 end
 
@@ -181,34 +183,34 @@ function _fill_output_table!(
     output.usa_coef[1:end-2] = _format_output_column(
         true_coefficient_table.usa_coef, true_se.usa_se
     )
-    output.usa_coef[end-1:end] = ""
+    output.usa_coef[end-1:end] .= ""
 
     output.dev_coef[1:end-2] = _format_output_column(
         true_coefficient_table.dev_coef, true_se.dev_se
     )
-    output.dev_coef[end-1:end] = ""
+    output.dev_coef[end-1:end] .= ""
 
-    output.usa_propα[1] = ""
-    output.usa_propα[2:end-2] = _format_output_column(
+    output.usa_propα[1:2] .= ""
+    output.usa_propα[3:end-2] = _format_output_column(
         true_coefficient_table.usa_propα[2:end], bootstrapped_se.usa_propα[2:end];
         as_percent=true
     )
-    output.usa_propα[end-1:end] = ""
+    output.usa_propα[end-1:end] .= ""
 
-    output.dev_propα[1] = ""
-    output.dev_propα[2:end-2] = _format_output_column(
+    output.dev_propα[1:2] .= ""
+    output.dev_propα[3:end-2] = _format_output_column(
         true_coefficient_table.dev_propα[2:end], bootstrapped_se.dev_propα[2:end];
         as_percent=true
     )
-    output.dev_propα[end-1:end] = ""
+    output.dev_propα[end-1:end] .= ""
 
-    output.dev_m_usa[1] = _format_output_column(
+    output.dev_m_usa[1:2] = _format_output_column(
         [true_coefficient_table.dev_m_usa[1]], [bootstrapped_se.dev_m_usa[1]]
     )
-    output.dev_m_usa[2:end] .= ""
+    output.dev_m_usa[3:end] .= ""
 
-    output.dev_m_usa_prop[1] = ""
-    output.dev_m_usa_prop[2:end-2] = _format_output_column(
+    output.dev_m_usa_prop[1:2] .= ""
+    output.dev_m_usa_prop[3:end-2] = _format_output_column(
         true_coefficient_table.dev_m_usa[2:end], bootstrapped_se.dev_m_usa[2:end];
         as_percent=true
     )
