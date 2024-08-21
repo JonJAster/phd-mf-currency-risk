@@ -18,7 +18,7 @@ export init_raw, initialise_base_data, initialise_flow_data
 export investment_target_is
 export loadarrow
 export makepath
-export pprint
+export pprint, mprint
 export printtime
 export qhead, qscan, qlookup
 export regression_table
@@ -300,6 +300,19 @@ function pprint(df; rows=nothing, centre=false) # df = DataFrame(primaryid=1:3, 
             println()
         end
     end
+end
+
+function mprint(df)
+    show(
+        df,
+        tf=PrettyTables.tf_markdown,
+        vlines=:all,
+        show_subheader=false,
+        show_row_number=false,
+        allrows=true,
+        allcols=true
+    )
+    return nothing
 end
 
 function printtime(
