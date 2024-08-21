@@ -28,7 +28,7 @@ function bootstrapped_regressions()
 end
 
 function _create_bootstrapped_table(n_trials; filter_by=nothing)
-    # n_trials = 15; filter_by=x->!x.foreign
+    # n_trials = 10; filter_by=x->!x.foreign
 
     coefficient_table = DataFrame(
         :factor =>
@@ -232,7 +232,7 @@ function _fill_output_table!(
     # dev_m_usa_prop
     output.dev_m_usa_prop[1:2] .= ""
     output.dev_m_usa_prop[3:end-2] = _format_output_column(
-        true_coefficient_table.dev_m_usa[2:end], bootstrapped_se.dev_m_usa[2:end];
+        true_coefficient_table.dev_m_usa_prop[2:end], bootstrapped_se.dev_m_usa_prop[2:end];
         as_percent=true
     )
     output.dev_m_usa_prop[end-1:end] = _format_output_column(
