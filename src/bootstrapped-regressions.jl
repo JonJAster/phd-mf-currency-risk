@@ -28,7 +28,7 @@ function bootstrapped_regressions()
 end
 
 function _create_bootstrapped_table(n_trials; filter_by=nothing)
-    # n_trials = 10; filter_by=x->x.foreign
+    # n_trials = 15; filter_by=x->!x.foreign
 
     coefficient_table = DataFrame(
         :factor =>
@@ -137,6 +137,7 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     )
 
     mprint(output)
+    println()
 
     return output
 end
