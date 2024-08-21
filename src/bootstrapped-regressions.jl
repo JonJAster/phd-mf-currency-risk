@@ -95,7 +95,7 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     dev_m_usa_sum = sum(true_coefficient_table.dev_m_usa)
     dev_m_usa_se = sqrt(sum(dev_m_usa_vcov))
 
-    dev_m_usa_prop_sum = sum(true_coefficient_table[2:end, :dev_m_usa])
+    dev_m_usa_prop_sum = sum(true_coefficient_table[2:end, :dev_m_usa_prop])
     dev_m_usa_prop_se = sqrt(sum(dev_m_usa_prop_vcov))
 
     sum_row = DataFrame(
@@ -138,7 +138,7 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
         true_se,
         sum_row
     )
-    
+
     println()
 
     return output
