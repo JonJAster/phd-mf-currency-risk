@@ -2,6 +2,8 @@ using Revise
 using DataFrames
 using Arrow
 using StatsBase
+using LinearAlgebra
+using Distributions
 using Base.Threads
 
 includet("shared/CommonConstants.jl")
@@ -26,7 +28,7 @@ function bootstrapped_regressions()
 end
 
 function _create_bootstrapped_table(n_trials; filter_by=nothing)
-    # n_trials = 10; filter_by=x->!x.foreign
+    # n_trials = 50; filter_by=x->x.foreign
 
     coefficient_table = DataFrame(
         :factor =>
@@ -59,7 +61,17 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     printtime("$n_trials bootstrapped regressions", task_start)
 
     bootstrapped_se = copy(coefficient_table)
-    _fill_bootstrapped_se!(bootstrapped_se, bootstrapped_outputs)
+    _fill_bootstrapped_se!(
+        bootstrapped_se[!, Not([:factor, :dev_m_usa])],
+        bootstrapped_outputs
+    )
+
+    dev_m_usa_idx = nrow(coefficient_table)*(ncol(coefficient_table) - 2) + 1
+    dev_m_usa_prop_idx = dev_m_usa_idx + 1
+    
+    dev_m_usa_prop_vcov = cov(bootstrapped_outputs[dev_m_usa_prop_idx:end,:], dims=2)
+    bootstrapped_se.dev_m_usa[1, :] .= std(bootstrapped_outputs[dev_m_usa_idx, :])
+    bootstrapped_se.dev_m_usa[2:end, :] .= sqrt.(diag(dev_m_usa_vcov))
 
     true_coefficient_table = _fill_coefficient_table!(
         coefficient_table, true_regression_usa, true_regression_dev
@@ -68,17 +80,45 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     rename!(true_regression_dev, :se => :dev_se)
     true_se = hcat(true_regression_usa[!, [:usa_se]], true_regression_dev[!, [:dev_se]])
 
+    dev_m_usa_prop_coefs = true_coefficient_table[2:end, :dev_m_usa]
+    dev_m_usa_prop_sum = sum(dev_m_usa_prop_coefs)
+    dev_m_usa_prop_se = sqrt(sum(dev_m_usa_prop_vcov))
+
     output = DataFrame(
-        :factor =>
-            [:alpha, :wret_mkt, :wret_smb, :wret_hml, :wret_rmw, :wret_cma, :wret_wml],
-        :usa_coef => Vector{String}(undef, 7),
-        :dev_coef => Vector{String}(undef, 7),
-        :usa_propα => Vector{String}(undef, 7),
-        :dev_propα => Vector{String}(undef, 7),
-        :dev_m_usa => Vector{String}(undef, 7)
+        :factor => [
+            :alpha,
+            :se,
+            :wret_mkt,
+            :se,
+            :wret_smb,
+            :se,
+            :wret_hml,
+            :se,
+            :wret_rmw,
+            :se,
+            :wret_cma,
+            :se,
+            :wret_wml,
+            :se,
+            :sum,
+            :se
+        ],
+        :usa_coef => Vector{String}(undef, 16),
+        :dev_coef => Vector{String}(undef, 16),
+        :usa_propα => Vector{String}(undef, 16),
+        :dev_propα => Vector{String}(undef, 16),
+        :dev_m_usa => Vector{String}(undef, 16),
+        :dev_m_usa_prop => Vector{String}(undef, 16) 
     )
 
-    _fill_output_table!(output, true_coefficient_table, bootstrapped_se, true_se)
+    _fill_output_table!(
+        output,
+        true_coefficient_table,
+        bootstrapped_se,
+        true_se,
+        dev_m_usa_prop_sum,
+        dev_m_usa_prop_se
+    )
 
     return output
 end
@@ -121,53 +161,78 @@ function _fill_coefficient_table!(coefficient_table, regression_usa, regression_
     return coefficient_table
 end
 
-function _fill_bootstrapped_se!(bootstrapped_se, bootstrapped_outputs)
-    for i in 1:ncol(bootstrapped_se)
-        i == 1 && continue
-        for j in 1:nrow(bootstrapped_se)
-            idx = (i - 2)*nrow(bootstrapped_se) + j
-            bootstrapped_se[j, i] = std(bootstrapped_outputs[idx, :])
+function _fill_bootstrapped_se!(bootstrapped_se_slice, bootstrapped_outputs)
+    for i in 1:ncol(bootstrapped_se_slice)
+        for j in 1:nrow(bootstrapped_se_slice)
+            idx = (i - 1)*nrow(bootstrapped_se_slice) + j
+            bootstrapped_se_slice[j, i] = std(bootstrapped_outputs[idx, :])
         end
     end
 end
 
-function _fill_output_table!(output, true_coefficient_table, bootstrapped_se, true_se)
-    output.usa_coef = _format_output_column(
+function _fill_output_table!(
+        output,
+        true_coefficient_table,
+        bootstrapped_se,
+        true_se,
+        dev_m_usa_prop_sum,
+        dev_m_usa_prop_se
+    )
+    output.usa_coef[1:end-2] = _format_output_column(
         true_coefficient_table.usa_coef, true_se.usa_se
     )
-    output.dev_coef = _format_output_column(
+    output.usa_coef[end-1:end] = ""
+
+    output.dev_coef[1:end-2] = _format_output_column(
         true_coefficient_table.dev_coef, true_se.dev_se
     )
+    output.dev_coef[end-1:end] = ""
 
     output.usa_propα[1] = ""
-    output.usa_propα[2:end] = _format_output_column(
-        true_coefficient_table.usa_propα[2:end], bootstrapped_se.usa_propα[2:end]
+    output.usa_propα[2:end-2] = _format_output_column(
+        true_coefficient_table.usa_propα[2:end], bootstrapped_se.usa_propα[2:end];
+        as_percent=true
     )
-    output.dev_propα[1] = ""
-    output.dev_propα[2:end] = _format_output_column(
-        true_coefficient_table.dev_propα[2:end], bootstrapped_se.dev_propα[2:end]
-    )
+    output.usa_propα[end-1:end] = ""
 
-    output.dev_m_usa = _format_output_column(
-        true_coefficient_table.dev_m_usa, bootstrapped_se.dev_m_usa
+    output.dev_propα[1] = ""
+    output.dev_propα[2:end-2] = _format_output_column(
+        true_coefficient_table.dev_propα[2:end], bootstrapped_se.dev_propα[2:end];
+        as_percent=true
+    )
+    output.dev_propα[end-1:end] = ""
+
+    output.dev_m_usa[1] = _format_output_column(
+        [true_coefficient_table.dev_m_usa[1]], [bootstrapped_se.dev_m_usa[1]]
+    )
+    output.dev_m_usa[2:end] .= ""
+
+    output.dev_m_usa_prop[1] = ""
+    output.dev_m_usa_prop[2:end-2] = _format_output_column(
+        true_coefficient_table.dev_m_usa[2:end], bootstrapped_se.dev_m_usa[2:end];
+        as_percent=true
+    )
+    output.dev_m_usa_prop[end-1:end] = _format_output_column(
+        [dev_m_usa_prop_sum], [dev_m_usa_prop_se]; as_percent=true
     )
 
     return output
 end
 
-function _format_output_column(coef, se; percentage=false)
-    if percentage
-        coef .*= 100
-        se .*= 100
+function _format_output_column(coef_col, se_col; as_percent=false)
+    # coef_col = true_coefficient_table.usa_coef; se_col = true_se.usa_se; as_percent = false
+    if as_percent
+        coef_col .*= 100
+        se_col .*= 100
         digits = 2
     else
         digits = 3
     end
 
-    output = [
-        "$(round(coef[i], digits=digits)) ± $(round(se[i], digits=digits))"
-        for i in eachindex(coef)
-    ]
+    output = zip(
+        ["$(round.(coef_col[i], digits=digits))" for i in eachindex(coef_col)],
+        ["$(round.(se_col[i], digits=digits))" for i in eachindex(se_col)]
+    ) |> Iterators.flatten |> collect
 
     return output
 end
