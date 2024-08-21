@@ -20,6 +20,9 @@ function bootstrapped_regressions()
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
 
+    mprint(output_d)
+    mprint(output_f)
+
     output_filepath_d = makepath(DIRS.output, "domestic_coef_table.arrow")
     output_filepath_f = makepath(DIRS.output, "foreign_coef_table.arrow")
 
@@ -135,8 +138,7 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
         true_se,
         sum_row
     )
-
-    mprint(output)
+    
     println()
 
     return output
