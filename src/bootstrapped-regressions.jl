@@ -15,7 +15,7 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10_000
+    n_trials = 10_0#00
     
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
@@ -37,7 +37,8 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
         :dev_coef => Vector{Float64}(undef, 7),
         :usa_propα => Vector{Float64}(undef, 7),
         :dev_propα => Vector{Float64}(undef, 7),
-        :dev_m_usa => Vector{Float64}(undef, 7)
+        :dev_m_usa => Vector{Float64}(undef, 7),
+        :dev_m_usa_prop => Vector{Float64}(undef, 7)
     )
 
     true_regression_usa = regress_fund_flows("ff_usa_ffc6"; filter_by=filter_by, bootstrapped=false).summary
@@ -71,7 +72,7 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     
     dev_m_usa_prop_vcov = cov(bootstrapped_outputs[dev_m_usa_prop_idx:end,:], dims=2)
     bootstrapped_se.dev_m_usa[1, :] .= std(bootstrapped_outputs[dev_m_usa_idx, :])
-    bootstrapped_se.dev_m_usa[2:end, :] .= sqrt.(diag(dev_m_usa_vcov))
+    bootstrapped_se.dev_m_usa[2:end, :] .= sqrt.(diag(dev_m_usa_prop_vcov))
 
     true_coefficient_table = _fill_coefficient_table!(
         coefficient_table, true_regression_usa, true_regression_dev
@@ -129,10 +130,8 @@ function _fill_coefficient_col!(coefficient_col, regression_usa, regression_dev)
     # regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
     usa_propα = regression_usa.coef / regression_usa.coef[1]
     dev_propα = regression_dev.coef / regression_dev.coef[1]
-    dev_m_usa = [
-        regression_dev.coef[1] - regression_usa.coef[1];
-        dev_propα[2:end] - usa_propα[2:end]
-    ]
+    dev_m_usa = regression_dev - regression_usa
+    dev_m_usa_prop = dev_propα - usa_propα
     
     coefficient_col .= [
         regression_usa.coef;
