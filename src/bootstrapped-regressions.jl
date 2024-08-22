@@ -133,12 +133,12 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
             :sum,
             :se
         ],
-        :usa_coef => Vector{String}(undef, 16),
-        :dev_coef => Vector{String}(undef, 16),
-        :usa_propα => Vector{String}(undef, 16),
-        :dev_propα => Vector{String}(undef, 16),
-        :dev_m_usa => Vector{String}(undef, 16),
-        :dev_m_usa_prop => Vector{String}(undef, 16) 
+        :usa_coef => Vector{String}(undef, 18),
+        :dev_coef => Vector{String}(undef, 18),
+        :usa_propα => Vector{String}(undef, 18),
+        :dev_propα => Vector{String}(undef, 18),
+        :dev_m_usa => Vector{String}(undef, 18),
+        :dev_m_usa_prop => Vector{String}(undef, 18) 
     )
 
     _fill_output_table!(
