@@ -237,7 +237,8 @@ function _fill_output_table!(
     output.dev_m_usa[1:end-4] = _format_output_column(
         true_coefficient_table.dev_m_usa, bootstrapped_se.dev_m_usa
     )
-    output.dev_m_usa[end-3:end] = _format_output_column(
+    output.dev_m_usa[end-3:end-2] .= ""
+    output.dev_m_usa[end-1:end] = _format_output_column(
         [sum_row[1, :dev_m_usa]], [sum_row[2, :dev_m_usa]]
     )
 
