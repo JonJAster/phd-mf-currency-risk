@@ -15,7 +15,7 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10_000
+    n_trials = 10_0#00
     
     output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
@@ -85,6 +85,9 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     bootstrapped_se.dev_m_usa .= sqrt.(diag(dev_m_usa_vcov))
 
     dev_m_usa_prop_vcov = cov(bootstrapped_outputs[dev_m_usa_prop_idx:end,:], dims=2)
+    dev_m_usa_prop_ff3_vcov = cov(
+        bootstrapped_outputs[dev_m_usa_prop_idx+1:dev_m_usa_prop_idx+3,:], dims=2
+    )
     bootstrapped_se.dev_m_usa_prop .= sqrt.(diag(dev_m_usa_prop_vcov))
 
     true_coefficient_table = _fill_coefficient_table!(
@@ -98,12 +101,15 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
     dev_m_usa_se = sqrt(sum(dev_m_usa_vcov))
 
     dev_m_usa_prop_sum = sum(true_coefficient_table[2:end, :dev_m_usa_prop])
+    dev_m_usa_prop_ff3_sum = sum(true_coefficient_table[2:4, :dev_m_usa_prop])
     dev_m_usa_prop_se = sqrt(sum(dev_m_usa_prop_vcov))
+    dev_m_usa_prop_ff3_se = sqrt(sum(dev_m_usa_prop_ff3_vcov))
 
     sum_row = DataFrame(
         :factor => [:sum, :se],
         :dev_m_usa => [dev_m_usa_sum, dev_m_usa_se],
-        :dev_m_usa_prop => [dev_m_usa_prop_sum, dev_m_usa_prop_se]
+        :dev_m_usa_prop => [dev_m_usa_prop_sum, dev_m_usa_prop_se],
+        :dev_m_usa_prop_ff3 => [dev_m_usa_prop_ff3_sum, dev_m_usa_prop_ff3_se]
     )
 
     output = DataFrame(
@@ -121,6 +127,8 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
             :wret_cma,
             :se,
             :wret_wml,
+            :se,
+            :ff3_sum,
             :se,
             :sum,
             :se
@@ -198,45 +206,49 @@ function _fill_output_table!(
         sum_row
     )
     # usa_coef
-    output.usa_coef[1:end-2] = _format_output_column(
+    output.usa_coef[1:end-4] = _format_output_column(
         true_coefficient_table.usa_coef, true_se.usa_se
     )
-    output.usa_coef[end-1:end] .= ""
+    output.usa_coef[end-3:end] .= ""
 
     # dev_coef
-    output.dev_coef[1:end-2] = _format_output_column(
+    output.dev_coef[1:end-4] = _format_output_column(
         true_coefficient_table.dev_coef, true_se.dev_se
     )
-    output.dev_coef[end-1:end] .= ""
+    output.dev_coef[end-3:end] .= ""
 
     # usa_propα
     output.usa_propα[1:2] .= ""
-    output.usa_propα[3:end-2] = _format_output_column(
+    output.usa_propα[3:end-4] = _format_output_column(
         true_coefficient_table.usa_propα[2:end], bootstrapped_se.usa_propα[2:end];
         as_percent=true
     )
-    output.usa_propα[end-1:end] .= ""
+    output.usa_propα[end-3:end] .= ""
 
     # dev_propα
     output.dev_propα[1:2] .= ""
-    output.dev_propα[3:end-2] = _format_output_column(
+    output.dev_propα[3:end-4] = _format_output_column(
         true_coefficient_table.dev_propα[2:end], bootstrapped_se.dev_propα[2:end];
         as_percent=true
     )
-    output.dev_propα[end-1:end] .= ""
+    output.dev_propα[end-3:end] .= ""
 
     # dev_m_usa
-    output.dev_m_usa[1:end-2] = _format_output_column(
+    output.dev_m_usa[1:end-4] = _format_output_column(
         true_coefficient_table.dev_m_usa, bootstrapped_se.dev_m_usa
     )
-    output.dev_m_usa[end-1:end] = _format_output_column(
+    output.dev_m_usa[end-3:end] = _format_output_column(
         [sum_row[1, :dev_m_usa]], [sum_row[2, :dev_m_usa]]
     )
 
     # dev_m_usa_prop
     output.dev_m_usa_prop[1:2] .= ""
-    output.dev_m_usa_prop[3:end-2] = _format_output_column(
+    output.dev_m_usa_prop[3:end-4] = _format_output_column(
         true_coefficient_table.dev_m_usa_prop[2:end], bootstrapped_se.dev_m_usa_prop[2:end];
+        as_percent=true
+    )
+    output.dev_m_usa_prop[end-3:end-2] = _format_output_column(
+        [sum_row[1, :dev_m_usa_prop_ff3]], [sum_row[2, :dev_m_usa_prop_ff3]];
         as_percent=true
     )
     output.dev_m_usa_prop[end-1:end] = _format_output_column(
