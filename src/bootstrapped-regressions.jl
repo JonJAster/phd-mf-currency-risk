@@ -17,8 +17,8 @@ using .RegressFundFlows
 function bootstrapped_regressions()
     n_trials = 10_0#00
     
-    output_d = _create_bootstrapped_table(n_trials; filter_by=x->!x.foreign)
-    output_f = _create_bootstrapped_table(n_trials; filter_by=x->x.foreign)
+    output_d = _create_bootstrapped_main(n_trials; filter_by=x->!x.foreign)
+    output_f = _create_bootstrapped_main(n_trials; filter_by=x->x.foreign)
 
     mprint(output_d)
     println()
@@ -28,22 +28,27 @@ function bootstrapped_regressions()
     output_filepath_d = makepath(DIRS.output, "domestic_coef_table.arrow")
     output_filepath_f = makepath(DIRS.output, "foreign_coef_table.arrow")
 
+    # TODO: This should obviously be a single function to avoid copied code whenever
+    #       time permits.
+    output_curr_d = _create_bootstrapped_curr(n_trials; filter_by=x->!x.foreign)
+    output_curr_f = _create_bootstrapped_curr(n_trials; filter_by=x->x.foreign)
+
     Arrow.write(output_filepath_d, output_d)
     Arrow.write(output_filepath_f, output_f)
 end
 
-function _create_bootstrapped_table(n_trials; filter_by=nothing)
+function _create_bootstrapped_main(n_trials; filter_by=nothing)
     # n_trials = 10; filter_by=x->!x.foreign
 
     coefficient_table = DataFrame(
         :factor =>
             [:alpha, :wret_mkt, :wret_smb, :wret_hml, :wret_rmw, :wret_cma, :wret_wml],
-        :usa_coef => Vector{Float64}(undef, 7),
-        :dev_coef => Vector{Float64}(undef, 7),
-        :usa_propα => Vector{Float64}(undef, 7),
-        :dev_propα => Vector{Float64}(undef, 7),
-        :dev_m_usa => Vector{Float64}(undef, 7),
-        :dev_m_usa_prop => Vector{Float64}(undef, 7)
+        :usa_coef => Vector{Float64}(undef, 9),
+        :dev_coef => Vector{Float64}(undef, 9),
+        :usa_propα => Vector{Float64}(undef, 9),
+        :dev_propα => Vector{Float64}(undef, 9),
+        :dev_m_usa => Vector{Float64}(undef, 9),
+        :dev_m_usa_prop => Vector{Float64}(undef, 9)
     )
 
     true_regression_usa = regress_fund_flows("ff_usa_ffc6"; filter_by=filter_by, bootstrapped=false).summary
@@ -133,12 +138,12 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
             :sum,
             :se
         ],
-        :usa_coef => Vector{String}(undef, 18),
-        :dev_coef => Vector{String}(undef, 18),
-        :usa_propα => Vector{String}(undef, 18),
-        :dev_propα => Vector{String}(undef, 18),
-        :dev_m_usa => Vector{String}(undef, 18),
-        :dev_m_usa_prop => Vector{String}(undef, 18) 
+        :usa_coef => Vector{String}(undef, 22),
+        :dev_coef => Vector{String}(undef, 22),
+        :usa_propα => Vector{String}(undef, 22),
+        :dev_propα => Vector{String}(undef, 22),
+        :dev_m_usa => Vector{String}(undef, 22),
+        :dev_m_usa_prop => Vector{String}(undef, 22) 
     )
 
     _fill_output_table!(
@@ -149,7 +154,138 @@ function _create_bootstrapped_table(n_trials; filter_by=nothing)
         sum_row
     )
 
-    println()
+    return output
+end
+
+function _create_bootstrapped_curr(n_trials; filter_by=nothing)
+    # n_trials = 10; filter_by=x->x.foreign
+
+    coefficient_table = DataFrame(
+        :factor => [
+            :alpha,
+            :wret_mkt,
+            :wret_smb,
+            :wret_hml,
+            :wret_rmw,
+            :wret_cma,
+            :wret_wml,
+            :wret_dollar,
+            :wret_carry
+        ],
+        :usa_coef => Vector{Float64}(undef, 9),
+        :dev_coef => Vector{Float64}(undef, 9),
+        :usa_propα => Vector{Float64}(undef, 9),
+        :dev_propα => Vector{Float64}(undef, 9),
+        :dev_m_usa => Vector{Float64}(undef, 9),
+        :dev_m_usa_prop => Vector{Float64}(undef, 9)
+    )
+
+    true_regression_usa = regress_fund_flows("ff_usa_ffc6_ver"; filter_by=filter_by, bootstrapped=false).summary
+    true_regression_dev = regress_fund_flows("ff_dev_ffc6_ver"; filter_by=filter_by, bootstrapped=false).summary
+
+    n_coefficients = nrow(coefficient_table)*(ncol(coefficient_table) - 1)
+    bootstrapped_outputs = Matrix{Float64}(undef, n_coefficients, n_trials)
+
+    task_start = time()
+    for i in 1:n_trials
+        # i = 1
+        col_size = size(bootstrapped_outputs, 1)
+        
+        boot_regression_usa = regress_fund_flows(
+            "ff_usa_ffc6_ver"; filter_by=filter_by, bootstrapped=true
+        ).summary
+        boot_regression_dev = regress_fund_flows(
+            "ff_dev_ffc6_ver"; filter_by=filter_by, bootstrapped=true
+        ).summary
+
+        _fill_coefficient_col!(
+            view(bootstrapped_outputs, :, i),
+            boot_regression_usa,
+            boot_regression_dev
+        )
+    end
+    printtime("$n_trials bootstrapped regressions", task_start)
+
+    bootstrapped_se = copy(coefficient_table)
+    _fill_bootstrapped_se!(
+        bootstrapped_se[!, Not([:factor, :dev_m_usa, :dev_m_usa_prop])],
+        bootstrapped_outputs
+    )
+
+    dev_m_usa_idx = nrow(coefficient_table)*(ncol(coefficient_table) - 3) + 1
+    dev_m_usa_prop_idx = nrow(coefficient_table)*(ncol(coefficient_table) - 2) + 1
+    
+    dev_m_usa_vcov = cov(bootstrapped_outputs[dev_m_usa_idx:dev_m_usa_prop_idx-1,:], dims=2)
+    bootstrapped_se.dev_m_usa .= sqrt.(diag(dev_m_usa_vcov))
+
+    dev_m_usa_prop_vcov = cov(bootstrapped_outputs[dev_m_usa_prop_idx:end,:], dims=2)
+    dev_m_usa_prop_ff3_vcov = cov(
+        bootstrapped_outputs[dev_m_usa_prop_idx+1:dev_m_usa_prop_idx+3,:], dims=2
+    )
+    bootstrapped_se.dev_m_usa_prop .= sqrt.(diag(dev_m_usa_prop_vcov))
+
+    true_coefficient_table = _fill_coefficient_table!(
+        coefficient_table, true_regression_usa, true_regression_dev
+    )
+    rename!(true_regression_usa, :se => :usa_se)
+    rename!(true_regression_dev, :se => :dev_se)
+    true_se = hcat(true_regression_usa[!, [:usa_se]], true_regression_dev[!, [:dev_se]])
+
+    dev_m_usa_sum = sum(true_coefficient_table.dev_m_usa)
+    dev_m_usa_se = sqrt(sum(dev_m_usa_vcov))
+
+    dev_m_usa_prop_sum = sum(true_coefficient_table[2:end, :dev_m_usa_prop])
+    dev_m_usa_prop_ff3_sum = sum(true_coefficient_table[2:4, :dev_m_usa_prop])
+    dev_m_usa_prop_se = sqrt(sum(dev_m_usa_prop_vcov))
+    dev_m_usa_prop_ff3_se = sqrt(sum(dev_m_usa_prop_ff3_vcov))
+
+    sum_row = DataFrame(
+        :factor => [:sum, :se],
+        :dev_m_usa => [dev_m_usa_sum, dev_m_usa_se],
+        :dev_m_usa_prop => [dev_m_usa_prop_sum, dev_m_usa_prop_se],
+        :dev_m_usa_prop_ff3 => [dev_m_usa_prop_ff3_sum, dev_m_usa_prop_ff3_se]
+    )
+
+    output = DataFrame(
+        :factor => [
+            :alpha,
+            :se,
+            :wret_mkt,
+            :se,
+            :wret_smb,
+            :se,
+            :wret_hml,
+            :se,
+            :wret_rmw,
+            :se,
+            :wret_cma,
+            :se,
+            :wret_wml,
+            :se,
+            :wret_dollar,
+            :se,
+            :wret_carry,
+            :se,
+            :ff3_sum,
+            :se,
+            :sum,
+            :se
+        ],
+        :usa_coef => Vector{String}(undef, 22),
+        :dev_coef => Vector{String}(undef, 22),
+        :usa_propα => Vector{String}(undef, 22),
+        :dev_propα => Vector{String}(undef, 22),
+        :dev_m_usa => Vector{String}(undef, 22),
+        :dev_m_usa_prop => Vector{String}(undef, 22) 
+    )
+
+    _fill_output_table!(
+        output,
+        true_coefficient_table,
+        bootstrapped_se,
+        true_se,
+        sum_row
+    )
 
     return output
 end
