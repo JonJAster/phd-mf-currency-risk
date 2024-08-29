@@ -638,19 +638,19 @@ function _fill_output_table_dated!(
     sum_row
 )
 # early_coef
-output.early_coef[1] = _format_output_column(
+output.early_coef[1:2] = _format_output_column(
     [true_coefficient_table.late_coef[1]], [true_se.late_se[1]]
 )
-output.early_coef[2:end-2] = _format_output_column(
+output.early_coef[3:end-2] = _format_output_column(
     true_coefficient_table.early_coef[2:end], true_se.early_se[2:end]
 )
 output.early_coef[end-1:end] .= ""
 
 # late_coef
-output.late_coef[1] = _format_output_column(
+output.late_coef[1:2] = _format_output_column(
     [true_coefficient_table.early_coef[1]], [true_se.early_se[1]]
 )
-output.late_coef[2:end-2] = _format_output_column(
+output.late_coef[3:end-2] = _format_output_column(
     true_coefficient_table.late_coef[2:end], true_se.late_se[2:end]
 )
 output.late_coef[end-1:end] .= ""
