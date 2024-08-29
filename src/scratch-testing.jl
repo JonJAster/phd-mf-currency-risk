@@ -24,5 +24,20 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function test()
-    
+    factors_file = joinpath(DIRS.eq.factors, "ff.arrow")
+    factors = loadarrow(factors_file)
+
+    factor_list = unique(factors.factor)
+    regional_factors = Dict()
+    for i in factor_list
+        regional_factors[i] = unstack(
+            factors[factors.factor .== i, :], :date, :source_id, :ret
+        ) |> dropmissing
+    end
+
+    for i in factor_list
+        println(i)
+        println(cor(Matrix(regional_factors[i][:, 2:end]))[1, 2])
+    end
+
 end
