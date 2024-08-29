@@ -286,8 +286,8 @@ function _create_bootstrapped_dated(n_trials; filter_by, model)
         :late_m_early_prop => Vector{Float64}(undef, 7)
     )
 
-    early_filter(x) = filter_by(x) && x.date .< Date(2011)
-    late_filter(x) = filter_by(x) && x.date .>= Date(2011)
+    early_filter(x) = filter_by(x) && (x.date .< Date(2011))
+    late_filter(x) = filter_by(x) && (x.date .>= Date(2011))
     
     true_regression_early = regress_fund_flows(
         model; filter_by=early_filter, bootstrapped=false
@@ -458,6 +458,22 @@ function _fill_coefficient_table_curr!(
     )
     coefficient_table.foreign_propα = (
         coefficient_table.foreign_coef / coefficient_table.foreign_coef[1]
+    )
+
+    return coefficient_table
+end
+
+function _fill_coefficient_table_dated!(coefficient_table, regression_usa, regression_dev)
+    # regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
+    coefficient_table.early_coef = regression_usa.coef
+    coefficient_table.late_coef = regression_dev.coef
+
+    coefficient_table.early_propα = coefficient_table.early_coef / coefficient_table.early_coef[1]
+    coefficient_table.late_propα = coefficient_table.late_coef / coefficient_table.late_coef[1]
+
+    coefficient_table.late_m_early = coefficient_table.late_coef - coefficient_table.early_coef
+    coefficient_table.late_m_early_prop = (
+        coefficient_table.late_propα - coefficient_table.early_propα
     )
 
     return coefficient_table
