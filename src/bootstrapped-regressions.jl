@@ -1,6 +1,7 @@
 using Revise
 using DataFrames
 using Arrow
+using Dates
 using StatsBase
 using LinearAlgebra
 using Distributions
@@ -15,7 +16,7 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10_0#00
+    n_trials = 10_00#0
     
     output_d = _create_bootstrapped_main(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_main(n_trials; filter_by=x->x.foreign)
@@ -33,9 +34,10 @@ function bootstrapped_regressions()
     Arrow.write(output_filepath_d, output_d)
     Arrow.write(output_filepath_f, output_f)
 
-    # TODO: This should obviously be a single function to avoid copied code whenever
+    # TODO: This should obviously be a single function to avoid copied code if ever
     #       time permits.
-    output_curr = _create_bootstrapped_curr(n_trials)
+    ### output_curr = _create_bootstrapped_curr(n_trials)
+    output_curr = loadarrow(joinpath(DIRS.output, "curr_coef_table.arrow"))
 
     mprint(output_curr)
     println()
@@ -52,12 +54,12 @@ function _create_bootstrapped_main(n_trials; filter_by=nothing)
     coefficient_table = DataFrame(
         :factor =>
             [:alpha, :wret_mkt, :wret_smb, :wret_hml, :wret_rmw, :wret_cma, :wret_wml],
-        :usa_coef => Vector{Float64}(undef, 9),
-        :dev_coef => Vector{Float64}(undef, 9),
-        :usa_propα => Vector{Float64}(undef, 9),
-        :dev_propα => Vector{Float64}(undef, 9),
-        :dev_m_usa => Vector{Float64}(undef, 9),
-        :dev_m_usa_prop => Vector{Float64}(undef, 9)
+        :usa_coef => Vector{Float64}(undef, 7),
+        :dev_coef => Vector{Float64}(undef, 7),
+        :usa_propα => Vector{Float64}(undef, 7),
+        :dev_propα => Vector{Float64}(undef, 7),
+        :dev_m_usa => Vector{Float64}(undef, 7),
+        :dev_m_usa_prop => Vector{Float64}(undef, 7)
     )
 
     true_regression_usa = regress_fund_flows("ff_usa_ffc6"; filter_by=filter_by, bootstrapped=false).summary
@@ -270,6 +272,130 @@ function _create_bootstrapped_curr(n_trials)
     return output
 end
 
+function _create_bootstrapped_dated(n_trials; filter_by, model)
+    # n_trials = 10; filter_by=x->!x.foreign; model="ff_usa_ffc6"
+
+    coefficient_table = DataFrame(
+        :factor =>
+            [:alpha, :wret_mkt, :wret_smb, :wret_hml, :wret_rmw, :wret_cma, :wret_wml],
+        :early_coef => Vector{Float64}(undef, 7),
+        :late_coef => Vector{Float64}(undef, 7),
+        :early_propα => Vector{Float64}(undef, 7),
+        :late_propα => Vector{Float64}(undef, 7),
+        :late_m_early => Vector{Float64}(undef, 7),
+        :late_m_early_prop => Vector{Float64}(undef, 7)
+    )
+
+    early_filter(x) = filter_by(x) && x.date .< Date(2011)
+    late_filter(x) = filter_by(x) && x.date .>= Date(2011)
+    
+    true_regression_early = regress_fund_flows(
+        model; filter_by=early_filter, bootstrapped=false
+    ).summary
+    true_regression_late = regress_fund_flows(
+        model; filter_by=late_filter, bootstrapped=false
+    ).summary
+
+    n_coefficients = nrow(coefficient_table)*(ncol(coefficient_table) - 1)
+    bootstrapped_outputs = Matrix{Float64}(undef, n_coefficients, n_trials)
+
+    task_start = time()
+    for i in 1:n_trials
+        # i = 1
+        
+        boot_regression_early = regress_fund_flows(
+            model; filter_by=early_filter, bootstrapped=true
+        ).summary
+        boot_regression_late = regress_fund_flows(
+            model; filter_by=late_filter, bootstrapped=true
+        ).summary
+
+        _fill_coefficient_col!(
+            view(bootstrapped_outputs, :, i),
+            boot_regression_early,
+            boot_regression_late
+        )
+    end
+    printtime("$n_trials bootstrapped regressions", task_start)
+
+    bootstrapped_se = copy(coefficient_table)
+    _fill_bootstrapped_se!(
+        bootstrapped_se[!, Not([:factor, :late_m_early, :late_m_early_prop])],
+        bootstrapped_outputs
+    )
+
+    late_m_early_idx = nrow(coefficient_table)*(ncol(coefficient_table) - 3) + 1
+    late_m_early_prop_idx = nrow(coefficient_table)*(ncol(coefficient_table) - 2) + 1
+    
+    late_m_early_vcov = cov(
+        bootstrapped_outputs[late_m_early_idx:late_m_early_prop_idx-1,:], dims=2
+    )
+    bootstrapped_se.late_m_early .= sqrt.(diag(late_m_early_vcov))
+
+    late_m_early_prop_vcov = cov(
+        bootstrapped_outputs[late_m_early_prop_idx:end,:], dims=2
+    )
+    bootstrapped_se.late_m_early_prop .= sqrt.(diag(late_m_early_prop_vcov))
+
+    true_coefficient_table = _fill_coefficient_table!(
+        coefficient_table, true_regression_early, true_regression_late
+    )
+    rename!(true_regression_early, :se => :early_se)
+    rename!(true_regression_late, :se => :late_se)
+    true_se = hcat(
+        true_regression_early[!, [:early_se]], true_regression_late[!, [:late_se]]
+    )
+
+    late_m_early_sum = sum(true_coefficient_table.late_m_early)
+    late_m_early_se = sqrt(sum(late_m_early_vcov))
+
+    late_m_early_prop_sum = sum(true_coefficient_table[2:end, :late_m_early_prop])
+    late_m_early_prop_se = sqrt(sum(late_m_early_prop_vcov))
+
+    sum_row = DataFrame(
+        :factor => [:sum, :se],
+        :late_m_early => [late_m_early_sum, late_m_early_se],
+        :late_m_early_prop => [late_m_early_prop_sum, late_m_early_prop_se]
+    )
+
+    output = DataFrame(
+        :factor => [
+            :alpha,
+            :se,
+            :wret_mkt,
+            :se,
+            :wret_smb,
+            :se,
+            :wret_hml,
+            :se,
+            :wret_rmw,
+            :se,
+            :wret_cma,
+            :se,
+            :wret_wml,
+            :se,
+            :sum,
+            :se
+        ],
+        :early_coef => Vector{String}(undef, 16),
+        :late_coef => Vector{String}(undef, 16),
+        :early_propα => Vector{String}(undef, 16),
+        :late_propα => Vector{String}(undef, 16),
+        :late_m_early => Vector{String}(undef, 16),
+        :late_m_early_prop => Vector{String}(undef, 16)
+    )
+
+    _fill_output_table_dated!(
+        output,
+        true_coefficient_table,
+        bootstrapped_se,
+        true_se,
+        sum_row
+    )
+
+    return output
+end
+
 function _fill_coefficient_col!(coefficient_col, regression_usa, regression_dev)
     # coefficient_col = view(bootstrapped_outputs, :, i); regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
     usa_propα = regression_usa.coef / regression_usa.coef[1]
@@ -436,6 +562,62 @@ function _fill_output_table_curr!(
     )
 
     return output
+end
+
+function _fill_output_table_dated!(
+    output,
+    true_coefficient_table,
+    bootstrapped_se,
+    true_se,
+    sum_row
+)
+# early_coef
+output.early_coef[1:end-2] = _format_output_column(
+    true_coefficient_table.early_coef, true_se.early_se
+)
+output.early_coef[end-1:end] .= ""
+
+# late_coef
+output.late_coef[1:end-2] = _format_output_column(
+    true_coefficient_table.late_coef, true_se.late_se
+)
+output.late_coef[end-1:end] .= ""
+
+# early_propα
+output.early_propα[1:2] .= ""
+output.early_propα[3:end-2] = _format_output_column(
+    true_coefficient_table.early_propα[2:end], bootstrapped_se.early_propα[2:end];
+    as_percent=true
+)
+output.early_propα[end-1:end] .= ""
+
+# late_propα
+output.late_propα[1:2] .= ""
+output.late_propα[3:end-2] = _format_output_column(
+    true_coefficient_table.late_propα[2:end], bootstrapped_se.late_propα[2:end];
+    as_percent=true
+)
+output.late_propα[end-1:end] .= ""
+
+# late_m_early
+output.late_m_early[1:end-2] = _format_output_column(
+    true_coefficient_table.late_m_early, bootstrapped_se.late_m_early
+)
+output.late_m_early[end-1:end] = _format_output_column(
+    [sum_row[1, :late_m_early]], [sum_row[2, :late_m_early]]
+)
+
+# late_m_early_prop
+output.late_m_early_prop[1:2] .= ""
+output.late_m_early_prop[3:end-2] = _format_output_column(
+    true_coefficient_table.late_m_early_prop[2:end], bootstrapped_se.late_m_early_prop[2:end];
+    as_percent=true
+)
+output.late_m_early_prop[end-1:end] = _format_output_column(
+    [sum_row[1, :late_m_early_prop]], [sum_row[2, :late_m_early_prop]]; as_percent=true
+)
+
+return output
 end
 
 function _format_output_column(coef_col, se_col; as_percent=false)
