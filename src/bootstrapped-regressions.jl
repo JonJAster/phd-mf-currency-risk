@@ -16,7 +16,9 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10_00#0
+    n_trials = 10_#0#0#0
+
+    # Table 2: Main results
     
     output_d = _create_bootstrapped_main(n_trials; filter_by=x->!x.foreign)
     output_f = _create_bootstrapped_main(n_trials; filter_by=x->x.foreign)
@@ -34,6 +36,7 @@ function bootstrapped_regressions()
     Arrow.write(output_filepath_d, output_d)
     Arrow.write(output_filepath_f, output_f)
 
+    # Table 3: Add currency factors
     # TODO: This should obviously be a single function to avoid copied code if ever
     #       time permits.
     ### output_curr = _create_bootstrapped_curr(n_trials)
@@ -46,6 +49,34 @@ function bootstrapped_regressions()
     output_filepath_curr = makepath(DIRS.output, "curr_coef_table.arrow")
 
     Arrow.write(output_filepath_curr, output_curr)
+
+    # Table 4: Early v Late
+
+    output_dated_full = _create_bootstrapped_dated(
+        n_trials; filter_by=x->true, model="ff_usa_ffc6"
+    )
+    output_dated_d = _create_bootstrapped_dated(
+        n_trials; filter_by=x->!x.foreign, model="ff_usa_ffc6"
+    )
+    output_dated_f = _create_bootstrapped_dated(
+        n_trials; filter_by=x->x.foreign, model="ff_dev_ffc6"
+    )
+
+    mprint(output_dated_full)
+    println()
+    println()
+    mprint(output_dated_d)
+    println()
+    println()
+    mprint(output_dated_f)
+    println()
+    println()
+
+    output_filepath_dated_d = makepath(DIRS.output, "dated_domestic_coef_table.arrow")
+    output_filepath_dated_f = makepath(DIRS.output, "dated_foreign_coef_table.arrow")
+
+    Arrow.write(output_filepath_dated_d, output_dated_d)
+    Arrow.write(output_filepath_dated_f, output_dated_f)
 end
 
 function _create_bootstrapped_main(n_trials; filter_by=nothing)
@@ -286,8 +317,8 @@ function _create_bootstrapped_dated(n_trials; filter_by, model)
         :late_m_early_prop => Vector{Float64}(undef, 7)
     )
 
-    early_filter(x) = filter_by(x) && (x.date .< Date(2011))
-    late_filter(x) = filter_by(x) && (x.date .>= Date(2011))
+    early_filter(x) = filter_by(x) && (x.date < Date(2010))
+    late_filter(x) = filter_by(x) && (x.date >= Date(2011))
     
     true_regression_early = regress_fund_flows(
         model; filter_by=early_filter, bootstrapped=false
@@ -310,7 +341,7 @@ function _create_bootstrapped_dated(n_trials; filter_by, model)
             model; filter_by=late_filter, bootstrapped=true
         ).summary
 
-        _fill_coefficient_col!(
+        _fill_coefficient_col_dated!(
             view(bootstrapped_outputs, :, i),
             boot_regression_early,
             boot_regression_late
@@ -337,7 +368,7 @@ function _create_bootstrapped_dated(n_trials; filter_by, model)
     )
     bootstrapped_se.late_m_early_prop .= sqrt.(diag(late_m_early_prop_vcov))
 
-    true_coefficient_table = _fill_coefficient_table!(
+    true_coefficient_table = _fill_coefficient_table_dated!(
         coefficient_table, true_regression_early, true_regression_late
     )
     rename!(true_regression_early, :se => :early_se)
@@ -415,6 +446,25 @@ function _fill_coefficient_col!(coefficient_col, regression_usa, regression_dev)
     return coefficient_col
 end
 
+function _fill_coefficient_col_dated!(coefficient_col, regression_early, regression_late)
+    # coefficient_col = view(bootstrapped_outputs, :, i); regression_early = boot_regression_early; regression_late = boot_regression_late
+    early_propα = regression_early.coef / regression_late.coef[1]
+    late_propα = regression_late.coef / regression_early.coef[1]
+    late_m_early = regression_late.coef - regression_early.coef
+    late_m_early_prop = late_propα - early_propα
+    
+    coefficient_col .= [
+        regression_early.coef;
+        regression_late.coef;
+        early_propα;
+        late_propα;
+        late_m_early;
+        late_m_early_prop
+    ]
+
+    return coefficient_col
+end
+
 function _fill_coefficient_col_curr!(coefficient_col, regression_domestic, regression_foreign)
     # coefficient_col = view(bootstrapped_outputs, :, i); regression_domestic = boot_regression_domestic; regression_foreign = boot_regression_foreign
     domestic_propα = regression_domestic.coef / regression_domestic.coef[1]
@@ -463,10 +513,10 @@ function _fill_coefficient_table_curr!(
     return coefficient_table
 end
 
-function _fill_coefficient_table_dated!(coefficient_table, regression_usa, regression_dev)
-    # regression_usa = boot_regression_usa; regression_dev = boot_regression_dev
-    coefficient_table.early_coef = regression_usa.coef
-    coefficient_table.late_coef = regression_dev.coef
+function _fill_coefficient_table_dated!(coefficient_table, regression_early, regression_late)
+    # regression_early = boot_regression_early; regression_late = boot_regression_late
+    coefficient_table.early_coef = regression_early.coef
+    coefficient_table.late_coef = regression_late.coef
 
     coefficient_table.early_propα = coefficient_table.early_coef / coefficient_table.early_coef[1]
     coefficient_table.late_propα = coefficient_table.late_coef / coefficient_table.late_coef[1]
@@ -588,14 +638,20 @@ function _fill_output_table_dated!(
     sum_row
 )
 # early_coef
-output.early_coef[1:end-2] = _format_output_column(
-    true_coefficient_table.early_coef, true_se.early_se
+output_early_coef[1] = _format_output_column(
+    [true_coefficient_table.late_coef[1]], [true_se.late_se[1]]
+)
+output.early_coef[2:end-2] = _format_output_column(
+    true_coefficient_table.early_coef[2:end], true_se.early_se[2:end]
 )
 output.early_coef[end-1:end] .= ""
 
 # late_coef
-output.late_coef[1:end-2] = _format_output_column(
-    true_coefficient_table.late_coef, true_se.late_se
+output.late_coef[1] = _format_output_column(
+    [true_coefficient_table.early_coef[1]], [true_se.early_se[1]]
+)
+output.late_coef[2:end-2] = _format_output_column(
+    true_coefficient_table.late_coef[2:end], true_se.late_se[2:end]
 )
 output.late_coef[end-1:end] .= ""
 
