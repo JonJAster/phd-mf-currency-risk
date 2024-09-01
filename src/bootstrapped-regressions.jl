@@ -16,7 +16,7 @@ using .CommonFunctions
 using .RegressFundFlows
 
 function bootstrapped_regressions()
-    n_trials = 10_0#0#0
+    n_trials = 10_00#0
 
     # Table 2: Main results
     
@@ -50,7 +50,7 @@ function bootstrapped_regressions()
 
     Arrow.write(output_filepath_curr, output_curr)
 
-    # Table 4: Early v Late
+    # Table 4: Late v Early
 
     output_dated_full = _create_bootstrapped_dated(
         n_trials; filter_by=x->true, model="ff_usa_ffc6"
@@ -58,9 +58,9 @@ function bootstrapped_regressions()
     output_dated_d = _create_bootstrapped_dated(
         n_trials; filter_by=x->!x.foreign, model="ff_usa_ffc6"
     )
-    output_dated_f = _create_bootstrapped_dated(
-        n_trials; filter_by=x->x.foreign, model="ff_dev_ffc6"
-    )
+    # output_dated_f = _create_bootstrapped_dated(
+    #     n_trials; filter_by=x->x.foreign, model="ff_dev_ffc6"
+    # )
 
     mprint(output_dated_full)
     println()
@@ -68,15 +68,12 @@ function bootstrapped_regressions()
     mprint(output_dated_d)
     println()
     println()
-    mprint(output_dated_f)
-    println()
-    println()
 
+    output_filepath_dated_full = makepath(DIRS.output, "dated_full_coef_table.arrow")
     output_filepath_dated_d = makepath(DIRS.output, "dated_domestic_coef_table.arrow")
-    output_filepath_dated_f = makepath(DIRS.output, "dated_foreign_coef_table.arrow")
 
+    Arrow.write(output_filepath_dated_full, output_dated_full)
     Arrow.write(output_filepath_dated_d, output_dated_d)
-    Arrow.write(output_filepath_dated_f, output_dated_f)
 end
 
 function _create_bootstrapped_main(n_trials; filter_by=nothing)
